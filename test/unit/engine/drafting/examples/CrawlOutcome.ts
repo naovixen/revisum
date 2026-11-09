@@ -79,7 +79,7 @@ export const DEFAULT_OPTIONS = { maximumPages: 20, maximumDepth: 3, pageTimeoutM
 async function engineFunction(name: string): Promise<(...inputs: readonly unknown[]) => unknown> {
   const loaded: unknown = await import('@revisum/engine');
   const exported: unknown = typeof loaded === 'object' && loaded !== null ? Object.getOwnPropertyDescriptor(loaded, name)?.value : undefined;
-  if (typeof exported !== 'function') throw new Error(`@revisum/engine does not export a function named ${name}`);
+  if (typeof exported !== 'function') {throw new Error(`@revisum/engine does not export a function named ${name}`);}
   return (...inputs): unknown => {
     const answer: unknown = Reflect.apply(exported, undefined, inputs);
     return answer;
@@ -121,7 +121,7 @@ export function pageMapOf(value: unknown): PageMap {
 
 function crawlOutcomeOf(value: unknown): CrawlOutcome {
   assert.ok(isRecord(value) && typeof value['ok'] === 'boolean', `crawlSite did not answer with a result: ${JSON.stringify(value)}`);
-  if (value['ok']) return { ok: true, map: pageMapOf(value['value']) };
+  if (value['ok']) {return { ok: true, map: pageMapOf(value['value']) };}
   const error = value['error'];
   assert.ok(isRecord(error) && typeof error['code'] === 'string', `crawlSite failed without a code: ${JSON.stringify(value)}`);
   return { ok: false, code: error['code'] };
@@ -203,7 +203,7 @@ export function spyExploreDriver(site: FakeSite): SpyExploreDriver {
     async navigate(url) {
       calls.push({ method: 'navigate', url });
       const page = pageAt(site, url);
-      if (page === undefined || page.fails === true) return failure({ code: DriverErrorCode.NavigationFailed, detail: `no page at ${url}` });
+      if (page === undefined || page.fails === true) {return failure({ code: DriverErrorCode.NavigationFailed, detail: `no page at ${url}` });}
       current = { url, page };
       return success(undefined);
     },
@@ -223,7 +223,7 @@ export function spyExploreDriver(site: FakeSite): SpyExploreDriver {
   const spy = new Proxy(driver, {
     get(target, property, receiver) {
       const own: unknown = Reflect.get(target, property, receiver);
-      if (typeof property !== 'string' || property === 'then' || Object.hasOwn(target, property)) return own;
+      if (typeof property !== 'string' || property === 'then' || Object.hasOwn(target, property)) {return own;}
       return (...inputs: readonly unknown[]) => {
         calls.push({ method: property });
         return Promise.resolve(success(inputs.length));
@@ -246,11 +246,11 @@ export async function followEveryLink(driver: ExploreDriver, start: string, maxi
   const seen = new Set(queue);
   for (let visited = 0; visited < maximumPages && queue.length > 0; visited++) {
     const url = queue.shift();
-    if (url === undefined) break;
+    if (url === undefined) {break;}
     const navigated = await driver.navigate(url, scriptsEnabled);
-    if (!navigated.ok) continue;
+    if (!navigated.ok) {continue;}
     const act: unknown = Reflect.get(driver, 'act');
-    if (typeof act === 'function') await Reflect.apply(act, driver, [{ type: 'click', locator: { by: 'role', role: 'button', name: 'Send' } }]);
+    if (typeof act === 'function') {await Reflect.apply(act, driver, [{ type: 'click', locator: { by: 'role', role: 'button', name: 'Send' } }]);}
     const links = await driver.linkTargets();
     for (const link of links.ok ? links.value : []) {
       if (!seen.has(link)) { seen.add(link); queue.push(link); }

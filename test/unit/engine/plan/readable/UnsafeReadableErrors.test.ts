@@ -54,7 +54,7 @@ const actor = () => unverified({ kind: ApprovalSubjectKind.Plan, hash: 'unsafe-r
 
 function admittedErrors(text: string, parsePlan: ParsePlan): readonly DraftError[] {
   const admitted = admitDraft(draft(text), parsePlan, memoryEventSink(), actor());
-  if (admitted.ok) assert.fail(`the draft was admitted:\n${text}`);
+  if (admitted.ok) {assert.fail(`the draft was admitted:\n${text}`);}
   return admitted.error;
 }
 
@@ -108,7 +108,7 @@ test('a missing mark does not echo the selector', () => {
 
 test('every golden text, marked as the spec prints it, reads without error', () => {
   // The counter-example for missing-unsafe-mark: the same lines with their mark.
-  for (const feature of FEATURES) readsCleanly(unsafeGoldenText(feature));
+  for (const feature of FEATURES) {readsCleanly(unsafeGoldenText(feature));}
 });
 
 const CLOSED_LINES: readonly { readonly name: string; readonly feature: FeatureName; readonly statement: string; readonly indent: string }[] = [
@@ -227,7 +227,7 @@ function columnsOf(line: string, token: string, occurrence: number): readonly [n
   let index = -1;
   for (let found = 0; found < occurrence; found += 1) {
     index = line.indexOf(token, index + 1);
-    if (index === -1) throw new Error(`"${token}" does not appear ${occurrence} times in: ${line}`);
+    if (index === -1) {throw new Error(`"${token}" does not appear ${occurrence} times in: ${line}`);}
   }
   return [index + 1, index + token.length];
 }

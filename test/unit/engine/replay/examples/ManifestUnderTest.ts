@@ -95,7 +95,7 @@ export const PER_ENVIRONMENT_FIELDS = ['host', 'browser', 'executableSha256', 'i
 export async function engineFunction(name: string): Promise<(...inputs: readonly unknown[]) => unknown> {
   const loaded: unknown = await import('@revisum/engine');
   const exported: unknown = typeof loaded === 'object' && loaded !== null ? Object.getOwnPropertyDescriptor(loaded, name)?.value : undefined;
-  if (typeof exported !== 'function') throw new Error(`@revisum/engine does not export a function named ${name}`);
+  if (typeof exported !== 'function') {throw new Error(`@revisum/engine does not export a function named ${name}`);}
   return (...inputs): unknown => Reflect.apply(exported, undefined, inputs);
 }
 
@@ -116,7 +116,7 @@ function replayFailureOf(error: unknown): ReplayFailure {
 
 export function replayAnswerOf(value: unknown): ReplayAnswer {
   assert.ok(isRecord(value) && typeof value['ok'] === 'boolean', `replay did not answer with a result: ${JSON.stringify(value)}`);
-  if (!value['ok']) return { ok: false, error: replayFailureOf(value['error']) };
+  if (!value['ok']) {return { ok: false, error: replayFailureOf(value['error']) };}
   const outcome = value['value'];
   assert.ok(isRecord(outcome), `replay's outcome is not an object: ${JSON.stringify(value)}`);
   const { identical, resultHash, manifestHash, differingInputs, verdict } = outcome;
@@ -129,13 +129,13 @@ export function replayAnswerOf(value: unknown): ReplayAnswer {
 
 // The outcome of a replay that must have succeeded.
 export function replayed(answer: ReplayAnswer): ReplayOutcome {
-  if (!answer.ok) assert.fail(`the replay failed: ${JSON.stringify(answer.error)}`);
+  if (!answer.ok) {assert.fail(`the replay failed: ${JSON.stringify(answer.error)}`);}
   return answer.value;
 }
 
 // The error of a replay that must have failed.
 export function refused(answer: ReplayAnswer): ReplayFailure {
-  if (answer.ok) assert.fail(`the replay was not refused: ${JSON.stringify(answer.value)}`);
+  if (answer.ok) {assert.fail(`the replay was not refused: ${JSON.stringify(answer.value)}`);}
   return answer.error;
 }
 
@@ -158,7 +158,7 @@ const executables = new Map<string, string>();
 // One file per text, made once.
 export function fakeExecutable(text: string): string {
   const known = executables.get(text);
-  if (known !== undefined) return known;
+  if (known !== undefined) {return known;}
   const folder = mkdtempSync(join(tmpdir(), 'revisum-replay-executable-'));
   executableFolders.push(folder);
   const path = join(folder, 'browser-executable');
@@ -169,7 +169,7 @@ export function fakeExecutable(text: string): string {
 
 // Removes every fake executable; each test file calls it after its tests.
 export function removeFakeExecutables(): void {
-  for (const folder of executableFolders.splice(0)) rmSync(folder, { recursive: true, force: true });
+  for (const folder of executableFolders.splice(0)) {rmSync(folder, { recursive: true, force: true });}
   executables.clear();
 }
 
@@ -283,7 +283,7 @@ const scriptBytes = (sources: Readonly<Record<string, string>>): Record<string, 
 
 export function parsedProject(projectFile: JsonRecord): Project {
   const parsed = parseProject(projectFile);
-  if (!parsed.ok) throw new Error(`bad test project: ${JSON.stringify(parsed.error)}`);
+  if (!parsed.ok) {throw new Error(`bad test project: ${JSON.stringify(parsed.error)}`);}
   return parsed.value;
 }
 
@@ -409,14 +409,14 @@ function hexStringsIn(value: unknown): { readonly text: string; set(next: string
   const visit = (holder: unknown): void => {
     if (Array.isArray(holder)) {
       holder.forEach((item: unknown, index) => {
-        if (typeof item === 'string' && SHA256_HEX.test(item)) found.push({ text: item, set: (next) => { holder[index] = next; } });
-        else visit(item);
+        if (typeof item === 'string' && SHA256_HEX.test(item)) {found.push({ text: item, set: (next) => { holder[index] = next; } });}
+        else {visit(item);}
       });
     } else if (isRecord(holder)) {
       const fields: Record<string, unknown> = Object.fromEntries(Object.entries(holder));
       for (const [key, item] of Object.entries(fields)) {
-        if (typeof item === 'string' && SHA256_HEX.test(item)) found.push({ text: item, set: (next) => { Reflect.set(holder, key, next); } });
-        else visit(item);
+        if (typeof item === 'string' && SHA256_HEX.test(item)) {found.push({ text: item, set: (next) => { Reflect.set(holder, key, next); } });}
+        else {visit(item);}
       }
     }
   };
@@ -430,7 +430,7 @@ export function replyListOf(recording: unknown, length: number): unknown[] {
   const lists: unknown[][] = [];
   const visit = (value: unknown): void => {
     if (Array.isArray(value)) {
-      if (value.length === length && value.every((entry: unknown) => isRecord(entry) && hexStringsIn(entry).length === 1)) lists.push(value);
+      if (value.length === length && value.every((entry: unknown) => isRecord(entry) && hexStringsIn(entry).length === 1)) {lists.push(value);}
       value.forEach(visit);
     } else if (isRecord(value)) {
       Object.values(value).forEach(visit);

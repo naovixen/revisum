@@ -21,7 +21,7 @@ const RESULT_JSON_PATH = (spec: number): string => `${TEST_JSON_PATH(spec)}.resu
 function assertRefusedAt(report: unknown, code: string, path: string, limits = evidenceLimits()): void {
   const errors = refusal(report, limits);
   assert.ok(errors.some((error) => error.code === code && error.path === path), `expected ${code} at ${path}, got ${JSON.stringify(errors)}`);
-  for (const error of errors) assert.deepEqual(Object.keys(error).sort(), ['code', 'path'], JSON.stringify(error));
+  for (const error of errors) {assert.deepEqual(Object.keys(error).sort(), ['code', 'path'], JSON.stringify(error));}
 }
 
 // ---- The recorded reports decode (the counter-example for every refusal below) --------------------

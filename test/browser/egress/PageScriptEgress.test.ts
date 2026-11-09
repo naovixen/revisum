@@ -71,7 +71,7 @@ async function runHostileScript(): Promise<ProxiedRun> {
 
 async function waitFor(condition: () => boolean): Promise<void> {
   const deadline = Date.now() + WAIT_MILLISECONDS;
-  while (!condition() && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, POLL_MILLISECONDS));
+  while (!condition() && Date.now() < deadline) {await new Promise((resolve) => setTimeout(resolve, POLL_MILLISECONDS));}
 }
 
 let hostile: ProxiedRun | undefined;

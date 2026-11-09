@@ -66,8 +66,8 @@ test('the scanner reports every planted file at once and nothing in the clean on
     plant('clean-events.jsonl', '{"kind":"run.state","state":"Running"}\n{"kind":"step.end","outcome":"passed"}\n'),
   ];
   const leaks = leakScanner().scan([...plantedPaths, ...cleanPaths], [secret]);
-  for (const path of plantedPaths) assert.ok(leaksIn(leaks, path).length > 0, `nothing reported in ${path}`);
-  for (const path of cleanPaths) assert.deepEqual(leaksIn(leaks, path), [], `a leak reported in clean file ${path}`);
+  for (const path of plantedPaths) {assert.ok(leaksIn(leaks, path).length > 0, `nothing reported in ${path}`);}
+  for (const path of cleanPaths) {assert.deepEqual(leaksIn(leaks, path), [], `a leak reported in clean file ${path}`);}
 });
 
 test('counter-example: another secret of the same shape in a file is not reported as this one', () => {

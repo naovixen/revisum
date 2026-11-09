@@ -38,8 +38,8 @@ function assertFailsNaming(outcome: LintOutcome, fileName: string): void {
 
 // Every object inside a JSON value, depth first.
 const objectsIn = (value: unknown): JsonRecord[] => {
-  if (Array.isArray(value)) return value.flatMap(objectsIn);
-  if (typeof value !== 'object' || value === null) return [];
+  if (Array.isArray(value)) {return value.flatMap(objectsIn);}
+  if (typeof value !== 'object' || value === null) {return [];}
   const record = value as JsonRecord;
   return [record, ...Object.values(record).flatMap(objectsIn)];
 };

@@ -160,7 +160,7 @@ test('a failing cleanup call is recorded cleanup-failed, and the passing verdict
 
 test('a failing cleanup call does not change a failing verdict either', async () => {
   const pendingAndFailingReset = shopWith((request, earlier) => {
-    if (request.method === HttpMethod.Get) return jsonReply(200, { status: 'pending', total: 42 });
+    if (request.method === HttpMethod.Get) {return jsonReply(200, { status: 'pending', total: 42 });}
     return failingReset(request, earlier);
   });
   const ran = await runWithCalls(withCleanup(callPlanOf([CREATE_ORDER, ORDER_PAID]), [RESET_SHOP]), { route: pendingAndFailingReset });
@@ -186,7 +186,7 @@ const shortChecks = callProjectFile({}, { backendCheckTimeoutMilliseconds: BACKE
 
 test('an expectBackend whose field matches only on the third poll passes', async () => {
   const paidOnThirdRead = shopWith((request, earlier) => {
-    if (request.method !== HttpMethod.Get) return undefined;
+    if (request.method !== HttpMethod.Get) {return undefined;}
     const readsBefore = earlier.filter((sent) => sent.method === HttpMethod.Get).length;
     return jsonReply(200, { status: readsBefore >= 2 ? 'paid' : 'pending', total: 42 });
   });
@@ -258,7 +258,7 @@ test('a header secret the store cannot resolve ends the run before any call or p
   assert.ok(JSON.stringify(ran.result.refusal).includes(TOKEN_SECRET), `the refusal names the secret: ${JSON.stringify(ran.result.refusal)}`);
   assert.deepEqual(lines(ran.requests), [], 'no call was made, cleanup included');
   assert.equal(ran.recording.environments.length, 0, 'no browser session was opened');
-  for (const value of Object.values(environment)) assert.deepEqual(echoesIn(ran.everything, value), [], 'a resolvable secret was echoed');
+  for (const value of Object.values(environment)) {assert.deepEqual(echoesIn(ran.everything, value), [], 'a resolvable secret was echoed');}
 });
 
 test('a secret argument or a cleanup call\'s secret that cannot be resolved ends the run before any call', async () => {
@@ -290,8 +290,8 @@ const basicForm = (value: string): string => Buffer.from(value).toString('base64
 const echoingShop = shopWith((request) => {
   const echoes = Object.values(SECRET_VALUES).flatMap((value) => [value, basicForm(value), encodeURIComponent(value)]);
   const body = { id: ORDER_ID, status: 'pending', total: 42, echo: { token: SECRET_VALUES[TOKEN_SECRET], all: echoes }, note: RESPONSE_MARKER };
-  if (request.method === HttpMethod.Get) return jsonReply(200, body);
-  if (requestLine(request) === 'POST /api/orders') return jsonReply(201, body);
+  if (request.method === HttpMethod.Get) {return jsonReply(200, body);}
+  if (requestLine(request) === 'POST /api/orders') {return jsonReply(201, body);}
   return undefined;
 });
 
@@ -359,7 +359,7 @@ test('a run with only cleanup calls lists service-calls too, and a run without c
 test('the same run with calls, repeated, gives the same result hash', async () => {
   const plan = withCleanup(callPlanOf([CREATE_ORDER, ORDER_PAID]), CLEANUP);
   const hashes = new Set<string>();
-  for (let attempt = 0; attempt < 3; attempt++) hashes.add((await runWithCalls(plan)).result.resultHash);
+  for (let attempt = 0; attempt < 3; attempt++) {hashes.add((await runWithCalls(plan)).result.resultHash);}
   assert.equal(hashes.size, 1);
 });
 
@@ -408,7 +408,7 @@ test('a plan that calls no service runs without a services port', async () => {
 
 test('an expectBackend polled three times counts once toward maximumCalls, so the run is not cut short', async () => {
   const paidOnThirdRead = shopWith((request, earlier) => {
-    if (request.method !== HttpMethod.Get) return undefined;
+    if (request.method !== HttpMethod.Get) {return undefined;}
     return jsonReply(200, { status: earlier.filter((sent) => sent.method === HttpMethod.Get).length >= 2 ? 'paid' : 'pending', total: 42 });
   });
   const projectFile = callProjectFile({}, { maximumCalls: 2, backendCheckTimeoutMilliseconds: 2000 });

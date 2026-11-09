@@ -86,7 +86,7 @@ for (const { title, name } of ESCAPING_NAMES) {
     assert.ok(!JSON.stringify(error).includes(file), `the refusal echoes the entry name: ${JSON.stringify(error)}`);
     const unixName = entryName.replaceAll('\\', '/');
     // A bare '..' names the parent folder itself, which always exists; there is no file to look for.
-    if (basename(unixName) === '..') return;
+    if (basename(unixName) === '..') {return;}
     for (const target of [resolve(unixName), resolve(tmpdir(), unixName), ...(isAbsolute(unixName) ? [unixName] : [])]) {
       assert.equal(existsSync(target), false, `a file was written at ${target}`);
     }

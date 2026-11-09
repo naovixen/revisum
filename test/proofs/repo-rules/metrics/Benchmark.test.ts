@@ -27,7 +27,7 @@ const MEMORY = /memory/i;
 const fixture = (name: string): string => join(FIXTURES, 'tooling', 'benchmark', name);
 
 const summaryFolders: string[] = [];
-after(() => { for (const folder of summaryFolders) rmSync(folder, { recursive: true, force: true }); });
+after(() => { for (const folder of summaryFolders) {rmSync(folder, { recursive: true, force: true });} });
 
 type BenchmarkRun = ToolRun & { readonly summary: string };
 

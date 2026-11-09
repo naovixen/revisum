@@ -23,7 +23,7 @@ type AdmittedSource = 'hand-written' | CoreRouteSource;
 
 const textOf = (plan: JsonRecord): string => {
   const parsed = defaultParser()(plan);
-  if (!parsed.ok) assert.fail(`the fixture plan was refused: ${JSON.stringify(parsed.error)}`);
+  if (!parsed.ok) {assert.fail(`the fixture plan was refused: ${JSON.stringify(parsed.error)}`);}
   return writePlanText(parsed.value);
 };
 const draftOf = (plan: JsonRecord): PlanDraft => ({ format: PlanFormat.Text, content: textOf(plan) });
@@ -71,7 +71,7 @@ async function treatmentOf(plan: Plan): Promise<Treatment> {
   let approvedStanding = '';
   await withRepository('solo', async (repository) => {
     const verified = await repository.verify(repository.subject('plan'), repository.lockdownProof());
-    if (!verified.ok) throw new Error(`the sign-up plan was not approved: ${verified.error}`);
+    if (!verified.ok) {throw new Error(`the sign-up plan was not approved: ${verified.error}`);}
     approvedStanding = planStanding(plan, memoryApprovalStore([verified.value.approval])).mode;
   });
   return {
@@ -87,7 +87,7 @@ function admittedUnder(source: AdmittedSource, plan: JsonRecord): Plan {
   const admitted = source === 'hand-written'
     ? admitDraft(draft, defaultParser(), memoryEventSink(), unverified({ kind: ApprovalSubjectKind.Plan, hash: planHash(parsedSignupPlan()) }, 'local'))
     : admitCoreDraft(draft, { source, reference: source === 'explore-draft' ? PAGE_MAP_REFERENCE : 'specs/signup.md' }, defaultParser(), memoryEventSink());
-  if (!admitted.ok) assert.fail(`${source}: ${JSON.stringify(admitted.error)}`);
+  if (!admitted.ok) {assert.fail(`${source}: ${JSON.stringify(admitted.error)}`);}
   return admitted.value;
 }
 
@@ -109,6 +109,6 @@ for (const { name, plan, decision, approved } of [
     assert.equal(explore.decision, decision);
     assert.equal(explore.withoutApproval, 'proposal', 'an explore draft stood approved without an approval');
     assert.equal(explore.withTheSignUpApproval, approved);
-    for (const { source, treatment } of treatments) assert.deepEqual(treatment, explore, `${source} was treated differently from explore-draft`);
+    for (const { source, treatment } of treatments) {assert.deepEqual(treatment, explore, `${source} was treated differently from explore-draft`);}
   });
 }

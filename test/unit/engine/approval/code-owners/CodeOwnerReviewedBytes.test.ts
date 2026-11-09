@@ -58,7 +58,7 @@ test('the review that verifies before merge appends one plan.approved event for 
     const approved = eventsOfKind(repository.events, 'plan.approved');
     assert.equal(approved.length, 1, JSON.stringify(repository.events.recorded));
     const [recorded] = approved;
-    if (recorded === undefined) return;
+    if (recorded === undefined) {return;}
     assert.equal(recorded.event.subjectHash, subject.hash);
     assert.equal(recorded.event.proofKind, 'code-owner-review');
     assert.equal(recorded.actor.actorType, 'person-verified');
@@ -96,7 +96,7 @@ test('counter-example: with no later change, the same review of the same bytes v
   }, (fixture) => {
     planAtCommit(FIRST_COMMIT, REVIEWED_PLAN)(fixture);
     const pullRequest = fixture.pullRequests[PULL_REQUEST];
-    if (pullRequest !== undefined) pullRequest.lastCommitTouching[PLAN_PATH] = FIRST_COMMIT;
+    if (pullRequest !== undefined) {pullRequest.lastCommitTouching[PLAN_PATH] = FIRST_COMMIT;}
   });
 });
 

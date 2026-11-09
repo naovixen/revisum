@@ -23,13 +23,13 @@ after(() => { scratch.dispose(); });
 
 // The glossary with one extra Domain terms row, placed before the Engine row.
 const withRow = (row: string) => (text: string): string => {
-  if (!text.includes(ANCHOR_ROW)) throw new Error(`${GLOSSARY_PATH} has no Engine row to place the new row beside`);
+  if (!text.includes(ANCHOR_ROW)) {throw new Error(`${GLOSSARY_PATH} has no Engine row to place the new row beside`);}
   return text.replace(ANCHOR_ROW, `${row}\n${ANCHOR_ROW}`);
 };
 
 // The glossary with one exact piece of text removed.
 const without = (removed: string) => (text: string): string => {
-  if (!text.includes(removed)) throw new Error(`${GLOSSARY_PATH} does not hold ${JSON.stringify(removed)}`);
+  if (!text.includes(removed)) {throw new Error(`${GLOSSARY_PATH} does not hold ${JSON.stringify(removed)}`);}
   return text.replace(removed, '');
 };
 

@@ -18,7 +18,7 @@ const parsePlan = planParser(project);
 
 function genuinePlan(): Plan {
   const parsed = parsePlan(signupPlan());
-  if (!parsed.ok) throw new Error(`the sign-up plan was rejected: ${JSON.stringify(parsed.error)}`);
+  if (!parsed.ok) {throw new Error(`the sign-up plan was rejected: ${JSON.stringify(parsed.error)}`);}
   return parsed.value;
 }
 
@@ -74,7 +74,7 @@ for (const [name, forge] of FORGERIES) {
 }
 
 test('assertBranded rejects values that are not plans at all', () => {
-  for (const value of [null, undefined, 'plan', 42, [], {}]) assert.throws(() => assertBranded(value), REFUSED_AS_NOT_PARSED, `accepted ${JSON.stringify(value)}`);
+  for (const value of [null, undefined, 'plan', 42, [], {}]) {assert.throws(() => assertBranded(value), REFUSED_AS_NOT_PARSED, `accepted ${JSON.stringify(value)}`);}
 });
 
 // Counter-examples: the parser's own output passes the check and reaches the driver, so the

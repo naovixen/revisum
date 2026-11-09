@@ -100,7 +100,7 @@ test('a response that echoed a secret is recorded without it, and the replay put
     ? jsonReply(200, { status: 'paid', total: 42, echo: { token } }) : undefined));
   const ran = await runScenario({ ...RECORDED_CALLS, serviceRoute: echoing }, { record: true });
   const text = JSON.stringify(ran.recording);
-  for (const value of Object.values(SECRET_VALUES)) assert.deepEqual(echoesIn(text, value), [], 'the recording holds a secret');
+  for (const value of Object.values(SECRET_VALUES)) {assert.deepEqual(echoesIn(text, value), [], 'the recording holds a secret');}
   const outcome = replayed((await replayRun(ran)).answer);
   assert.equal(outcome.identical, true);
 });

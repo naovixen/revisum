@@ -148,8 +148,8 @@ for (const place of PLACES) {
       errors.some((error) => (error.code === 'wrong_type' || error.code === 'unknown_field') && atOrBelow(error.path, place.path)),
       JSON.stringify(errors),
     );
-    if (place.code !== undefined) assert.deepEqual(errors, [{ code: place.code, path: place.path }]);
-    for (const error of errors) assert.ok(atOrBelow(error.path, place.path), `an error outside ${place.path}: ${JSON.stringify(error)}`);
+    if (place.code !== undefined) {assert.deepEqual(errors, [{ code: place.code, path: place.path }]);}
+    for (const error of errors) {assert.ok(atOrBelow(error.path, place.path), `an error outside ${place.path}: ${JSON.stringify(error)}`);}
     const text = JSON.stringify(parsed);
     assert.ok(!text.includes(MARKED) && !text.includes(MARKED_PREFIX), `the error echoed a value: ${text}`);
   });

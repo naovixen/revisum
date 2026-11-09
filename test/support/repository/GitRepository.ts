@@ -59,8 +59,8 @@ export function createGitRepository(): GitRepository {
     git,
     write,
     commit(fixture) {
-      for (const [relativePath, content] of Object.entries(fixture.files ?? {})) write(relativePath, content);
-      for (const relativePath of fixture.removed ?? []) rmSync(join(root, relativePath), { force: true });
+      for (const [relativePath, content] of Object.entries(fixture.files ?? {})) {write(relativePath, content);}
+      for (const relativePath of fixture.removed ?? []) {rmSync(join(root, relativePath), { force: true });}
       git('add', '--all');
       execFileSync('git', ['commit', '--quiet', '--allow-empty', '--file', '-'], {
         cwd: root, ['env']: environment, input: fixture.message, encoding: 'utf8',

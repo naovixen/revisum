@@ -68,7 +68,7 @@ function draftWith(format: PlanFormat, content: string, provenance: PlanProvenan
 // A plan's content as a route would write it: readable text as writePlanText writes it, or JSON as an agent writes it.
 function contentOf(plan: JsonRecord, format: PlanFormat): string {
   const parsed = defaultParser()(plan);
-  if (!parsed.ok) throw new Error(`the fixture plan was refused: ${JSON.stringify(parsed.error)}`);
+  if (!parsed.ok) {throw new Error(`the fixture plan was refused: ${JSON.stringify(parsed.error)}`);}
   return format === PlanFormat.Text ? writePlanText(parsed.value) : JSON.stringify(plan, null, 2);
 }
 
@@ -78,9 +78,9 @@ const draftOf = (source: PlanSource, plan: JsonRecord, format: PlanFormat = ROUT
 
 // The JSON the parser should receive for a draft: what the text reads to, or the JSON itself.
 function expectedParserInput(draft: PlanDraft): unknown {
-  if (draft.format === PlanFormat.Json) return JSON.parse(draft.content);
+  if (draft.format === PlanFormat.Json) {return JSON.parse(draft.content);}
   const read = readPlanText(draft.content, testProject().limits);
-  if (!read.ok) assert.fail(`the fixture text was refused: ${JSON.stringify(read.error)}`);
+  if (!read.ok) {assert.fail(`the fixture text was refused: ${JSON.stringify(read.error)}`);}
   return read.value.json;
 }
 
@@ -100,7 +100,7 @@ function spyParser(log: CallLog, inner: PlanParse = defaultParser()) {
     log.push('parse');
     inputs.push(input);
     const parsed = inner(input);
-    if (parsed.ok) plans.push(parsed.value);
+    if (parsed.ok) {plans.push(parsed.value);}
     return parsed;
   };
   return { parse, inputs, plans };
@@ -154,7 +154,7 @@ for (const source of DECLARABLE) {
   test(`a ${source} draft reaches a run only after its parse: no gate or driver call comes first`, async () => {
     const log: CallLog = [];
     const admitted = admitDraft(draftOf(source, signupPlan()), spyParser(log).parse, memoryEventSink(), someActor());
-    if (!admitted.ok) assert.fail(shown(admitted.error));
+    if (!admitted.ok) {assert.fail(shown(admitted.error));}
     assert.deepEqual(log, ['parse'], 'something besides the parser was called while the draft was admitted');
     await runAdmitted(admitted.value, log);
     assert.equal(log[0], 'parse');
@@ -201,7 +201,7 @@ for (const content of ['{ "version": "1.3", ', 'not JSON at all', '']) {
     const log: CallLog = [];
     const events = memoryEventSink();
     const admitted = admitDraft(draftWith('json', content, DEFAULT_PROVENANCE), spyParser(log).parse, events, someActor());
-    if (admitted.ok) assert.fail('malformed JSON was admitted');
+    if (admitted.ok) {assert.fail('malformed JSON was admitted');}
     assert.deepEqual(admitted.error.map((error) => (error.stage === 'plan' ? `${error.code} ${error.path}` : `text ${error.code}`)), ['not_object $']);
     assert.deepEqual(log, []);
     assert.deepEqual(events.recorded.map(({ event }) => event.kind), ['plan.rejected']);
@@ -233,7 +233,7 @@ for (const source of SOURCES) {
     const events = memoryEventSink();
     const claim: PlanProvenance = { source, basis: ProvenanceBasis.CoreRecorded };
     const admitted = admitDraft(draftWith('text', contentOf(signupPlan(), 'text'), claim), defaultParser(), events, someActor());
-    if (admitted.ok) assert.fail(`a claimed core-recorded basis for ${source} was admitted`);
+    if (admitted.ok) {assert.fail(`a claimed core-recorded basis for ${source} was admitted`);}
     assert.ok(shown(admitted.error).includes('untrusted-source'), shown(admitted.error));
     assert.deepEqual(events.recorded.map(({ event }) => event.kind), ['plan.rejected']);
     // The counter-example: the same content, declared rather than claimed, is admitted when the source may be declared.
@@ -277,13 +277,13 @@ for (const source of DECLARABLE) {
 // decision, and whether it stands approved or as a proposal.
 async function treatmentOf(draft: PlanDraft): Promise<string> {
   const admitted = admitDraft(draft, defaultParser(), memoryEventSink(), someActor());
-  if (!admitted.ok) assert.fail(shown(admitted.error));
+  if (!admitted.ok) {assert.fail(shown(admitted.error));}
   const project = testProject();
   const decision = policyGate({ project, events: memoryEventSink() }).decide(admitted.value, project.matrix.map((target) => target.id));
   let approvedStanding = '';
   await withRepository('solo', async (repository) => {
     const verified = await repository.verify(repository.subject('plan'), repository.lockdownProof());
-    if (!verified.ok) throw new Error(`the sign-up plan was not approved: ${verified.error}`);
+    if (!verified.ok) {throw new Error(`the sign-up plan was not approved: ${verified.error}`);}
     approvedStanding = planStanding(admitted.value, memoryApprovalStore([verified.value.approval])).mode;
   });
   return JSON.stringify({
@@ -306,7 +306,7 @@ for (const { name, plan, decision, approved } of [
       ...(['text', 'json'] as const).map((format) => ({ label: `no declared source, ${format}`, draft: draftWith(format, contentOf(plan(), format), undefined) })),
     ];
     const treatments: { label: string; treatment: string }[] = [];
-    for (const { label, draft } of drafts) treatments.push({ label, treatment: await treatmentOf(draft) });
+    for (const { label, draft } of drafts) {treatments.push({ label, treatment: await treatmentOf(draft) });}
     const first = treatments[0]?.treatment;
     // The expected treatment, so a test that compared nothing with nothing would fail.
     assert.ok(first !== undefined);
@@ -314,6 +314,6 @@ for (const { name, plan, decision, approved } of [
     assert.equal(read.decision, decision);
     assert.equal(read.withoutApproval, 'proposal');
     assert.equal(read.withTheSignUpApproval, approved);
-    for (const { label, treatment } of treatments) assert.equal(treatment, first, `${label} was treated differently`);
+    for (const { label, treatment } of treatments) {assert.equal(treatment, first, `${label} was treated differently`);}
   });
 }

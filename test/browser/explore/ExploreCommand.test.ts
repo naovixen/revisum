@@ -81,7 +81,7 @@ test('the crawl never follows a link to another origin: the second origin and pr
     assert.deepEqual(navigations.filter((url) => new URL(url).origin !== run.site.origin), []);
     assert.deepEqual(run.site.secondRequested, [], 'the second origin was asked for a page');
     const paths = writtenMap(run).pages.map((page) => page.path);
-    for (const foreign of ['/partner.html', '/checkout']) assert.equal(paths.includes(foreign), false, `${foreign} is in the page map`);
+    for (const foreign of ['/partner.html', '/checkout']) {assert.equal(paths.includes(foreign), false, `${foreign} is in the page map`);}
   });
 });
 
@@ -101,7 +101,7 @@ test('without --after, the browser spy records only navigation, page, accessibil
   await withExploreRun(hostRun(), (run) => {
     const recorded = methods(run.browser?.calls ?? []);
     assert.deepEqual(recorded.filter((method) => !CRAWL_CALLS.includes(method) && !UPKEEP_CALLS.includes(method)), [], JSON.stringify(recorded));
-    for (const method of CRAWL_CALLS) assert.ok(recorded.includes(method), `the crawl never called ${method}`);
+    for (const method of CRAWL_CALLS) {assert.ok(recorded.includes(method), `the crawl never called ${method}`);}
   });
 });
 
@@ -249,7 +249,7 @@ test('the request holds no cookie, stored value, screenshot, query string, typed
       run.workspace.root.replaceAll('\\', '/'), run.loginName, OFFICE_KEY_VALUE,
     ];
     for (const text of plannerRequestTexts(run)) {
-      for (const value of absent) assert.equal(text.includes(value), false, `the request holds ${value}`);
+      for (const value of absent) {assert.equal(text.includes(value), false, `the request holds ${value}`);}
     }
   });
 });
@@ -265,7 +265,7 @@ test('counter-example: the browser did hold the cookie the home page set, so its
 test('without --from, no criterion text is sent', async () => {
   await withExploreRun(hostRun(), (run) => {
     for (const text of plannerRequestTexts(run)) {
-      for (const criterion of Object.values(CRITERION_TEXTS)) assert.equal(text.includes(criterion), false, `the request holds ${criterion}`);
+      for (const criterion of Object.values(CRITERION_TEXTS)) {assert.equal(text.includes(criterion), false, `the request holds ${criterion}`);}
     }
   });
 });
@@ -288,7 +288,7 @@ for (const { name, reply } of [
       assert.equal(run.workspace.exists(DRAFT_OUT), false, 'a draft was written');
       assert.deepEqual(exploreErrorCodes(run), ['plan-rejected']);
       assert.notEqual(run.outcome.exitCode, 0);
-      for (const text of [run.outcome.stdout, run.outcome.stderr, run.printed]) assert.equal(text.includes('document.cookie'), false, text);
+      for (const text of [run.outcome.stdout, run.outcome.stderr, run.printed]) {assert.equal(text.includes('document.cookie'), false, text);}
     });
   });
 }

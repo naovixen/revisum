@@ -114,7 +114,7 @@ test('each suite file the change edits, a helper included, raises its own change
     );
     const named = eventsOfKind(events, 'trusted.changed-with-code').map(({ event }) => JSON.stringify(event));
     assert.equal(named.length, 2, JSON.stringify(events.recorded));
-    for (const path of SUITE_EDITS) assert.ok(named.some((event) => event.includes(path)), `no event names ${path}`);
+    for (const path of SUITE_EDITS) {assert.ok(named.some((event) => event.includes(path)), `no event names ${path}`);}
   }, protectEvidenceMode);
 });
 

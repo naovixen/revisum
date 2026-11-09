@@ -70,7 +70,7 @@ export type DraftCommand = (argv: readonly string[], ports: DraftCommandPorts) =
 export async function loadDraftCommand(): Promise<DraftCommand> {
   const loaded: unknown = await import('@revisum/cli');
   const exported: unknown = typeof loaded === 'object' && loaded !== null ? Object.getOwnPropertyDescriptor(loaded, 'draftCommand')?.value : undefined;
-  if (typeof exported !== 'function') throw new Error('@revisum/cli does not export a function named draftCommand');
+  if (typeof exported !== 'function') {throw new Error('@revisum/cli does not export a function named draftCommand');}
   return async (argv, ports) => {
     const outcome: unknown = await Reflect.apply(exported, undefined, [argv, ports]);
     assert.ok(typeof outcome === 'object' && outcome !== null, 'draftCommand answered with no outcome');
@@ -176,7 +176,7 @@ export function recordedReply(wire: WireFormat): JsonRecord {
 // The recorded reply with its text, or the whole value where the text stands, replaced.
 export function replyWithContent(wire: WireFormat, content: unknown): JsonRecord {
   const reply = recordedReply(wire);
-  if (wire === PlannerWire.AnthropicMessages) return { ...reply, content: [{ type: 'text', text: content }] };
+  if (wire === PlannerWire.AnthropicMessages) {return { ...reply, content: [{ type: 'text', text: content }] };}
   return { ...reply, choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }] };
 }
 
@@ -249,8 +249,8 @@ export function draftWorkspace(options: WorkspaceOptions): DraftWorkspace {
     const visit = (relative: string): void => {
       for (const entry of readdirSync(join(root, relative), { withFileTypes: true })) {
         const path = relative === '' ? entry.name : `${relative}/${entry.name}`;
-        if (entry.isDirectory()) visit(path);
-        else if (entry.isFile()) files.set(path, createHash('sha256').update(readFileSync(join(root, path))).digest('hex'));
+        if (entry.isDirectory()) {visit(path);}
+        else if (entry.isFile()) {files.set(path, createHash('sha256').update(readFileSync(join(root, path))).digest('hex'));}
       }
     };
     visit('');
@@ -433,15 +433,15 @@ export function outputData(run: DraftRun): JsonRecord {
 export function outputErrorCodes(run: DraftRun): readonly string[] {
   assert.ok(run.output !== undefined, `stdout is not one JSON object:\n${run.outcome.stdout}`);
   const errors = run.output['errors'];
-  if (!Array.isArray(errors)) return [];
+  if (!Array.isArray(errors)) {return [];}
   return errors.map((error: unknown) => (typeof error === 'object' && error !== null ? String(Reflect.get(error, 'code')) : ''));
 }
 
 // Every string anywhere in a JSON value.
 export function stringsIn(value: unknown): readonly string[] {
-  if (typeof value === 'string') return [value];
-  if (Array.isArray(value)) return value.flatMap(stringsIn);
-  if (typeof value === 'object' && value !== null) return Object.values(value).flatMap(stringsIn);
+  if (typeof value === 'string') {return [value];}
+  if (Array.isArray(value)) {return value.flatMap(stringsIn);}
+  if (typeof value === 'object' && value !== null) {return Object.values(value).flatMap(stringsIn);}
   return [];
 }
 
@@ -472,12 +472,12 @@ export function requestBody(request: ReceivedRequest): JsonRecord {
 export function promptTexts(body: JsonRecord): readonly string[] {
   const texts: string[] = [];
   const system = body['system'];
-  if (typeof system === 'string') texts.push(system);
+  if (typeof system === 'string') {texts.push(system);}
   const messages = body['messages'];
   if (Array.isArray(messages)) {
     for (const message of messages) {
       const content: unknown = typeof message === 'object' && message !== null ? Reflect.get(message, 'content') : undefined;
-      if (typeof content === 'string') texts.push(content);
+      if (typeof content === 'string') {texts.push(content);}
     }
   }
   return texts;
@@ -489,13 +489,13 @@ export const PROMPT_PLACEHOLDER = '<prompt>';
 // the prompt is the engine's fixed text, compared between wire formats rather than pinned here.
 export function withPromptsReplaced(body: JsonRecord): JsonRecord {
   const replaced: JsonRecord = { ...body };
-  if (typeof replaced['system'] === 'string') replaced['system'] = PROMPT_PLACEHOLDER;
+  if (typeof replaced['system'] === 'string') {replaced['system'] = PROMPT_PLACEHOLDER;}
   const messages = replaced['messages'];
   if (Array.isArray(messages)) {
     replaced['messages'] = messages.map((message: unknown) => {
-      if (typeof message !== 'object' || message === null) return message;
+      if (typeof message !== 'object' || message === null) {return message;}
       const copy: JsonRecord = { ...message };
-      if (typeof copy['content'] === 'string') copy['content'] = PROMPT_PLACEHOLDER;
+      if (typeof copy['content'] === 'string') {copy['content'] = PROMPT_PLACEHOLDER;}
       return copy;
     });
   }

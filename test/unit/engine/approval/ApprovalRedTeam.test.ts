@@ -32,7 +32,7 @@ const ATTEMPTS: readonly Attempt[] = [
     code: 'not-maintainer',
     edit: (fixture) => {
       const lockdown = approversOf(fixture).agentLockdown;
-      if (lockdown !== undefined) lockdown.maintainer = 'build-agent';
+      if (lockdown !== undefined) {lockdown.maintainer = 'build-agent';}
     },
   },
   {
@@ -41,7 +41,7 @@ const ATTEMPTS: readonly Attempt[] = [
     code: 'not-maintainer',
     edit: (fixture) => {
       const lockdown = approversOf(fixture).agentLockdown;
-      if (lockdown !== undefined) lockdown.maintainer = 'github-actions[bot]';
+      if (lockdown !== undefined) {lockdown.maintainer = 'github-actions[bot]';}
     },
   },
   {
@@ -79,7 +79,7 @@ test('after every agent attempt in the red-team repository, the merge gate is st
   for (const attempt of ATTEMPTS) {
     await withRepository('red-team', async (repository) => {
       const verified = await repository.verify(repository.subject('plan'), attempt.proof(repository));
-      if (verified.ok) minted.push(verified.value.approval);
+      if (verified.ok) {minted.push(verified.value.approval);}
     }, attempt.edit);
   }
   assert.deepEqual(minted, []);
@@ -103,9 +103,9 @@ test('the same lock-down, with a person as maintainer who merged, does approve',
     assert.equal(verified.ok, true, JSON.stringify(verified));
   }, (fixture) => {
     const lockdown = approversOf(fixture).agentLockdown;
-    if (lockdown !== undefined) lockdown.maintainer = 'maintainer-mia';
+    if (lockdown !== undefined) {lockdown.maintainer = 'maintainer-mia';}
     fixture.landings.push({ commit: 'commit-person-merge', branch: 'main', login: 'maintainer-mia', type: AccountType.User, at: '2026-10-25T09:00:00Z' });
     fixture.lastCommitsOnProtectedBranch = { [PLAN_PATH]: 'commit-person-merge' };
-    if (fixture.protectedFiles[APPROVERS_PATH] === undefined) throw new Error('the red-team repository has no approvers.json');
+    if (fixture.protectedFiles[APPROVERS_PATH] === undefined) {throw new Error('the red-team repository has no approvers.json');}
   });
 });

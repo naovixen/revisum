@@ -32,7 +32,7 @@ test('parseReportInput rejects each class of bad input with a typed error and a 
   assert.ok(find((broken) => { broken.findings[0].log = ['Authorization: Bearer abcdefghijklmnop']; }).some((code) => code.endsWith('secret_shape')));
   assert.ok(find((broken) => { broken.findings[0].severity = null; }).some((code) => code.endsWith('failed_needs_severity')));
   assert.ok(find((broken) => { broken.findings.push(clone(broken.findings[0])); }).some((code) => code.endsWith('duplicate_id')));
-  for (const junk of [null, undefined, 7, 'x', [], { schema: 'nope' }, () => 1, Symbol('s'), 10n]) assert.doesNotThrow(() => parseReportInput(junk));
+  for (const junk of [null, undefined, 7, 'x', [], { schema: 'nope' }, () => 1, Symbol('s'), 10n]) {assert.doesNotThrow(() => parseReportInput(junk));}
   assert.equal(parseReportInput(null).ok, false);
   const cyclic: Record<string, unknown> = {};
   cyclic['self'] = cyclic;

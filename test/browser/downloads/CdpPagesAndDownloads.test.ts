@@ -77,7 +77,7 @@ for (const targetId of Object.values(BrowserTarget)) {
         let popupState = '';
         for (let attempt = 0; attempt < 20 && popupState !== 'closed'; attempt++) {
           popupState = await shownText(capability, session, 'popup-state');
-          if (popupState !== 'closed') await new Promise((resolve) => setTimeout(resolve, 50));
+          if (popupState !== 'closed') {await new Promise((resolve) => setTimeout(resolve, 50));}
         }
         assert.equal(popupState, 'closed');
         assert.equal(new URL(expectRead(await session.page()).url).pathname, '/pages.html');

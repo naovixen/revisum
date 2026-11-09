@@ -106,7 +106,7 @@ for (const { targetId, actions } of DRIVERS) {
         await withGuardPage(targetId, async (session) => { await session.act(capability.actionStep(action.step), guard); });
         const asked = calls[0];
         assert.ok(asked !== undefined, 'the guard was asked');
-        for (const [field, value] of Object.entries(action.element)) assert.equal(asked.element[field as keyof ResolvedElement], value, field);
+        for (const [field, value] of Object.entries(action.element)) {assert.equal(asked.element[field as keyof ResolvedElement], value, field);}
         assert.ok(asked.element.box !== null && asked.element.box.width > 0 && asked.element.box.height > 0, 'the element was resolved on the page');
         assert.equal(asked.element.formSubmitName, null, 'the control is outside any form');
         assert.equal(asked.dialogText, null);

@@ -65,7 +65,7 @@ function callsDuringAdvances(calls: readonly string[]): readonly string[] {
   for (const call of calls) {
     if (call === 'advance-start') { depth += 1; continue; }
     if (call === 'advance-end') { depth -= 1; continue; }
-    if (depth > 0) inside.push(call);
+    if (depth > 0) {inside.push(call);}
   }
   return inside;
 }

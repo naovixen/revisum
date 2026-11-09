@@ -74,7 +74,7 @@ test('a closed run\'s result and manifest hold no unsafe field at all, not even 
   for (const [name, plan] of Object.entries(RECORDED_RUNS)) {
     const { result } = await runPlan(plan());
     assert.equal(Object.hasOwn(result, 'unsafeFeatures'), false, name);
-    if (result.manifest === null) continue;
+    if (result.manifest === null) {continue;}
     assert.equal(Object.hasOwn(result.manifest, 'unsafeFeatures'), false, name);
     assert.equal(Object.hasOwn(result.manifest, 'unsafeDeclarations'), false, name);
   }

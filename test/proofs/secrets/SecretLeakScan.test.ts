@@ -50,7 +50,7 @@ before(async () => {
   server = await startFixtureServer(join(FIXTURES, 'sites', 'secret-echo-app'));
   const projectFile = { ...makeProjectFile(server.origin), secretNames: [SECRET] };
   const parsed = parseProject(projectFile);
-  if (!parsed.ok) throw new Error(`bad test project: ${JSON.stringify(parsed.error)}`);
+  if (!parsed.ok) {throw new Error(`bad test project: ${JSON.stringify(parsed.error)}`);}
   project = parsed.value;
   trusted = await trustedProjectFrom(projectFile);
   folder = mkdtempSync(join(tmpdir(), 'leak-scan-'));
@@ -77,7 +77,7 @@ const echoPlan = (targetId: string, echo: string, value: unknown, field = 'Acces
 
 function parsed(raw: unknown): Plan {
   const outcome = planParser(project)(raw);
-  if (!outcome.ok) throw new Error(`test plan rejected: ${JSON.stringify(outcome.error)}`);
+  if (!outcome.ok) {throw new Error(`test plan rejected: ${JSON.stringify(outcome.error)}`);}
   return outcome.value;
 }
 

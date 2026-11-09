@@ -124,7 +124,7 @@ export const stubProjectFile = (
 
 export function stubProject(declarations: Declarations = {}, limits: Readonly<Record<string, number>> = {}, fields: JsonRecord = {}): Project {
   const parsed = parseProject(stubProjectFile(declarations, limits, fields));
-  if (!parsed.ok) throw new Error(`bad test project: ${JSON.stringify(parsed.error)}`);
+  if (!parsed.ok) {throw new Error(`bad test project: ${JSON.stringify(parsed.error)}`);}
   return parsed.value;
 }
 

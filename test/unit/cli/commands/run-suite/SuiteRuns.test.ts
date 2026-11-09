@@ -75,7 +75,7 @@ test('the suite runs with the declared command, then --retries=0, the JSON repor
   const { runner } = await runDeclaredSuite();
   const argv = suiteRequestOf(runner).argv;
   assert.deepEqual(argv.slice(0, DECLARED_COMMAND.length), DECLARED_COMMAND);
-  for (const argument of ['--retries=0', '--reporter=json', '--trace=on']) assert.ok(argv.includes(argument), `${argument} is missing: ${JSON.stringify(argv)}`);
+  for (const argument of ['--retries=0', '--reporter=json', '--trace=on']) {assert.ok(argv.includes(argument), `${argument} is missing: ${JSON.stringify(argv)}`);}
   assert.ok(argv.includes('--project=chromium') || argv.join(' ').includes('--project chromium'), JSON.stringify(argv));
 });
 
@@ -181,7 +181,7 @@ test('the manifest\'s evidence record names the suite and the workload image dig
 
 test('the manifest lists suite-code, suite-browser and app-server as inputs it could not pin', async () => {
   const { manifest } = await manifestOf();
-  for (const input of ['suite-code', 'suite-browser', 'app-server']) assert.ok(manifest.nonHermeticInputs.includes(input), JSON.stringify(manifest.nonHermeticInputs));
+  for (const input of ['suite-code', 'suite-browser', 'app-server']) {assert.ok(manifest.nonHermeticInputs.includes(input), JSON.stringify(manifest.nonHermeticInputs));}
 });
 
 test('the Playwright version the report gives is recorded, marked as self-reported', async () => {
@@ -241,9 +241,9 @@ async function replayCode(manifest: Parameters<typeof replayManifest>[0]): Promi
   } catch {
     return null;
   }
-  if (typeof outcome !== 'object' || outcome === null || Reflect.get(outcome, 'ok') !== false) return null;
+  if (typeof outcome !== 'object' || outcome === null || Reflect.get(outcome, 'ok') !== false) {return null;}
   const error: unknown = Reflect.get(outcome, 'error');
-  if (typeof error === 'string') return error;
+  if (typeof error === 'string') {return error;}
   const code: unknown = typeof error === 'object' && error !== null ? Reflect.get(error, 'code') : undefined;
   return typeof code === 'string' ? code : null;
 }

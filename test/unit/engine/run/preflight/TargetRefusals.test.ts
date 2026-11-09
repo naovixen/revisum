@@ -41,13 +41,13 @@ const projectFile = {
 
 function parsedProject(): Project {
   const parsed = parseProject(projectFile);
-  if (!parsed.ok) throw new Error(`bad test project: ${JSON.stringify(parsed.error)}`);
+  if (!parsed.ok) {throw new Error(`bad test project: ${JSON.stringify(parsed.error)}`);}
   return parsed.value;
 }
 const project = parsedProject();
 const target = (id: string): Target => {
   const found = project.matrix.find((candidate) => candidate.id === id);
-  if (found === undefined) throw new Error(`no target ${id}`);
+  if (found === undefined) {throw new Error(`no target ${id}`);}
   return found;
 };
 
@@ -64,7 +64,7 @@ function watched(driver: BrowserDriver): BrowserDriver & { opened: number } {
 
 async function runOn(targetId: string, drivers: ReadonlyMap<string, BrowserDriver>) {
   const parsed = planParser(project)(headingPlan(targetId));
-  if (!parsed.ok) throw new Error(`bad test plan: ${JSON.stringify(parsed.error)}`);
+  if (!parsed.ok) {throw new Error(`bad test plan: ${JSON.stringify(parsed.error)}`);}
   const store = memoryArtifactStore();
   const result = await createRunService(fakePorts({ drivers, clock: systemClock, artifacts: store })).run(clearRun(parsed.value, await trustedProjectFrom(projectFile), target(targetId).id), {
     baseUrl: baseUrlOf(ORIGIN), seed: 42, fixedTimeMilliseconds: 0, fixtures: [], host: { platform: platform(), arch: arch() },

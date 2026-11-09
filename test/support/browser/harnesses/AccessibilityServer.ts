@@ -27,9 +27,9 @@ export function startAccessibilityServer(): Promise<AccessibilityServer> {
   const server = createServer((request, response) => {
     const requested = decodeURIComponent((request.url ?? '/').split('?')[0] ?? '/');
     for (const [prefix, folder] of MOUNTS) {
-      if (!requested.startsWith(prefix)) continue;
+      if (!requested.startsWith(prefix)) {continue;}
       const file = resolve(folder, `.${requested.slice(prefix.length - 1)}`);
-      if (!file.startsWith(folder) || !existsSync(file) || statSync(file).isDirectory()) break;
+      if (!file.startsWith(folder) || !existsSync(file) || statSync(file).isDirectory()) {break;}
       response.writeHead(200, { 'content-type': MEDIA_TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream', 'cache-control': 'no-store' });
       response.end(readFileSync(file));
       return;

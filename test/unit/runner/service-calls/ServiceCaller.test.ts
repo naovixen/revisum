@@ -121,8 +121,8 @@ for (const status of [301, 302, 303, 307, 308]) {
     await withCallerHarness({}, async ({ caller, service }) => {
       // The location is on the same declared service, so a caller that followed it would get there.
       service.answerWith((received, response) => {
-        if (received.path === '/api/test/reset') response.writeHead(status, { location: `${service.origin}/api/test/landing` }).end();
-        else response.writeHead(200, { 'content-type': 'application/json' }).end('{}');
+        if (received.path === '/api/test/reset') {response.writeHead(status, { location: `${service.origin}/api/test/landing` }).end();}
+        else {response.writeHead(200, { 'content-type': 'application/json' }).end('{}');}
       });
       const answered = await caller.call(serviceRequest(service.origin, { method: HttpMethod.Post, pathAndQuery: '/api/test/reset', body: ['{}'] }));
       assert.ok(answered.ok, JSON.stringify(answered));

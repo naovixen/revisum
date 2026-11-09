@@ -58,7 +58,7 @@ async function readMappedTests(root: string): Promise<ReadonlyMap<GuaranteeRow, 
   for (const row of GUARANTEE_ROWS) {
     const entry = map[row];
     const testId = typeof entry === 'object' && entry !== null ? Object.getOwnPropertyDescriptor(entry, 'testId')?.value : undefined;
-    if (isPending(row)) continue;
+    if (isPending(row)) {continue;}
     assert.ok(typeof testId === 'string' && testId.includes('#'), `row ${row} has no test id of the form <file>#<full name>`);
     tests.set(row, testId);
   }
@@ -85,19 +85,19 @@ function runGates(outcomes: Readonly<Partial<Record<GuaranteeRow, Outcome>>>): {
     const tests = byFile.get(file) ?? [];
     // Two rows may share one test; it fails if either row asks it to, and is left out only if all do.
     const existing = tests.find((entry) => entry.name === name);
-    if (existing === undefined) tests.push({ name, outcome });
-    else if (outcome === 'fail' || existing.outcome === 'absent') existing.outcome = outcome;
+    if (existing === undefined) {tests.push({ name, outcome });}
+    else if (outcome === 'fail' || existing.outcome === 'absent') {existing.outcome = outcome;}
     byFile.set(file, tests);
   }
   const topFolders = [...new Set([...byFile.keys()].map((file) => file.split('/')[0] ?? file))];
   assert.ok(topFolders.every((folder) => TEST_FOLDERS.includes(folder)), `a mapped test lies outside ${TEST_FOLDERS.join(' and ')}: ${topFolders.join(', ')}`);
-  for (const folder of TEST_FOLDERS) rmSync(join(scratch.root(), folder), { recursive: true, force: true });
+  for (const folder of TEST_FOLDERS) {rmSync(join(scratch.root(), folder), { recursive: true, force: true });}
   rmSync(join(scratch.root(), '.test-results'), { recursive: true, force: true });
 
   for (const [file, tests] of byFile) {
     const lines = ["import { describe, test } from 'node:test';"];
     for (const { name, outcome } of tests) {
-      if (outcome === 'absent') continue;
+      if (outcome === 'absent') {continue;}
       const parts = name.split(' > ');
       const testName = parts.pop() ?? name;
       const body = outcome === 'pass' ? '() => {}' : "() => { throw new Error('fails on purpose'); }";
@@ -130,7 +130,7 @@ const tickSpecs = (specs: readonly number[]) => (text: string): string => {
   let ticked = text;
   for (const spec of specs) {
     const unticked = `- [ ] ${specId(spec)} `;
-    if (!ticked.includes(unticked)) throw new Error(`START.md has no unticked line for ${specId(spec)}`);
+    if (!ticked.includes(unticked)) {throw new Error(`START.md has no unticked line for ${specId(spec)}`);}
     ticked = ticked.replace(unticked, `- [x] ${specId(spec)} `);
   }
   return ticked;
@@ -143,7 +143,7 @@ test('when every mapped test passes, the gates step passes and the run matches t
   assert.equal(gates.passed, true, describeRun(gates));
   assert.ok(!rowLine(table, PROVEN_ROW).includes(WEAKER_CLASS), `a passing row shows its weaker class:\n${table}`);
   const published = readFileSync(join(scratch.root(), 'docs', 'guarantees.md'), 'utf8');
-  for (const row of GUARANTEE_ROWS) assert.ok(published.includes(row), `the published table has no row ${row}`);
+  for (const row of GUARANTEE_ROWS) {assert.ok(published.includes(row), `the published table has no row ${row}`);}
 });
 
 test('every row that is not pending maps to a test id', () => {

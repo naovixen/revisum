@@ -60,10 +60,10 @@ function lintCommands(root: string): string[][] {
   const commands: string[][] = [];
   for (const script of LINT_SCRIPTS) {
     const line = manifest.scripts?.[script];
-    if (line === undefined) throw new Error(`package.json has no "${script}" script`);
+    if (line === undefined) {throw new Error(`package.json has no "${script}" script`);}
     for (const command of line.split('&&')) {
       const words = command.trim().split(/\s+/);
-      if (words[0] !== 'node') throw new Error(`lint command "${command.trim()}" does not start with node; teach ScratchRepository.ts to run it`);
+      if (words[0] !== 'node') {throw new Error(`lint command "${command.trim()}" does not start with node; teach ScratchRepository.ts to run it`);}
       commands.push(words.slice(1));
     }
   }
@@ -131,7 +131,7 @@ export function copyRepository(): ScratchRepository {
       const path = join(copied(), relativePath);
       const original = readFileSync(path, 'utf8');
       const edited = edit(original);
-      if (edited === original) throw new Error(`the edit left ${relativePath} unchanged`);
+      if (edited === original) {throw new Error(`the edit left ${relativePath} unchanged`);}
       writeFileSync(path, edited);
       try {
         return lint(choice);
@@ -145,7 +145,7 @@ export function copyRepository(): ScratchRepository {
       }
       // Remove the link first, so deleting the copy can never reach the real node_modules.
       const modules = join(copiedRoot, 'node_modules');
-      if (existsSync(modules)) unlinkSync(modules);
+      if (existsSync(modules)) {unlinkSync(modules);}
       rmSync(copiedRoot, { recursive: true, force: true });
     },
   };

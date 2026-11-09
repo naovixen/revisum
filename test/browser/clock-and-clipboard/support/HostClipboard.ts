@@ -112,7 +112,7 @@ function startWindowsClipboardProcess(): WindowsClipboardProcess {
     for (let newline = buffered.indexOf('\n'); newline >= 0; newline = buffered.indexOf('\n')) {
       const line = buffered.slice(0, newline).trim();
       buffered = buffered.slice(newline + 1);
-      if (line === '') continue;
+      if (line === '') {continue;}
       const parsed: unknown = JSON.parse(line);
       const reply: Reply = typeof parsed === 'object' && parsed !== null ? { ...parsed } : { ok: false, error: line };
       waiting.shift()?.(reply);
@@ -120,7 +120,7 @@ function startWindowsClipboardProcess(): WindowsClipboardProcess {
   });
   const exited = new Promise<void>((resolve) => { child.once('exit', () => resolve()); });
   child.once('exit', () => {
-    for (const answer of waiting.splice(0)) answer({ ok: false, error: `the clipboard process ended: ${errors.trim()}` });
+    for (const answer of waiting.splice(0)) {answer({ ok: false, error: `the clipboard process ended: ${errors.trim()}` });}
   });
   return {
     ask: (command) => new Promise<Reply>((resolve) => {
@@ -128,7 +128,7 @@ function startWindowsClipboardProcess(): WindowsClipboardProcess {
       child.stdin.write(`${command}\n`);
     }),
     end: async () => {
-      if (child.exitCode === null) child.stdin.end('exit\n');
+      if (child.exitCode === null) {child.stdin.end('exit\n');}
       await exited;
     },
   };
@@ -136,7 +136,7 @@ function startWindowsClipboardProcess(): WindowsClipboardProcess {
 
 async function askOrThrow(clipboard: WindowsClipboardProcess, command: string): Promise<Reply> {
   const reply = await clipboard.ask(command);
-  if (reply['ok'] !== true) throw new Error(`the host clipboard refused "${command.split(' ')[0] ?? ''}": ${String(reply['error'])}`);
+  if (reply['ok'] !== true) {throw new Error(`the host clipboard refused "${command.split(' ')[0] ?? ''}": ${String(reply['error'])}`);}
   return reply;
 }
 
@@ -145,9 +145,9 @@ const listOf = (value: unknown): readonly string[] => (Array.isArray(value) ? va
 // Takes the snapshot. Null when it is whole; otherwise why the clipboard cannot be restored.
 async function takeSnapshot(clipboard: WindowsClipboardProcess): Promise<string | null> {
   const reply = await clipboard.ask('snapshot');
-  if (reply['ok'] !== true) return `the host clipboard could not be read: ${String(reply['error'])}`;
+  if (reply['ok'] !== true) {return `the host clipboard could not be read: ${String(reply['error'])}`;}
   const unreadable = listOf(reply['unreadable']);
-  if (unreadable.length > 0) return `the host clipboard holds data that cannot be saved and restored (${unreadable.join(', ')}); copy plain text and run again`;
+  if (unreadable.length > 0) {return `the host clipboard holds data that cannot be saved and restored (${unreadable.join(', ')}); copy plain text and run again`;}
   return null;
 }
 
@@ -164,11 +164,11 @@ const DISPLAY_VARIABLES = ['DISPLAY', 'WAYLAND_DISPLAY'] as const;
 
 function hideDisplays(): () => void {
   const saved = DISPLAY_VARIABLES.map((name) => [name, process.env[name]] as const);
-  for (const name of DISPLAY_VARIABLES) delete process.env[name];
+  for (const name of DISPLAY_VARIABLES) {delete process.env[name];}
   return () => {
     for (const [name, value] of saved) {
-      if (value === undefined) delete process.env[name];
-      else process.env[name] = value;
+      if (value === undefined) {delete process.env[name];}
+      else {process.env[name] = value;}
     }
   };
 }
@@ -189,11 +189,11 @@ export async function guardHostClipboard(): Promise<HostClipboardGuard> {
   return {
     skipReason: null,
     restore: async () => {
-      if (ended) return false;
+      if (ended) {return false;}
       ended = true;
       try {
         const now = (await askOrThrow(clipboard, 'sequence'))['sequence'];
-        if (now === before) return false;
+        if (now === before) {return false;}
         await askOrThrow(clipboard, 'restore');
         return true;
       } finally {
@@ -235,7 +235,7 @@ async function windowsHostClipboard(): Promise<HostClipboard> {
     write: async (text) => { await askOrThrow(clipboard, `write ${Buffer.from(text, 'utf8').toString('base64')}`); },
     read: async () => Buffer.from(String((await askOrThrow(clipboard, 'read'))['text'] ?? ''), 'base64').toString('utf8'),
     restore: async () => {
-      if (ended) return;
+      if (ended) {return;}
       ended = true;
       try { await askOrThrow(clipboard, 'restore'); } finally { await clipboard.end(); }
     },
@@ -248,15 +248,15 @@ const pause = (milliseconds: number): Promise<void> => new Promise((resolve) => 
 
 async function linuxHostClipboard(): Promise<HostClipboard> {
   const missing = ['Xvfb', 'xclip'].filter((tool) => !commandExists(tool));
-  if (missing.length > 0) return unavailable(`the Linux half of this proof needs ${missing.join(' and ')} on the path, as the pinned image should install`);
+  if (missing.length > 0) {return unavailable(`the Linux half of this proof needs ${missing.join(' and ')} on the path, as the pinned image should install`);}
   // The first display number with no server and no lock file.
   let displayNumber = -1;
   for (let candidate = 99; candidate >= 80; candidate--) {
     if (!existsSync(`/tmp/.X11-unix/X${candidate}`) && !existsSync(`/tmp/.X${candidate}-lock`)) { displayNumber = candidate; break; }
   }
-  if (displayNumber < 0) return unavailable('no free X display number between :80 and :99');
+  if (displayNumber < 0) {return unavailable('no free X display number between :80 and :99');}
   const server = spawn('Xvfb', [`:${displayNumber}`, '-nolisten', 'tcp', '-screen', '0', '1280x720x24'], { stdio: 'ignore' });
-  for (let waited = 0; waited < 10_000 && !existsSync(`/tmp/.X11-unix/X${displayNumber}`); waited += 100) await pause(100);
+  for (let waited = 0; waited < 10_000 && !existsSync(`/tmp/.X11-unix/X${displayNumber}`); waited += 100) {await pause(100);}
   if (!existsSync(`/tmp/.X11-unix/X${displayNumber}`)) {
     server.kill();
     return unavailable(`the private display :${displayNumber} did not start`);
@@ -270,14 +270,14 @@ async function linuxHostClipboard(): Promise<HostClipboard> {
     write: async (text) => {
       // xclip keeps serving the selection from a background copy of itself, which ends with the display.
       const written = spawnSync('xclip', ['-selection', 'clipboard', '-i'], { input: text, stdio: ['pipe', 'ignore', 'ignore'], timeout: 10_000 });
-      if (written.status !== 0) throw new Error('xclip could not write the private display\'s clipboard');
+      if (written.status !== 0) {throw new Error('xclip could not write the private display\'s clipboard');}
     },
     read: async () => {
       const read = spawnSync('xclip', ['-selection', 'clipboard', '-o'], { encoding: 'utf8', timeout: 10_000 });
       return read.status === 0 ? read.stdout : '';
     },
     restore: async () => {
-      if (ended) return;
+      if (ended) {return;}
       ended = true;
       showDisplays();
       const stopped = new Promise<void>((resolve) => { server.once('exit', () => resolve()); });
@@ -288,7 +288,7 @@ async function linuxHostClipboard(): Promise<HostClipboard> {
 }
 
 export async function openHostClipboard(): Promise<HostClipboard> {
-  if (platform() === 'win32') return windowsHostClipboard();
-  if (platform() === 'linux') return linuxHostClipboard();
+  if (platform() === 'win32') {return windowsHostClipboard();}
+  if (platform() === 'linux') {return linuxHostClipboard();}
   return unavailable(`this proof runs on Windows and in the pinned Linux image, not on ${platform()}`);
 }

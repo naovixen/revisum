@@ -57,7 +57,7 @@ function refusedBuild(name: string, callArguments: CallArguments, values: RunVal
 // A request body is JSON text in parts, where a part may be a hidden secret. These tests read
 // bodies that hold no secret, so every part is text; a secret part fails the test.
 const bodyJson = (request: ServiceRequest): unknown => {
-  if (request.body === null) return null;
+  if (request.body === null) {return null;}
   const parts = request.body.jsonParts.map((part) => {
     assert.equal(typeof part, 'string', 'the body holds a secret part');
     return String(part);
@@ -71,9 +71,9 @@ const headerNamed = (request: ServiceRequest, name: string) => request.headers.f
 
 // Every string in a JSON value, depth first.
 const stringsIn = (value: unknown): string[] => {
-  if (typeof value === 'string') return [value];
-  if (Array.isArray(value)) return value.flatMap(stringsIn);
-  if (typeof value === 'object' && value !== null) return Object.values(value).flatMap(stringsIn);
+  if (typeof value === 'string') {return [value];}
+  if (Array.isArray(value)) {return value.flatMap(stringsIn);}
+  if (typeof value === 'object' && value !== null) {return Object.values(value).flatMap(stringsIn);}
   return [];
 };
 

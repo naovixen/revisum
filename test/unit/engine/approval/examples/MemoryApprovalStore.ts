@@ -88,7 +88,7 @@ export const HOLDOUT_PLAN_HASH = sha256(canonicalJson(HOLDOUT_PLAN));
 // JSON, so the file's SHA-256 and the plan's hash agree.
 export function parsedSignupPlan(input: JsonRecord = signupPlan()): Plan {
   const parsed = defaultParser()(input);
-  if (!parsed.ok) throw new Error(`the sign-up plan was rejected: ${JSON.stringify(parsed.error)}`);
+  if (!parsed.ok) {throw new Error(`the sign-up plan was rejected: ${JSON.stringify(parsed.error)}`);}
   return parsed.value;
 }
 
@@ -173,7 +173,7 @@ export function openRepository(name: RepositoryName, edit: (fixture: FixtureRepo
       protectedBranch: fixture.protectedBranch,
       async protectedFile(path) {
         calls.push(`protectedFile ${path}`);
-        if (down.has('protectedFile')) return failure('unavailable');
+        if (down.has('protectedFile')) {return failure('unavailable');}
         const file = repositoryFile(path);
         const content = fixture.protectedFiles[file];
         const commit = fixture.lastCommitsOnProtectedBranch?.[file] ?? fixture.protectedCommit;
@@ -181,29 +181,29 @@ export function openRepository(name: RepositoryName, edit: (fixture: FixtureRepo
       },
       async reviews(number) {
         calls.push(`reviews ${number}`);
-        if (down.has('reviews')) return failure('unavailable');
+        if (down.has('reviews')) {return failure('unavailable');}
         return success(pullRequestNumbered(number)?.reviews ?? []);
       },
       async changedFiles(number) {
         calls.push(`changedFiles ${number}`);
-        if (down.has('changedFiles')) return failure('unavailable');
+        if (down.has('changedFiles')) {return failure('unavailable');}
         return success(pullRequestNumbered(number)?.changedFiles ?? []);
       },
       async pullRequest(number) {
         calls.push(`pullRequest ${number}`);
-        if (down.has('pullRequest')) return failure('unavailable');
+        if (down.has('pullRequest')) {return failure('unavailable');}
         const found = pullRequestNumbered(number);
         return found === undefined ? failure('unavailable') : success({ author: found.author, headCommit: found.headCommit });
       },
       async lastCommitTouching(path, number) {
         calls.push(`lastCommitTouching ${path} ${number}`);
-        if (down.has('lastCommitTouching')) return failure('unavailable');
+        if (down.has('lastCommitTouching')) {return failure('unavailable');}
         const commit = pullRequestNumbered(number)?.lastCommitTouching[path];
         return commit === undefined ? failure('unavailable') : success(commit);
       },
       async landedBy(commit, branch) {
         calls.push(`landedBy ${commit} ${branch}`);
-        if (down.has('landedBy')) return failure('unavailable');
+        if (down.has('landedBy')) {return failure('unavailable');}
         const landing = fixture.landings.find((candidate) => candidate.commit === commit && candidate.branch === branch);
         return success(landing === undefined ? null : { login: landing.login, type: landing.type, at: landing.at });
       },
@@ -211,7 +211,7 @@ export function openRepository(name: RepositoryName, edit: (fixture: FixtureRepo
       // branch's.
       async fileAtCommit(path, commit) {
         calls.push(`fileAtCommit ${path} ${commit}`);
-        if (down.has('fileAtCommit')) return failure('unavailable');
+        if (down.has('fileAtCommit')) {return failure('unavailable');}
         const file = repositoryFile(path);
         const atCommit = fixture.filesAtCommits?.[commit];
         const content = atCommit !== undefined && file in atCommit ? atCommit[file] : fixture.protectedFiles[file];
@@ -224,15 +224,15 @@ export function openRepository(name: RepositoryName, edit: (fixture: FixtureRepo
     fixture, root, events, loaderEvents, verifier, calls, versionControl,
     async trustedProject() {
       const loaded = await loadForChange(versionControl(), [], loaderEvents);
-      if (!loaded.ok) throw new Error(`the ${name} repository's project was not trusted: ${JSON.stringify(loaded.error)}`);
+      if (!loaded.ok) {throw new Error(`the ${name} repository's project was not trusted: ${JSON.stringify(loaded.error)}`);}
       return loaded.value.project;
     },
     subject(kind) {
       const path = SUBJECT_PATHS[kind];
-      if (kind === ApprovalSubjectKind.Plan) return { kind, hash: planHash(parsedSignupPlan()), path };
-      if (kind === ApprovalSubjectKind.HoldoutPlan) return { kind, hash: HOLDOUT_PLAN_HASH, path };
+      if (kind === ApprovalSubjectKind.Plan) {return { kind, hash: planHash(parsedSignupPlan()), path };}
+      if (kind === ApprovalSubjectKind.HoldoutPlan) {return { kind, hash: HOLDOUT_PLAN_HASH, path };}
       const content = fixture.protectedFiles[path];
-      if (content === undefined) throw new Error(`the ${name} repository has no ${path} on its protected branch`);
+      if (content === undefined) {throw new Error(`the ${name} repository has no ${path} on its protected branch`);}
       return { kind, hash: sha256(fileBytes(content)), path };
     },
     codeOwnerProof(reviewId, overrides = {}) {
@@ -277,9 +277,9 @@ export async function withRepository(
 export function assertRefused(
   repository: TestRepository, verified: Result<{ approval: Approval; actor: DerivedActor }, ApprovalErrorCode>, code: ApprovalErrorCode,
 ): void {
-  if (verified.ok) throw new Error(`expected ${code}, but the approval verified as ${verified.value.approval.strength}`);
-  if (verified.error !== code) throw new Error(`expected ${code}, got ${verified.error}`);
-  if (eventsOfKind(repository.events, 'plan.approved').length !== 0) throw new Error('a refused attempt left a plan.approved event');
+  if (verified.ok) {throw new Error(`expected ${code}, but the approval verified as ${verified.value.approval.strength}`);}
+  if (verified.error !== code) {throw new Error(`expected ${code}, got ${verified.error}`);}
+  if (eventsOfKind(repository.events, 'plan.approved').length !== 0) {throw new Error('a refused attempt left a plan.approved event');}
   const refused = eventsOfKind(repository.events, 'approval.refused');
   if (!refused.some(({ event }) => JSON.stringify(event).includes(code))) {
     throw new Error(`no approval.refused event carries ${code}: ${JSON.stringify(repository.events.recorded)}`);

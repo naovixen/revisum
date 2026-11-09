@@ -55,7 +55,7 @@ export const readableLimits = () => readableProject().limits;
 // The plan the parser makes from `input`; a refusal is a broken test.
 export function parsedWith(parsePlan: ParsePlan, input: unknown, label: string): Plan {
   const parsed = parsePlan(input);
-  if (!parsed.ok) throw new Error(`${label} was refused: ${JSON.stringify(parsed.error)}`);
+  if (!parsed.ok) {throw new Error(`${label} was refused: ${JSON.stringify(parsed.error)}`);}
   return parsed.value;
 }
 
@@ -346,27 +346,27 @@ export function featuresOf(plan: JsonRecord): Set<string> {
   const features = new Set<string>();
   const isRecord = (value: unknown): value is JsonRecord => typeof value === 'object' && value !== null && !Array.isArray(value);
   const visitText = (value: unknown, where: string): void => {
-    if (isRecord(value) && Object.hasOwn(value, 'valueName')) features.add(`reference in ${where}`);
+    if (isRecord(value) && Object.hasOwn(value, 'valueName')) {features.add(`reference in ${where}`);}
   };
   const visitLocator = (locator: JsonRecord): void => {
     features.add(`locator ${String(locator['by'])}`);
-    if (locator['by'] === 'role') features.add(`role ${String(locator['role'])}`);
+    if (locator['by'] === 'role') {features.add(`role ${String(locator['role'])}`);}
     const position = locator['position'];
-    if (typeof position === 'string') features.add(`position ${position}`);
-    if (typeof position === 'number') features.add(position === 1 ? 'position 1' : 'position ordinal');
-    if (Object.hasOwn(locator, 'attribute')) features.add('locator attribute');
-    for (const field of ['name', 'label', 'text', 'testId']) visitText(locator[field], 'locator');
+    if (typeof position === 'string') {features.add(`position ${position}`);}
+    if (typeof position === 'number') {features.add(position === 1 ? 'position 1' : 'position ordinal');}
+    if (Object.hasOwn(locator, 'attribute')) {features.add('locator attribute');}
+    for (const field of ['name', 'label', 'text', 'testId']) {visitText(locator[field], 'locator');}
   };
   const visitUrl = (url: unknown): void => {
-    if (typeof url === 'string') features.add(url.startsWith('/') ? 'url path' : 'url absolute');
-    if (!isRecord(url)) return;
+    if (typeof url === 'string') {features.add(url.startsWith('/') ? 'url path' : 'url absolute');}
+    if (!isRecord(url)) {return;}
     features.add('url path template');
-    if (isRecord(url['query'])) features.add(Object.keys(url['query']).length === 0 ? 'url empty query' : 'url query');
+    if (isRecord(url['query'])) {features.add(Object.keys(url['query']).length === 0 ? 'url empty query' : 'url query');}
   };
   const visitArguments = (step: JsonRecord): void => {
     const args = step['arguments'];
-    if (!isRecord(args)) return;
-    if (Object.keys(args).length === 0) features.add(`${String(step['type'])} with no arguments`);
+    if (!isRecord(args)) {return;}
+    if (Object.keys(args).length === 0) {features.add(`${String(step['type'])} with no arguments`);}
     for (const value of Object.values(args)) {
       features.add(`argument ${isRecord(value) ? Object.keys(value)[0] ?? 'object' : typeof value}`);
     }
@@ -376,52 +376,52 @@ export function featuresOf(plan: JsonRecord): Set<string> {
       const type = String(step['type']);
       features.add(`step ${type}`);
       const locator = step['locator'];
-      if (isRecord(locator)) visitLocator(locator);
+      if (isRecord(locator)) {visitLocator(locator);}
       const assertion = step['assert'];
       if (isRecord(assertion)) {
         features.add(`assert ${type} ${String(assertion['kind'])}`);
         visitText(assertion['value'], 'check');
-        if (isRecord(assertion['value']) && Object.hasOwn(assertion['value'], 'lines')) features.add(`lines in ${type}`);
+        if (isRecord(assertion['value']) && Object.hasOwn(assertion['value'], 'lines')) {features.add(`lines in ${type}`);}
       }
       if (type === 'press') {
         features.add(`key ${String(step['key'])}`);
-        for (const modifier of (step['modifiers'] ?? []) as string[]) features.add(`modifier ${modifier}`);
+        for (const modifier of (step['modifiers'] ?? []) as string[]) {features.add(`modifier ${modifier}`);}
       }
-      if (type === 'navigate' || type === 'newTab') visitUrl(step['url']);
-      if (type === 'navigate' && step['scripts'] === 'disabled') features.add('scripts disabled');
+      if (type === 'navigate' || type === 'newTab') {visitUrl(step['url']);}
+      if (type === 'navigate' && step['scripts'] === 'disabled') {features.add('scripts disabled');}
       if (type === 'fill') {
         const value = step['value'];
         features.add(`fill ${typeof value === 'string' ? 'text' : isRecord(value) ? Object.keys(value)[0] ?? 'object' : typeof value}`);
       }
-      if (type === 'select') visitText(step['option'], 'option');
-      if (type === 'dialog') features.add(Object.hasOwn(step, 'expectText') ? `dialog ${String(step['action'])} expecting` : `dialog ${String(step['action'])}`);
+      if (type === 'select') {visitText(step['option'], 'option');}
+      if (type === 'dialog') {features.add(Object.hasOwn(step, 'expectText') ? `dialog ${String(step['action'])} expecting` : `dialog ${String(step['action'])}`);}
       if (type === 'remember' && isRecord(step['from'])) {
         const from = step['from'];
         const source = Object.keys(from).find((key) => key !== 'read' && key !== 'field') ?? 'unknown';
         features.add(`remember ${source}${typeof from['read'] === 'string' ? ` ${from['read']}` : ''}`);
       }
       if (type === 'call') {
-        if (isRecord(step['remember'])) features.add(Object.keys(step['remember']).length === 0 ? 'call remembering nothing' : 'call remembering');
+        if (isRecord(step['remember'])) {features.add(Object.keys(step['remember']).length === 0 ? 'call remembering nothing' : 'call remembering');}
       }
-      if (type === 'call' || type === 'expectBackend' || type === 'stub' || type === 'setStorage') visitArguments(step);
-      if (type === 'stub') features.add(`stub ${String(step['action'])}`);
-      if (type === 'expectRequests' && isRecord(step['count'])) features.add(`count ${Object.keys(step['count'])[0] ?? 'none'}`);
+      if (type === 'call' || type === 'expectBackend' || type === 'stub' || type === 'setStorage') {visitArguments(step);}
+      if (type === 'stub') {features.add(`stub ${String(step['action'])}`);}
+      if (type === 'expectRequests' && isRecord(step['count'])) {features.add(`count ${Object.keys(step['count'])[0] ?? 'none'}`);}
       if (type === 'advanceClock') {
         const by = isRecord(step['by']) ? step['by'] : {};
         features.add(`unit ${String(by['unit'])}`);
         features.add(`advance ${typeof step['mode'] === 'string' ? step['mode'] : 'default mode'}`);
       }
       const nested = step['steps'];
-      if (Array.isArray(nested)) visitSteps(nested as JsonRecord[]);
+      if (Array.isArray(nested)) {visitSteps(nested as JsonRecord[]);}
     }
   };
-  for (const field of Object.keys(plan)) features.add(`field ${field}`);
+  for (const field of Object.keys(plan)) {features.add(`field ${field}`);}
   if (isRecord(plan['values'])) {
-    if (Object.keys(plan['values']).length === 0) features.add('empty values');
+    if (Object.keys(plan['values']).length === 0) {features.add('empty values');}
     for (const value of Object.values(plan['values'])) {
-      if (!isRecord(value)) continue;
+      if (!isRecord(value)) {continue;}
       features.add(`value ${String(value['kind'])}`);
-      if (value['kind'] === 'uniqueEmail') features.add(Object.hasOwn(value, 'domain') ? 'email with domain' : 'email without domain');
+      if (value['kind'] === 'uniqueEmail') {features.add(Object.hasOwn(value, 'domain') ? 'email with domain' : 'email without domain');}
       if (value['kind'] === 'date') {
         features.add(`format ${String(value['format'])}`);
         const day = isRecord(value['day']) ? value['day'] : {};
@@ -431,7 +431,7 @@ export function featuresOf(plan: JsonRecord): Set<string> {
       }
     }
   }
-  if (Array.isArray(plan['cleanup']) && plan['cleanup'].length === 0) features.add('empty cleanup');
+  if (Array.isArray(plan['cleanup']) && plan['cleanup'].length === 0) {features.add('empty cleanup');}
   visitSteps((plan['steps'] ?? []) as JsonRecord[]);
   visitSteps((plan['cleanup'] ?? []) as JsonRecord[]);
   return features;
@@ -499,7 +499,7 @@ const AWKWARD_PIECES = [
 function awkwardText(next: () => number): string {
   const count = 1 + Math.floor(next() * 5);
   let result = '';
-  for (let index = 0; index < count; index += 1) result += AWKWARD_PIECES[Math.floor(next() * AWKWARD_PIECES.length)] ?? 'x';
+  for (let index = 0; index < count; index += 1) {result += AWKWARD_PIECES[Math.floor(next() * AWKWARD_PIECES.length)] ?? 'x';}
   // Text must not be empty or blank-only for every field, so keep a letter in it.
   return /[A-Za-z]/.test(result) ? result : `${result}Ada`;
 }
@@ -543,9 +543,9 @@ export function generatedPlans(parsePlan: ParsePlan, firstSeed: number, count: n
   const generated: { seed: number; name: string; plan: JsonRecord }[] = [];
   for (let seed = firstSeed; seed < firstSeed + count; seed += 1) {
     const example = examples[seed % examples.length];
-    if (example === undefined) continue;
+    if (example === undefined) {continue;}
     const plan = replaceText(example.plan, seededNumbers(seed), '', null, null) as JsonRecord;
-    if (parsePlan(plan).ok) generated.push({ seed, name: example.name, plan });
+    if (parsePlan(plan).ok) {generated.push({ seed, name: example.name, plan });}
   }
   return generated;
 }
@@ -558,14 +558,14 @@ export const joinLines = (lines: readonly string[]): string => lines.join('\n');
 // The 1-based number of the one line whose content, without its indentation, is `statement`.
 export function lineOf(text: string, statement: string): number {
   const found = linesOf(text).flatMap((line, index) => (line.trim() === statement ? [index + 1] : []));
-  if (found.length !== 1) throw new Error(`expected one line "${statement}", found ${found.length} in:\n${text}`);
+  if (found.length !== 1) {throw new Error(`expected one line "${statement}", found ${found.length} in:\n${text}`);}
   return found[0] ?? 0;
 }
 
 // The 1-based number of the one line that starts with `prefix`, such as "Version:".
 export function lineStartingWith(text: string, prefix: string): number {
   const found = linesOf(text).flatMap((line, index) => (line.startsWith(prefix) ? [index + 1] : []));
-  if (found.length !== 1) throw new Error(`expected one line starting "${prefix}", found ${found.length} in:\n${text}`);
+  if (found.length !== 1) {throw new Error(`expected one line starting "${prefix}", found ${found.length} in:\n${text}`);}
   return found[0] ?? 0;
 }
 

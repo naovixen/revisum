@@ -65,7 +65,7 @@ for (const driver of DRIVERS) {
     const declared: Record<string, unknown> = {};
     for (const field of DEPENDENCY_FIELDS) {
       const value = manifest[field];
-      if (typeof value === 'object' && value !== null) Object.assign(declared, value);
+      if (typeof value === 'object' && value !== null) {Object.assign(declared, value);}
     }
     assert.deepEqual(declared, driver.dependencies);
   });

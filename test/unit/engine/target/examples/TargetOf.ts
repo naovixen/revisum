@@ -22,7 +22,7 @@ export const projectFileWith = (matrix: readonly JsonRecord[]): JsonRecord => te
 
 export function projectWith(matrix: readonly JsonRecord[]): Project {
   const parsed = parseProject(projectFileWith(matrix));
-  if (!parsed.ok) throw new Error(`bad test project: ${JSON.stringify(parsed.error)}`);
+  if (!parsed.ok) {throw new Error(`bad test project: ${JSON.stringify(parsed.error)}`);}
   return parsed.value;
 }
 
@@ -31,7 +31,7 @@ export const trustedProjectWith = (matrix: readonly JsonRecord[]): Promise<Trust
 // The target with this id in the project's matrix; a missing one is a broken test.
 export function targetOf(project: Project | TrustedProject, id: string): Target {
   const found = project.matrix.find((candidate) => candidate.id === id);
-  if (found === undefined) throw new Error(`no target ${id} in the test project`);
+  if (found === undefined) {throw new Error(`no target ${id} in the test project`);}
   return found;
 }
 
@@ -112,7 +112,7 @@ export async function runOnTarget(options: {
 // The sign-up plan, declaring `planTargets`, parsed under `planProject`.
 export function signupPlanOn(planProject: Project, planTargets: readonly string[]): Plan {
   const parsed = planParser(planProject)(withValue(signupPlan(), ['targets'], [...planTargets]));
-  if (!parsed.ok) throw new Error(`bad test plan: ${JSON.stringify(parsed.error)}`);
+  if (!parsed.ok) {throw new Error(`bad test plan: ${JSON.stringify(parsed.error)}`);}
   return parsed.value;
 }
 

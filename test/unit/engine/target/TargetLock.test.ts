@@ -22,8 +22,8 @@ const MATRIX = [
 const temporaryFolders: string[] = [];
 const builds: FakeBrowserBuild[] = [];
 after(() => {
-  for (const folder of temporaryFolders) rmSync(folder, { recursive: true, force: true });
-  for (const build of builds) build.remove();
+  for (const folder of temporaryFolders) {rmSync(folder, { recursive: true, force: true });}
+  for (const build of builds) {build.remove();}
 });
 
 const projectFolder = (): string => {

@@ -52,20 +52,20 @@ const ALLOWED_IPV6: readonly string[] = [
 
 for (const { range, addresses } of REFUSED_IPV4) {
   test(`an IPv4 address in ${range} is refused`, () => {
-    for (const address of addresses) assert.equal(checkResolvedAddress(address), 'refused', address);
+    for (const address of addresses) {assert.equal(checkResolvedAddress(address), 'refused', address);}
   });
 }
 
 test('a public IPv4 address, including each one just outside a refused range, is allowed', () => {
-  for (const address of ALLOWED_IPV4) assert.equal(checkResolvedAddress(address), 'allowed', address);
+  for (const address of ALLOWED_IPV4) {assert.equal(checkResolvedAddress(address), 'allowed', address);}
 });
 
 for (const { range, addresses } of REFUSED_IPV6) {
   test(`an IPv6 address in ${range} is refused`, () => {
-    for (const address of addresses) assert.equal(checkResolvedAddress(address), 'refused', address);
+    for (const address of addresses) {assert.equal(checkResolvedAddress(address), 'refused', address);}
   });
 }
 
 test('a public IPv6 address, and each IPv6 form carrying a public IPv4 address, is allowed', () => {
-  for (const address of ALLOWED_IPV6) assert.equal(checkResolvedAddress(address), 'allowed', address);
+  for (const address of ALLOWED_IPV6) {assert.equal(checkResolvedAddress(address), 'allowed', address);}
 });

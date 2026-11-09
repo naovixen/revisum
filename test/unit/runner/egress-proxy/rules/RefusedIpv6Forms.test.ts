@@ -34,13 +34,13 @@ const ALLOWED: readonly { readonly range: string; readonly addresses: readonly s
 
 for (const { range, addresses } of REFUSED) {
   test(`an IPv6 address in ${range} is refused, whatever it holds`, () => {
-    for (const address of addresses) assert.equal(checkResolvedAddress(address), 'refused', address);
+    for (const address of addresses) {assert.equal(checkResolvedAddress(address), 'refused', address);}
   });
 }
 
 for (const { range, addresses } of ALLOWED) {
   test(`counter-example: an IPv6 address just outside ${range} is allowed`, () => {
-    for (const address of addresses) assert.equal(checkResolvedAddress(address), 'allowed', address);
+    for (const address of addresses) {assert.equal(checkResolvedAddress(address), 'allowed', address);}
   });
 }
 

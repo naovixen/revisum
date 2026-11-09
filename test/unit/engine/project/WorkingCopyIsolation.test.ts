@@ -128,7 +128,7 @@ test('with an edited approvers.json reachable in the working copy, its new maint
     assert.deepEqual(reads, []);
   }, (fixture) => {
     const edited = structuredClone(approversOf(fixture));
-    if (edited.agentLockdown !== undefined) edited.agentLockdown.maintainer = 'build-agent';
+    if (edited.agentLockdown !== undefined) {edited.agentLockdown.maintainer = 'build-agent';}
     fixture.workingCopy[APPROVERS_PATH] = edited;
     fixture.landings.push({ commit: 'commit-agent-merge', branch: 'main', login: 'build-agent', type: AccountType.User, at: '2026-10-25T09:00:00Z' });
   });

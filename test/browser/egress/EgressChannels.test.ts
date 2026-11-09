@@ -75,7 +75,7 @@ const eventsOf = (session: DriverSession): readonly EgressEvent[] => joinEgressE
 
 async function waitFor(condition: () => boolean): Promise<void> {
   const deadline = Date.now() + WAIT_MILLISECONDS;
-  while (!condition() && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, POLL_MILLISECONDS));
+  while (!condition() && Date.now() < deadline) {await new Promise((resolve) => setTimeout(resolve, POLL_MILLISECONDS));}
 }
 
 // Opens the channel's page, makes it send its traffic, and returns the run's egress events once
@@ -85,7 +85,7 @@ async function sendThrough(channel: ChannelName): Promise<{ readonly events: rea
   const host = CHANNEL_HOSTS[channel];
   const navigated = await session.navigate(fixture.url(CHANNEL_PAGES[channel]), scriptsEnabled);
   assert.ok(navigated.ok, JSON.stringify(navigated));
-  if (channel === BrowserChannel.Popup) await session.act(capability.actionStep(click(role('button', 'Open the partner site'))), allowEveryAction);
+  if (channel === BrowserChannel.Popup) {await session.act(capability.actionStep(click(role('button', 'Open the partner site'))), allowEveryAction);}
   await waitFor(() => eventsOf(session).some((event) => event.channel === channel && hostOf(String(event.origin)) === host));
   return { events: eventsOf(session), session };
 }

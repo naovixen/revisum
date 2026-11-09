@@ -119,7 +119,7 @@ describe('(c) logging manifest', () => {
   test('every event of a real run uses only manifest fields and contains no typed value', async () => {
     const { events } = await testHarness.run(testHarness.plan(signupPlan(['cdp-chromium'])), 'cdp-chromium');
     const allowed = new Set(Object.keys(LOGGING_MANIFEST));
-    for (const event of events.read()) for (const key of Object.keys(event)) assert.ok(allowed.has(key), `field ${key}`);
+    for (const event of events.read()) {for (const key of Object.keys(event)) {assert.ok(allowed.has(key), `field ${key}`);}}
     const everything = JSON.stringify(events.read());
     assert.ok(!everything.includes(EMAIL) && !everything.includes(NAME));
   });
@@ -135,7 +135,7 @@ function blackFraction(png: Uint8Array, box: Box): number {
     for (let x = Math.ceil(box.x) + 2; x < Math.floor(box.x + box.width) - 2; x++) {
       const index = (y * image.width + x) * image.channels;
       total++;
-      if (image.data[index] === 0 && image.data[index + 1] === 0 && image.data[index + 2] === 0) black++;
+      if (image.data[index] === 0 && image.data[index + 1] === 0 && image.data[index + 2] === 0) {black++;}
     }
   }
   return total === 0 ? 0 : black / total;

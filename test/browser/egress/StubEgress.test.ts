@@ -136,7 +136,7 @@ test('a script, style sheet, frame, worker and image that match a stub go throug
     stopStub('assetRequests'),
   ]);
   assert.equal(ran.result.state, 'Passed', JSON.stringify(ran.result.steps));
-  for (const path of Object.keys(SERVER_ASSETS)) assert.equal(timesRequested(ran.requestedPaths, path), 1, `${path} reached the server`);
+  for (const path of Object.keys(SERVER_ASSETS)) {assert.equal(timesRequested(ran.requestedPaths, path), 1, `${path} reached the server`);}
   const events = fixtureEvents(ran);
   assert.deepEqual(events.filter((event) => event.decision !== 'allowed'), [], JSON.stringify(ran.egressEvents));
   assert.equal(events.length, ran.requestedPaths.length, 'every request the server received went through the proxy, and nothing else was recorded');

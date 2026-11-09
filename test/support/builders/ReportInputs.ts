@@ -17,7 +17,7 @@ const readJson = (name: string): unknown => JSON.parse(readFileSync(join(REPORT_
 
 function loadReport(kind: ReportKindName): LoadedReport {
   const parsed = parseReportInput(readJson(`${kind}.json`));
-  if (!parsed.ok) throw new Error(`${kind} report input rejected: ${JSON.stringify(parsed.error.slice(0, 5))}`);
+  if (!parsed.ok) {throw new Error(`${kind} report input rejected: ${JSON.stringify(parsed.error.slice(0, 5))}`);}
   const assets = new Map<string, Uint8Array>();
   for (const image of parsed.value.images) {
     assets.set(image.id, new Uint8Array(readFileSync(join(REPORT_INPUTS, kind, 'images', `${image.id}.png`))));
@@ -27,7 +27,7 @@ function loadReport(kind: ReportKindName): LoadedReport {
 
 function loadHistory(): History {
   const parsed = parseHistory(readJson('history.json'));
-  if (!parsed.ok) throw new Error(`history rejected: ${JSON.stringify(parsed.error.slice(0, 5))}`);
+  if (!parsed.ok) {throw new Error(`history rejected: ${JSON.stringify(parsed.error.slice(0, 5))}`);}
   return parsed.value;
 }
 
@@ -35,7 +35,7 @@ export const loaded: LoadedReports = { reports: ALL_KINDS.map(loadReport), histo
 
 export const byKind = (kind: ReportKindName): ValidReport => {
   const report = loaded.reports.find((candidate) => candidate.input.kind === kind);
-  if (report === undefined) throw new Error(`no ${kind} report`);
+  if (report === undefined) {throw new Error(`no ${kind} report`);}
   return report.input;
 };
 export const assetsOf = (report: ValidReport): { png: ReadonlyMap<string, Uint8Array> } =>
@@ -44,14 +44,14 @@ export const assetsOf = (report: ValidReport): { png: ReadonlyMap<string, Uint8A
 const generated = new Map<string, readonly Output[]>();
 export function outputs(report: ValidReport): readonly Output[] {
   const cached = generated.get(report.reportId);
-  if (cached) return cached;
+  if (cached) {return cached;}
   const fresh = generate(report, assetsOf(report), loaded.history);
   generated.set(report.reportId, fresh);
   return fresh;
 }
 export const outputText = (files: readonly Output[], name: string): string => {
   const file = files.find((candidate) => candidate.name === name);
-  if (file === undefined) throw new Error(`no output ${name}`);
+  if (file === undefined) {throw new Error(`no output ${name}`);}
   return new TextDecoder().decode(file.bytes);
 };
 export const reportHtml = (report: ValidReport): string => outputText(outputs(report), 'report.html');

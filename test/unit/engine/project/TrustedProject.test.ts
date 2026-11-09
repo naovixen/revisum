@@ -101,7 +101,7 @@ test('the trusted project is the same whether or not the change edits project.js
     const untouched = await loadForChange(repository.versionControl(), [], memoryEventSink());
     const edited = await loadForChange(repository.versionControl(), [PROJECT_PATH, APPLICATION_CODE], memoryEventSink());
     assert.equal(untouched.ok && edited.ok, true, JSON.stringify({ untouched, edited }));
-    if (!untouched.ok || !edited.ok) return;
+    if (!untouched.ok || !edited.ok) {return;}
     assert.equal(canonicalJson(edited.value.project), canonicalJson(untouched.value.project));
   }, editsProjectWithCode);
 });
@@ -144,7 +144,7 @@ test('an approvers.json edited in the change does not make its new maintainer ab
   }, (fixture) => {
     // The change names the agent's account as maintainer; that account then lands a commit on main.
     const edited = structuredClone(approversOf(fixture));
-    if (edited.agentLockdown !== undefined) edited.agentLockdown.maintainer = 'agent-account';
+    if (edited.agentLockdown !== undefined) {edited.agentLockdown.maintainer = 'agent-account';}
     fixture.workingCopy[APPROVERS_PATH] = edited;
     fixture.landings.push({ commit: 'commit-agent-merge', branch: 'main', login: 'agent-account', type: AccountType.User, at: '2026-10-25T09:00:00Z' });
   });
@@ -157,7 +157,7 @@ test('the same maintainer, once named in approvers.json on the protected branch,
     assert.equal(verified.ok, true, JSON.stringify(verified));
   }, (fixture) => {
     const lockdown = approversOf(fixture).agentLockdown;
-    if (lockdown !== undefined) lockdown.maintainer = 'agent-account';
+    if (lockdown !== undefined) {lockdown.maintainer = 'agent-account';}
     fixture.landings.push({ commit: 'commit-agent-merge', branch: 'main', login: 'agent-account', type: AccountType.User, at: '2026-10-25T09:00:00Z' });
     fixture.lastCommitsOnProtectedBranch = { [PLAN_PATH]: 'commit-agent-merge' };
   });

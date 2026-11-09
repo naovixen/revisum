@@ -64,9 +64,9 @@ export function runnerOn(engine: ContainerEngine, checkout: string = REPOSITORY_
 
 // The failure's code, whether the runner gives the bare code or a { code } object.
 export function errorCode(result: Result<WorkloadOutcome, unknown>): string | null {
-  if (result.ok) return null;
+  if (result.ok) {return null;}
   const error: unknown = result.error;
-  if (typeof error === 'string') return error;
+  if (typeof error === 'string') {return error;}
   const code: unknown = typeof error === 'object' && error !== null ? Reflect.get(error, 'code') : undefined;
   return typeof code === 'string' ? code : JSON.stringify(error);
 }
@@ -93,13 +93,13 @@ export const DISTINCTIVE_HOST_VALUES: readonly string[] = Object.values(HOST_CRE
 // Runs `body` with the host's environment seeded with HOST_CREDENTIALS, then restores it.
 export async function withSeededHost<Value>(body: () => Promise<Value>): Promise<Value> {
   const previous = new Map(Object.keys(HOST_CREDENTIALS).map((name) => [name, process.env[name]] as const));
-  for (const [name, value] of Object.entries(HOST_CREDENTIALS)) process.env[name] = value;
+  for (const [name, value] of Object.entries(HOST_CREDENTIALS)) {process.env[name] = value;}
   try {
     return await body();
   } finally {
     for (const [name, value] of previous) {
-      if (value === undefined) Reflect.deleteProperty(process.env, name);
-      else process.env[name] = value;
+      if (value === undefined) {Reflect.deleteProperty(process.env, name);}
+      else {process.env[name] = value;}
     }
   }
 }

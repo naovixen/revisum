@@ -113,10 +113,10 @@ async function declaredSignupApproval(): Promise<Approval> {
   let approval: Approval | undefined;
   await withRepository('solo', async (repository) => {
     const verified = await repository.verify(repository.subject('plan'), repository.lockdownProof());
-    if (!verified.ok) throw new Error(`the sign-up plan was not approved: ${verified.error}`);
+    if (!verified.ok) {throw new Error(`the sign-up plan was not approved: ${verified.error}`);}
     approval = verified.value.approval;
   });
-  if (approval === undefined) throw new Error('no approval');
+  if (approval === undefined) {throw new Error('no approval');}
   return approval;
 }
 

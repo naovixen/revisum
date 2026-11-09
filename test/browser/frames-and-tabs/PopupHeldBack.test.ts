@@ -93,7 +93,7 @@ async function openPopup(session: DriverSession): Promise<void> {
   await session.act(capability.actionStep(click(role('button', OPEN_BUTTON))), allowEveryAction);
   const deadline = Date.now() + WAIT_MILLISECONDS;
   const reported = (): boolean => session.egressRecords().some((entry) => entry.channel === BrowserChannel.Popup && entry.origin === reachable.origin);
-  while (!reported() && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, POLL_MILLISECONDS));
+  while (!reported() && Date.now() < deadline) {await new Promise((resolve) => setTimeout(resolve, POLL_MILLISECONDS));}
   assert.ok(reported(), `the browser reported the popup: ${JSON.stringify(session.egressRecords())}`);
   await new Promise((resolve) => setTimeout(resolve, POPUP_SETTLE_MILLISECONDS));
 }

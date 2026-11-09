@@ -69,14 +69,14 @@ export const withPatterns = (irreversiblePatterns: Readonly<Record<string, reado
 // The project as core trusts it: read from the protected branch.
 export async function trustedProject(input: JsonRecord = policyProjectInput()): Promise<TrustedProject> {
   const loaded = await loadTrustedProject('project.json', fakeProtectedBranchHolding(input), { files: [], events: memoryEventSink() });
-  if (!loaded.ok) throw new Error(`the policy test project was not trusted: ${JSON.stringify(loaded.error)}`);
+  if (!loaded.ok) {throw new Error(`the policy test project was not trusted: ${JSON.stringify(loaded.error)}`);}
   return loaded.value.project;
 }
 
 // The project the plan parser reads, from the same file.
 export function parserProject(input: JsonRecord = policyProjectInput()): Project {
   const parsed = parseProject(input);
-  if (!parsed.ok) throw new Error(`bad policy test project: ${JSON.stringify(parsed.error)}`);
+  if (!parsed.ok) {throw new Error(`bad policy test project: ${JSON.stringify(parsed.error)}`);}
   return parsed.value;
 }
 
@@ -96,7 +96,7 @@ export const planOf = (steps: readonly unknown[], targets: readonly string[] = [
 // A plan parsed against `projectInput`, as the plan parser returns it.
 export function parsedPlan(raw: JsonRecord, projectInput: JsonRecord = policyProjectInput()): Plan {
   const parsed = planParser(parserProject(projectInput))(raw);
-  if (!parsed.ok) throw new Error(`the test plan was rejected: ${JSON.stringify(parsed.error)}`);
+  if (!parsed.ok) {throw new Error(`the test plan was rejected: ${JSON.stringify(parsed.error)}`);}
   return parsed.value;
 }
 
@@ -125,13 +125,13 @@ export const decideOn = (tested: TestGate, plan: Plan, standing?: PlanStanding):
 
 export function localeOf(project: TrustedProject, targetId: string): Locale {
   const found = project.matrix.find((candidate) => candidate.id === targetId);
-  if (found === undefined) throw new Error(`no target ${targetId} in the test project`);
+  if (found === undefined) {throw new Error(`no target ${targetId} in the test project`);}
   return found.locale;
 }
 
 export function stepAt(plan: Plan, index: number): Step {
   const step = plan.steps[index];
-  if (step === undefined) throw new Error(`the plan has no step ${index}`);
+  if (step === undefined) {throw new Error(`the plan has no step ${index}`);}
   return step;
 }
 
@@ -168,9 +168,9 @@ export async function approvedStanding(plan: Plan): Promise<PlanStanding> {
   let standing: PlanStanding | undefined;
   await withRepository('solo', async (repository) => {
     const verified = await repository.verify({ kind: ApprovalSubjectKind.Plan, hash: planHash(plan), path: PLAN_PATH }, repository.lockdownProof());
-    if (!verified.ok) throw new Error(`the test plan was not approved: ${verified.error}`);
+    if (!verified.ok) {throw new Error(`the test plan was not approved: ${verified.error}`);}
     standing = { mode: 'approved', approval: verified.value.approval };
   }, (fixture) => { fixture.protectedFiles[PLAN_PATH] = plan; });
-  if (standing === undefined) throw new Error('no approval');
+  if (standing === undefined) {throw new Error('no approval');}
   return standing;
 }

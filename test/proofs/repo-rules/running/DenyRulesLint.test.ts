@@ -21,11 +21,11 @@ after(() => { scratch.dispose(); });
 // The settings with every deny rule that `matches` removed.
 const withoutDenials = (matches: (rule: string) => boolean) => editJson((settings) => {
   const permissions = settings['permissions'];
-  if (typeof permissions !== 'object' || permissions === null) throw new Error(`${SETTINGS_PATH} has no permissions`);
+  if (typeof permissions !== 'object' || permissions === null) {throw new Error(`${SETTINGS_PATH} has no permissions`);}
   const deny: unknown = Object.getOwnPropertyDescriptor(permissions, 'deny')?.value;
-  if (!Array.isArray(deny)) throw new Error(`${SETTINGS_PATH} has no deny list`);
+  if (!Array.isArray(deny)) {throw new Error(`${SETTINGS_PATH} has no deny list`);}
   const kept = deny.filter((rule) => !(typeof rule === 'string' && matches(rule)));
-  if (kept.length === deny.length) throw new Error(`no deny rule in ${SETTINGS_PATH} matched`);
+  if (kept.length === deny.length) {throw new Error(`no deny rule in ${SETTINGS_PATH} matched`);}
   Object.assign(permissions, { deny: kept });
 });
 

@@ -135,9 +135,9 @@ test('the team\'s container gets only the declared variables and Revisum\'s own'
 
 test('no seeded host credential reaches the team\'s container, by name or by value', async () => {
   const { options } = await teamContainer();
-  for (const name of Object.keys(HOST_CREDENTIALS)) assert.ok(!Object.hasOwn(options.environment, name), `${name} reached the container`);
+  for (const name of Object.keys(HOST_CREDENTIALS)) {assert.ok(!Object.hasOwn(options.environment, name), `${name} reached the container`);}
   const values = Object.values(options.environment);
-  for (const value of DISTINCTIVE_HOST_VALUES) assert.ok(!values.some((text) => text.includes(value)), 'a host credential\'s value reached the container');
+  for (const value of DISTINCTIVE_HOST_VALUES) {assert.ok(!values.some((text) => text.includes(value)), 'a host credential\'s value reached the container');}
   assert.deepEqual(Object.keys(options.environment).filter((name) => name.startsWith('GITHUB_')), []);
 });
 

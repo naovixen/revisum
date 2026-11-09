@@ -39,7 +39,7 @@ export function fakeSecretValue(): string {
     const candidate = `rv${randomBytes(12).toString('base64')}/${randomBytes(6).toString('hex')}~?`;
     const base64 = Buffer.from(candidate).toString('base64');
     const changesUnderUriEncoding = encodeURIComponent(candidate) !== candidate;
-    if (/[a-z]/.test(candidate) && changesUnderUriEncoding && /[+/]/.test(base64)) return candidate;
+    if (/[a-z]/.test(candidate) && changesUnderUriEncoding && /[+/]/.test(base64)) {return candidate;}
   }
 }
 
@@ -53,7 +53,7 @@ export function letterNonce(length: number): string {
 // A fresh fake secret of exactly `length` characters, letters and digits only.
 export function fakeSecretOfLength(length: number): string {
   let value = '';
-  while (value.length < length) value += randomBytes(16).toString('base64').replace(/[^A-Za-z0-9]/g, '');
+  while (value.length < length) {value += randomBytes(16).toString('base64').replace(/[^A-Za-z0-9]/g, '');}
   return value.slice(0, length);
 }
 
@@ -75,9 +75,9 @@ export function echoesIn(text: string, value: string): readonly string[] {
   const forms = echoForms(value);
   const lowerText = text.toLowerCase();
   const found: string[] = [];
-  for (const form of ['raw', 'uri', 'base64', 'base64url'] as const) if (text.includes(forms[form])) found.push(form);
-  if (lowerText.includes(value.toLowerCase())) found.push('case');
-  if (lowerText.includes(forms.prefix.toLowerCase())) found.push('prefix');
+  for (const form of ['raw', 'uri', 'base64', 'base64url'] as const) {if (text.includes(forms[form])) {found.push(form);}}
+  if (lowerText.includes(value.toLowerCase())) {found.push('case');}
+  if (lowerText.includes(forms.prefix.toLowerCase())) {found.push('prefix');}
   return found;
 }
 
@@ -90,7 +90,7 @@ export const fakeEnvironmentStore = (variables: Readonly<Record<string, string>>
 // The secret a fake environment holds under `name`; a test that cannot resolve it is broken.
 export function resolvedSecret(name: string, value: string): Secret {
   const secret = fakeEnvironmentStore({ [name]: value }).resolve(secretName(name));
-  if (secret === null) throw new Error(`the store did not resolve ${name}`);
+  if (secret === null) {throw new Error(`the store did not resolve ${name}`);}
   return secret;
 }
 
@@ -111,7 +111,7 @@ export const secretProjectFile = (secretNames: readonly string[]) => ({
 
 export function secretProject(secretNames: readonly string[]): Project {
   const parsed = parseProject(secretProjectFile(secretNames));
-  if (!parsed.ok) throw new Error(`bad test project: ${JSON.stringify(parsed.error)}`);
+  if (!parsed.ok) {throw new Error(`bad test project: ${JSON.stringify(parsed.error)}`);}
   return parsed.value;
 }
 
@@ -131,7 +131,7 @@ export const secretFillPlan = (secretNames: readonly string[], extra: Readonly<R
 
 export function parsedPlan(project: Project, raw: unknown): Plan {
   const parsed = planParser(project)(raw);
-  if (!parsed.ok) throw new Error(`test plan rejected: ${JSON.stringify(parsed.error)}`);
+  if (!parsed.ok) {throw new Error(`test plan rejected: ${JSON.stringify(parsed.error)}`);}
   return parsed.value;
 }
 

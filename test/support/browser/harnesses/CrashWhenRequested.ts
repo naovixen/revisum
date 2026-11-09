@@ -12,7 +12,7 @@ const GIVE_UP_MILLISECONDS = 20_000;
 export function crashWhenRequested(harness: CapabilityHarness, watched: WatchedDriver, path: string): Promise<number> {
   const crash = Promise.all([watched.opened(), harness.requested(path)]).then(([browserProcessId]) => {
     const renderers = rendererProcesses(browserProcessId);
-    for (const renderer of renderers) endAtOnce(renderer.processId);
+    for (const renderer of renderers) {endAtOnce(renderer.processId);}
     return renderers.length;
   });
   let timer: NodeJS.Timeout | undefined;

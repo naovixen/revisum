@@ -25,7 +25,7 @@ const BANNED = [
 ] as const;
 
 const scratchFolders: string[] = [];
-after(() => { for (const folder of scratchFolders) rmSync(folder, { recursive: true, force: true }); });
+after(() => { for (const folder of scratchFolders) {rmSync(folder, { recursive: true, force: true });} });
 
 // A throw-away copy of the clean fixture repository with one file added.
 function cleanCopyWith(path: string, content: string): string {

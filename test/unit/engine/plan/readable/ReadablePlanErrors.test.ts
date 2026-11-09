@@ -56,7 +56,7 @@ const CREATE_ORDER = 'Call createOrder with contactEmail "ada@example.com", cust
 
 function textErrors(text: string): readonly DraftError[] {
   const read = readPlanText(text, limits);
-  if (read.ok) assert.fail(`the text was accepted:\n${text}`);
+  if (read.ok) {assert.fail(`the text was accepted:\n${text}`);}
   return read.error;
 }
 
@@ -75,7 +75,7 @@ function columnsOf(line: string, token: string, occurrence: number): readonly [n
   let index = -1;
   for (let found = 0; found < occurrence; found += 1) {
     index = line.indexOf(token, index + 1);
-    if (index === -1) throw new Error(`"${token}" does not appear ${occurrence} times in: ${line}`);
+    if (index === -1) {throw new Error(`"${token}" does not appear ${occurrence} times in: ${line}`);}
   }
   return [index + 1, index + token.length];
 }
@@ -109,7 +109,7 @@ test('the sign-up plan\'s canonical text reads with no error and no warning', ()
 test('reading text gives the line each step came from', () => {
   const text = signupText();
   const read = readPlanText(text, limits);
-  if (!read.ok) assert.fail(shown(read.error));
+  if (!read.ok) {assert.fail(shown(read.error));}
   for (const [index, statement] of STEP_STATEMENTS) {
     assert.equal(read.value.positions.get(`$.steps[${index}]`)?.line, lineOf(text, statement), `the line of step ${index}`);
   }
@@ -169,7 +169,7 @@ test('the same position with its English suffix reads as position 2', () => {
   // The counter-example for the wrong suffix.
   const original = signupText();
   const read = readPlanText(withLineReplaced(original, lineOf(original, CREATE_ACCOUNT), 'Click 2nd button "Create account"'), limits);
-  if (!read.ok) assert.fail(shown(read.error));
+  if (!read.ok) {assert.fail(shown(read.error));}
   const steps = (read.value.json as { steps: { locator?: unknown }[] }).steps;
   assert.deepEqual(steps[8]?.locator, { by: 'role', role: 'button', name: 'Create account', position: 2 });
 });
@@ -209,7 +209,7 @@ test('quoted text with the two allowed escapes and braces reads as literal text'
   const original = signupText();
   const text = withLineReplaced(original, lineOf(original, CREATE_ACCOUNT), 'Click button "Create \\"new\\" \\\\ {account}"');
   const read = readPlanText(text, limits);
-  if (!read.ok) assert.fail(shown(read.error));
+  if (!read.ok) {assert.fail(shown(read.error));}
   const steps = (read.value.json as { steps: { locator?: unknown }[] }).steps;
   assert.deepEqual(steps[8]?.locator, { by: 'role', role: 'button', name: 'Create "new" \\ {account}' });
 });
@@ -315,9 +315,9 @@ test('a name reused elsewhere in the plan is the parser\'s duplicate, not duplic
   const line = linesOf(original).length;
   const text = withLineInserted(original, line, 'Remember text of test id "echo" as contact');
   const read = readPlanText(text, limits);
-  if (!read.ok) assert.fail(`the text was refused: ${shown(read.error)}`);
+  if (!read.ok) {assert.fail(`the text was refused: ${shown(read.error)}`);}
   const admitted = admitDraft(textDraft(text), parsePlan, memoryEventSink(), actor());
-  if (admitted.ok) assert.fail('the plan with a reused name was admitted');
+  if (admitted.ok) {assert.fail('the plan with a reused name was admitted');}
   assert.ok(admitted.error.some((error) => error.stage === 'plan' && error.code === 'duplicate'), shown(admitted.error));
 });
 
@@ -342,7 +342,7 @@ function actor() {
 
 function parserErrors(text: string): readonly DraftError[] {
   const admitted = admitDraft(textDraft(text), parsePlan, memoryEventSink(), actor());
-  if (admitted.ok) assert.fail(`the draft was admitted:\n${text}`);
+  if (admitted.ok) {assert.fail(`the draft was admitted:\n${text}`);}
   return admitted.error;
 }
 
@@ -375,7 +375,7 @@ test('the parser refuses a lone surrogate in JSON as unsafe_text, and accepts a 
     const plan = signupPlan();
     const steps = plan['steps'] as { locator: { name: string } }[];
     const step = steps[8];
-    if (step === undefined) throw new Error('the sign-up plan has no step 8');
+    if (step === undefined) {throw new Error('the sign-up plan has no step 8');}
     step.locator.name = name;
     return plan;
   };

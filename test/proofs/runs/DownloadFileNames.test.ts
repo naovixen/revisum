@@ -39,7 +39,7 @@ test('every hostile file is served under the name it claims, with a marker in it
   assert.deepEqual(harness.hostileFiles.map((file) => lastPart(file.fileName)), [
     'passwd', `${escapingName()}.txt`, `${escapingName()}-absolute.txt`, 'CON', 'NUL.txt',
   ]);
-  for (const file of harness.hostileFiles) assert.ok(file.bytes.toString('utf8').includes(file.marker));
+  for (const file of harness.hostileFiles) {assert.ok(file.bytes.toString('utf8').includes(file.marker));}
 });
 
 // The hostile names, in the order the harness serves them.
@@ -78,7 +78,7 @@ for (const [index, described] of HOSTILE_NAMES.entries()) {
     assert.deepEqual(filesHolding(file.marker, ran.startedAt), [], `${file.kind}: no copy of the file is left`);
     assert.deepEqual(filesNamed(escapingName(), ran.startedAt), [], `${file.kind}: no file carries the escaping name`);
     for (const folder of nearbyFolders()) {
-      for (const name of [`${escapingName()}.txt`, `${escapingName()}-absolute.txt`]) assert.ok(!existsSync(join(folder, name)), `${file.kind}: ${join(folder, name)} was written`);
+      for (const name of [`${escapingName()}.txt`, `${escapingName()}-absolute.txt`]) {assert.ok(!existsSync(join(folder, name)), `${file.kind}: ${join(folder, name)} was written`);}
     }
     assert.ok(!existsSync(join(tmpdir(), `${escapingName()}-absolute.txt`)), `${file.kind}: the absolute path was written`);
     assert.equal(digestOf(SYSTEM_PASSWORD_FILE), passwordBefore, `${file.kind}: ${SYSTEM_PASSWORD_FILE} changed`);

@@ -50,13 +50,13 @@ const lineOf = (received: ReceivedRequest): string => `${received.method} ${rece
 // The shop, as the fake caller's SHOP_ROUTE answers: an order is created, read back as paid and
 // deleted; the test data is reset; an administrator session opens.
 const shopAnswer = (override: ShopOverride | undefined): Answer => (received, response, earlier) => {
-  if (override?.(received, response, earlier) === true) return;
+  if (override?.(received, response, earlier) === true) {return;}
   const line = lineOf(received);
-  if (line === 'POST /api/orders') json(response, 201, { id: ORDER_ID, status: 'pending' });
-  else if (line === `GET /api/orders/${ORDER_ID}`) json(response, 200, { status: 'paid', total: 42 });
-  else if (line === `DELETE /api/orders/${ORDER_ID}` || line === 'POST /api/test/reset') response.writeHead(204).end();
-  else if (line === 'POST /api/test/sessions') json(response, 201, { session: 'session_7' });
-  else json(response, 404, { error: 'no such route' });
+  if (line === 'POST /api/orders') {json(response, 201, { id: ORDER_ID, status: 'pending' });}
+  else if (line === `GET /api/orders/${ORDER_ID}`) {json(response, 200, { status: 'paid', total: 42 });}
+  else if (line === `DELETE /api/orders/${ORDER_ID}` || line === 'POST /api/test/reset') {response.writeHead(204).end();}
+  else if (line === 'POST /api/test/sessions') {json(response, 201, { session: 'session_7' });}
+  else {json(response, 404, { error: 'no such route' });}
 };
 
 type RealRun = CallRun & { readonly shop: LocalService; readonly proxy: EgressProxy; readonly consoleText: string };
@@ -106,7 +106,7 @@ const received = (shop: LocalService): string[] => shop.received.map(lineOf);
 const countOf = (shop: LocalService, line: string): number => received(shop).filter((sent) => sent === line).length;
 const answering = (line: string, answer: (response: Parameters<Answer>[1], earlier: readonly ReceivedRequest[]) => void): ShopOverride =>
   (request, response, earlier) => {
-    if (lineOf(request) !== line) return false;
+    if (lineOf(request) !== line) {return false;}
     answer(response, earlier);
     return true;
   };
@@ -243,10 +243,10 @@ const echoingShop: ShopOverride = (request, response) => {
   const echoes = Object.values(SECRET_VALUES).flatMap((value) => [value, basicForm(value), encodeURIComponent(value)]);
   const echo = { token: authorization.replace(/^Bearer /, ''), headers: request.headers, body: request.body, all: echoes };
   const line = lineOf(request);
-  if (line === 'POST /api/orders') json(response, 201, { id: ORDER_ID, status: 'pending', echo });
-  else if (line === `GET /api/orders/${ORDER_ID}`) json(response, 200, { status: 'paid', total: 42, echo });
-  else if (line === 'POST /api/test/sessions') json(response, 201, { session: 'session_7', echo });
-  else return false;
+  if (line === 'POST /api/orders') {json(response, 201, { id: ORDER_ID, status: 'pending', echo });}
+  else if (line === `GET /api/orders/${ORDER_ID}`) {json(response, 200, { status: 'paid', total: 42, echo });}
+  else if (line === 'POST /api/test/sessions') {json(response, 201, { session: 'session_7', echo });}
+  else {return false;}
   return true;
 };
 

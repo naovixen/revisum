@@ -111,7 +111,7 @@ export function endlessAnswer(totalBytes: number): EndlessAnswer {
           return;
         }
       }
-      if (!closed) response.end();
+      if (!closed) {response.end();}
     };
     writeMore();
   };

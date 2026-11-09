@@ -28,7 +28,7 @@ for (const [what, steps, targets] of PLANS) {
     const first = decideOn(tested, plan);
     const second = decideOn(tested, plan);
     assert.deepEqual(comparable(second), comparable(first));
-    if (first.kind === PolicyVerdictKind.Allow && second.kind === PolicyVerdictKind.Allow) assert.deepEqual(second.runs.map((cleared) => canonicalJson(cleared.plan)), first.runs.map((cleared) => canonicalJson(cleared.plan)));
+    if (first.kind === PolicyVerdictKind.Allow && second.kind === PolicyVerdictKind.Allow) {assert.deepEqual(second.runs.map((cleared) => canonicalJson(cleared.plan)), first.runs.map((cleared) => canonicalJson(cleared.plan)));}
   });
 
   test(`two gates built from the same project file decide ${what} alike`, async () => {

@@ -66,7 +66,7 @@ for (const targetId of Object.values(BrowserTarget)) {
       }
       assert.equal(hashes.size, 1, 'every replay gives the same result hash');
       assert.equal(reused.environments.length, determinismRuns(), 'every replay asked for its session');
-      for (const environment of reused.environments) assert.deepEqual(environment, reused.environments[0]);
+      for (const environment of reused.environments) {assert.deepEqual(environment, reused.environments[0]);}
       assert.equal(reused.environments[0]?.fixedTimeMilliseconds, FIRST_OF_NOVEMBER_AT_NINE, 'the session is frozen at the plan clock');
     });
   });

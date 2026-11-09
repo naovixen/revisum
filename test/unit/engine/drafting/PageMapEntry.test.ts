@@ -93,7 +93,7 @@ test('the filled text field keeps its role and name, and its value is nowhere in
 test('the paragraph and every static text are dropped, so no paragraph text is in the entry', async () => {
   const entry = await contactEntry();
   const roles = allNodes(entry.tree).map((kept) => kept.role);
-  for (const dropped of ['paragraph', 'StaticText', 'generic', 'label', 'ListMarker', 'document']) assert.equal(roles.includes(dropped), false, `${dropped} was kept`);
+  for (const dropped of ['paragraph', 'StaticText', 'generic', 'label', 'ListMarker', 'document']) {assert.equal(roles.includes(dropped), false, `${dropped} was kept`);}
   assert.equal(shown(entry).includes(PARAGRAPH_TEXT), false, 'paragraph text reached the page map');
 });
 
@@ -156,7 +156,7 @@ test('a title holding an email address or the declared secret is redacted too', 
 test('the path keeps no query or fragment, so values in the address never reach the map', async () => {
   const entry = await contactEntry();
   assert.equal(entry.path, '/contact.html');
-  for (const part of ['newsletter', 'reader=ada', '#form', '?']) assert.equal(shown(entry).includes(part), false, `${part} is in the entry`);
+  for (const part of ['newsletter', 'reader=ada', '#form', '?']) {assert.equal(shown(entry).includes(part), false, `${part} is in the entry`);}
 });
 
 test('every kept role is kept, with its name, in document order', async () => {

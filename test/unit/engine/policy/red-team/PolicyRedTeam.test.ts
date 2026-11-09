@@ -49,15 +49,15 @@ const ACTING_STEPS: readonly Step['type'][] = ['click', 'hover', 'fill', 'select
 
 // What the page resolves a step's locator to, unless the case says otherwise.
 function resolvedElement(step: Step, seen: PageView | undefined): ResolvedElement {
-  if (seen?.element !== undefined) return element(seen.element);
-  if (step.type === StepType.Dialog) return NO_ELEMENT;
-  if (!('locator' in step)) throw new Error(`a ${step.type} step resolves no element`);
+  if (seen?.element !== undefined) {return element(seen.element);}
+  if (step.type === StepType.Dialog) {return NO_ELEMENT;}
+  if (!('locator' in step)) {throw new Error(`a ${step.type} step resolves no element`);}
   // The red-team plans hold literal text only; literalLocator is the one place that says so.
   const locator = literalLocator(step.locator);
-  if (locator === undefined) throw new Error(`the ${step.type} step's locator names a run value`);
-  if (locator.by === SemanticLocatorKind.Role) return element({ role: locator.role, name: locator.name });
-  if (locator.by === 'label') return element({ role: 'textbox', name: locator.label });
-  if (locator.by === 'text') return element({ name: locator.text });
+  if (locator === undefined) {throw new Error(`the ${step.type} step's locator names a run value`);}
+  if (locator.by === SemanticLocatorKind.Role) {return element({ role: locator.role, name: locator.name });}
+  if (locator.by === 'label') {return element({ role: 'textbox', name: locator.label });}
+  if (locator.by === 'text') {return element({ name: locator.text });}
   throw new Error(`the case must say what test id ${locator.testId} resolves to`);
 }
 
@@ -66,13 +66,13 @@ function resolvedElement(step: Step, seen: PageView | undefined): ResolvedElemen
 function runThroughGate(gate: PolicyGate, project: TrustedProject, plan: Plan, targetId: string, page: Variant['page']): Outcome {
   const inputEvents = plan.steps.map(() => 0);
   const decision = gate.decide(plan, plan.targets);
-  if (decision.kind === PolicyVerdictKind.Deny) return { state: TerminalState.Denied, stage: 'static', rule: decision.rule, stepIndex: decision.stepIndex, inputEvents };
+  if (decision.kind === PolicyVerdictKind.Deny) {return { state: TerminalState.Denied, stage: 'static', rule: decision.rule, stepIndex: decision.stepIndex, inputEvents };}
   const locale = localeOf(project, targetId);
   for (const [index, step] of plan.steps.entries()) {
-    if (!ACTING_STEPS.includes(step.type)) continue;
+    if (!ACTING_STEPS.includes(step.type)) {continue;}
     const seen = page?.[String(index)];
     const verdict = gate.guardAction(step, index, resolvedElement(step, seen), seen?.dialogText ?? null, locale);
-    if (verdict.kind === PolicyVerdictKind.Deny) return { state: TerminalState.Denied, stage: 'runtime', rule: verdict.rule, stepIndex: verdict.stepIndex, inputEvents };
+    if (verdict.kind === PolicyVerdictKind.Deny) {return { state: TerminalState.Denied, stage: 'runtime', rule: verdict.rule, stepIndex: verdict.stepIndex, inputEvents };}
     inputEvents[index] = (inputEvents[index] ?? 0) + 1;
   }
   return { state: 'Ran', inputEvents };

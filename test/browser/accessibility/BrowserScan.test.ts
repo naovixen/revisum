@@ -45,7 +45,7 @@ test('CDP commands time out and closing ends the launched browser process', { ti
   await assert.rejects(launched.connection.ask(sessionId, EVALUATE, { expression: 'new Promise(() => {})', awaitPromise: true }, 500), /timeout after 500 ms/);
   await assert.rejects(launched.connection.ask(sessionId, NO_SUCH_COMMAND, {}, 5000), /No.suchMethod/);
   await launched.connection.ask(undefined, CLOSE_THE_BROWSER, {}, 5000).catch(() => undefined);
-  for (let i = 0; i < 200 && launched.browserProcess.exitCode === null; i++) await new Promise((resolve) => setTimeout(resolve, 50));
+  for (let i = 0; i < 200 && launched.browserProcess.exitCode === null; i++) {await new Promise((resolve) => setTimeout(resolve, 50));}
   assert.notEqual(launched.browserProcess.exitCode, null);
   launched.connection.close();
   const second = await launchBrowser(BROWSERS.chrome);

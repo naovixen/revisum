@@ -36,7 +36,7 @@ after(() => { scratch.dispose(); });
 type JsonObject = Record<string, unknown>;
 const recordAt = (value: JsonObject, key: string): JsonObject => {
   const found = value[key];
-  if (typeof found === 'object' && found !== null && !Array.isArray(found)) return found as JsonObject;
+  if (typeof found === 'object' && found !== null && !Array.isArray(found)) {return found as JsonObject;}
   const created: JsonObject = {};
   value[key] = created;
   return created;
@@ -67,11 +67,11 @@ const developmentDependencyEdits = {
 function replaceResultAfter(component: string, from: string, to: string): (text: string) => string {
   return (text) => {
     const start = text.indexOf(component);
-    if (start < 0) throw new Error(`${REVIEWS_PATH} does not mention ${component}`);
+    if (start < 0) {throw new Error(`${REVIEWS_PATH} does not mention ${component}`);}
     const rest = text.slice(start);
     const result = `DependencyCheckResult.${from}`;
     const index = rest.indexOf(result);
-    if (index < 0) throw new Error(`no ${result} follows ${component} in ${REVIEWS_PATH}`);
+    if (index < 0) {throw new Error(`no ${result} follows ${component} in ${REVIEWS_PATH}`);}
     return text.slice(0, start) + rest.slice(0, index) + `DependencyCheckResult.${to}` + rest.slice(index + result.length);
   };
 }
@@ -115,7 +115,7 @@ test('the lint fails when a review cites a repository path that does not exist',
       const cited = [...text.matchAll(/(['"])([\w.-]+(?:\/[\w.-]+)+\.\w+)\1/g)]
         .map((match) => match[2] ?? '')
         .find((path) => path !== '' && existsSync(join(scratch.root(), path)));
-      if (cited === undefined) throw new Error(`${REVIEWS_PATH} cites no repository path as evidence`);
+      if (cited === undefined) {throw new Error(`${REVIEWS_PATH} cites no repository path as evidence`);}
       return text.split(cited).join('docs/decisions/missing-dependency-review.md');
     },
   }, ONLY_THE_RULE);

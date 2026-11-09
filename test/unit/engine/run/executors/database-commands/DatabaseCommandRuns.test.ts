@@ -181,8 +181,8 @@ test('the request\'s environment holds exactly the declared variables', async ()
     assert.deepEqual(Object.keys(ran.commands[0]?.environment ?? {}).sort(), [...DECLARED_VARIABLES].sort());
     assert.equal(ran.commands[0]?.environment['PGDATABASE'], DATABASE_NAME);
   } finally {
-    if (before === undefined) Reflect.deleteProperty(process.env, seeded);
-    else process.env[seeded] = before;
+    if (before === undefined) {Reflect.deleteProperty(process.env, seeded);}
+    else {process.env[seeded] = before;}
   }
 });
 

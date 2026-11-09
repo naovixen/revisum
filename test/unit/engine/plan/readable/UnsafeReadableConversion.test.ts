@@ -63,7 +63,7 @@ for (const feature of FEATURES) {
 
 test('the unsafe conversion examples use every unsafe construct and readable form of plan 1.3', () => {
   const used = new Set<string>();
-  for (const { plan } of EXAMPLES) for (const feature of unsafeFeaturesUsed(plan)) used.add(feature);
+  for (const { plan } of EXAMPLES) {for (const feature of unsafeFeaturesUsed(plan)) {used.add(feature);}}
   assert.deepEqual(UNSAFE_LANGUAGE_FEATURES.filter((feature) => !used.has(feature)), [], 'constructs no example uses');
 });
 
@@ -125,7 +125,7 @@ for (const { name, plan } of EXAMPLES) {
     assert.equal(marked.length, markedStepCount(plan['steps']) + markedStepCount(plan['cleanup']), text);
     // The writer prints the mark followed by one space, then a step statement: never a header,
     // Criterion:, Values:, Clean up: or a script line.
-    for (const line of marked) assert.match(line.trimStart(), /^Unsafe: (Expect|Click|Hover|Type|In frame|Remember|Run) /, line);
+    for (const line of marked) {assert.match(line.trimStart(), /^Unsafe: (Expect|Click|Hover|Type|In frame|Remember|Run) /, line);}
   });
 }
 
@@ -141,7 +141,7 @@ test('seeded plans with awkward selectors and script sources survive the trip th
     if (!read.ok) { failures.push(`seed ${seed} (${name}): the text was refused: ${JSON.stringify(read.error)}`); continue; }
     const again = parseAll(read.value.json);
     if (!again.ok) { failures.push(`seed ${seed} (${name}): the read JSON was refused: ${JSON.stringify(again.error)}`); continue; }
-    if (writePlanJson(again.value) !== canonical) failures.push(`seed ${seed} (${name}): the canonical JSON changed`);
+    if (writePlanJson(again.value) !== canonical) {failures.push(`seed ${seed} (${name}): the canonical JSON changed`);}
   }
   assert.deepEqual(failures, []);
 });
@@ -154,7 +154,7 @@ test('seeded plans with awkward selectors and script sources keep their canonica
     if (!read.ok) { failures.push(`seed ${seed} (${name}): the text was refused: ${JSON.stringify(read.error)}`); continue; }
     const again = parseAll(read.value.json);
     if (!again.ok) { failures.push(`seed ${seed} (${name}): the read JSON was refused: ${JSON.stringify(again.error)}`); continue; }
-    if (writePlanText(again.value) !== text) failures.push(`seed ${seed} (${name}): the text changed`);
+    if (writePlanText(again.value) !== text) {failures.push(`seed ${seed} (${name}): the text changed`);}
   }
   assert.deepEqual(failures, []);
 });
@@ -166,12 +166,12 @@ test('the generated plans really hold the awkward text the property is about', (
   const selectors: string[] = [];
   const collect = (value: unknown, key: string): void => {
     if (typeof value === 'string') {
-      if (key === 'source') sources.push(value);
-      if (key === 'selector' || key === 'expression') selectors.push(value);
-    } else if (Array.isArray(value)) value.forEach((item) => collect(item, ''));
-    else if (isRecord(value)) for (const [childKey, child] of Object.entries(value)) collect(child, childKey);
+      if (key === 'source') {sources.push(value);}
+      if (key === 'selector' || key === 'expression') {selectors.push(value);}
+    } else if (Array.isArray(value)) {value.forEach((item) => collect(item, ''));}
+    else if (isRecord(value)) {for (const [childKey, child] of Object.entries(value)) {collect(child, childKey);}}
   };
-  for (const { plan } of generatedUnsafePlans(FIRST_SEED, GENERATED_COUNT)) collect(plan, '');
+  for (const { plan } of generatedUnsafePlans(FIRST_SEED, GENERATED_COUNT)) {collect(plan, '');}
   for (const piece of ['\t', '\r\n', '\r', '\n', '"', '\\', '#', 'Unsafe: ', '日本語']) {
     assert.ok(sources.some((source) => source.includes(piece)), `no generated source holds ${JSON.stringify(piece)}`);
   }

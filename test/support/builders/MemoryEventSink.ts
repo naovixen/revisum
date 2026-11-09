@@ -39,7 +39,7 @@ export function memoryArtifactStore(): MemoryArtifactStore {
   const references: ArtifactReference[] = [];
   return {
     async put(name, bytes, mediaType) {
-      if (data.has(name)) throw new Error(`artifact already exists: ${name}`);
+      if (data.has(name)) {throw new Error(`artifact already exists: ${name}`);}
       data.set(name, bytes);
       const reference = { name, mediaType, sha256: sha256(bytes), bytes: bytes.length };
       references.push(reference);

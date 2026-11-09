@@ -125,8 +125,8 @@ function readResult(root: string, file: string): unknown {
 
 // Every value stored under `key`, at any depth.
 function valuesOf(value: unknown, key: string): unknown[] {
-  if (Array.isArray(value)) return value.flatMap((item) => valuesOf(item, key));
-  if (typeof value !== 'object' || value === null) return [];
+  if (Array.isArray(value)) {return value.flatMap((item) => valuesOf(item, key));}
+  if (typeof value !== 'object' || value === null) {return [];}
   return Object.entries(value).flatMap(([name, inner]) => (name === key ? [inner, ...valuesOf(inner, key)] : valuesOf(inner, key)));
 }
 

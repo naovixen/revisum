@@ -25,7 +25,7 @@ export function compileFiles(files: readonly (string | { readonly name: string; 
     // Without a package.json saying "module", nodenext treats the scratch files as CommonJS.
     writeFileSync(join(folder, 'package.json'), '{"type":"module"}');
     const paths = files.map((file) => {
-      if (typeof file === 'string') return forwardSlashes(file);
+      if (typeof file === 'string') {return forwardSlashes(file);}
       const path = join(folder, file.name);
       writeFileSync(path, file.source);
       return forwardSlashes(path);

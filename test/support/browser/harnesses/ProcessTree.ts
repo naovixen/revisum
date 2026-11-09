@@ -28,10 +28,10 @@ function linuxStatus(processId: number): { readonly state: string; readonly pare
 function linuxProcesses(): RunningProcess[] {
   const processes: RunningProcess[] = [];
   for (const name of readdirSync('/proc')) {
-    if (!/^\d+$/.test(name)) continue;
+    if (!/^\d+$/.test(name)) {continue;}
     const processId = Number(name);
     const status = linuxStatus(processId);
-    if (status === null || status.state === 'Z') continue;
+    if (status === null || status.state === 'Z') {continue;}
     let commandLine = '';
     try { commandLine = readFileSync(`/proc/${processId}/cmdline`, 'utf8').split('\0').join(' ').trim(); } catch { /* gone */ }
     processes.push({ processId, parentProcessId: status.parentProcessId, commandLine });
@@ -47,7 +47,7 @@ function windowsProcesses(): RunningProcess[] {
     'Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,CommandLine,'
       + '@{n="Started";e={$_.CreationDate.ToFileTimeUtc()}} | ConvertTo-Json -Compress'],
   { encoding: 'utf8', windowsHide: true, ['maxBuffer']: 64 * 1024 * 1024 });
-  if (query.status !== 0) throw new Error(`listing processes failed: ${query.stderr}`);
+  if (query.status !== 0) {throw new Error(`listing processes failed: ${query.stderr}`);}
   const parsed: unknown = JSON.parse(query.stdout);
   const entries: readonly WindowsProcess[] = Array.isArray(parsed) ? parsed : [parsed as WindowsProcess];
   return entries.map((entry) => ({
@@ -60,7 +60,7 @@ function windowsProcesses(): RunningProcess[] {
 
 function otherProcesses(): RunningProcess[] {
   const query = spawnSync('ps', ['-A', '-o', 'pid=,ppid=,args='], { encoding: 'utf8' });
-  if (query.status !== 0) throw new Error(`listing processes failed: ${query.stderr}`);
+  if (query.status !== 0) {throw new Error(`listing processes failed: ${query.stderr}`);}
   return query.stdout.split('\n').flatMap((line) => {
     const match = /^\s*(\d+)\s+(\d+)\s+(.*)$/.exec(line);
     return match === null ? [] : [{ processId: Number(match[1]), parentProcessId: Number(match[2]), commandLine: match[3] ?? '' }];
@@ -69,8 +69,8 @@ function otherProcesses(): RunningProcess[] {
 
 // Every process running now.
 export function listProcesses(): RunningProcess[] {
-  if (platform() === 'linux') return linuxProcesses();
-  if (platform() === 'win32') return windowsProcesses();
+  if (platform() === 'linux') {return linuxProcesses();}
+  if (platform() === 'win32') {return windowsProcesses();}
   return otherProcesses();
 }
 
@@ -82,7 +82,7 @@ export function processTree(rootProcessId: number, processes: readonly RunningPr
   const seen = new Set(tree.map((member) => member.processId));
   for (let index = 0; index < tree.length; index++) {
     const parent = tree[index];
-    if (parent === undefined) continue;
+    if (parent === undefined) {continue;}
     for (const candidate of processes) {
       const startedFirst = candidate.startedAt !== undefined && parent.startedAt !== undefined && candidate.startedAt < parent.startedAt;
       if (candidate.parentProcessId === parent.processId && !startedFirst && !seen.has(candidate.processId)) {

@@ -151,8 +151,8 @@ const FAILING_STATUSES = new Set(['failed', 'timedOut', 'interrupted']);
 
 // The status of every test result in a report, found wherever a "results" list sits.
 function resultStatuses(value: unknown): string[] {
-  if (Array.isArray(value)) return value.flatMap(resultStatuses);
-  if (typeof value !== 'object' || value === null) return [];
+  if (Array.isArray(value)) {return value.flatMap(resultStatuses);}
+  if (typeof value !== 'object' || value === null) {return [];}
   const entries = Object.entries(value);
   const results: unknown = entries.find(([key]) => key === 'results')?.[1];
   const own = Array.isArray(results)
@@ -226,7 +226,7 @@ export const HOSTILE_MARKER = 'hostile-marker-v3kq';
 
 const letters = (count: number): string => {
   let text = '';
-  while (text.length < count) text += randomBytes(32).toString('base64').replace(/[^A-Za-z0-9]/g, '');
+  while (text.length < count) {text += randomBytes(32).toString('base64').replace(/[^A-Za-z0-9]/g, '');}
   return text.slice(0, count);
 };
 // A fresh token-shaped fake with a well-known issuer prefix, made at run time so no file holds one.

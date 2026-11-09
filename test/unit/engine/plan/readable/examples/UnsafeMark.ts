@@ -47,14 +47,14 @@ export const GOLDEN_TEXT_FOLDER_PATH = GOLDEN_TEXT_FOLDER;
 // The plan the parser makes from `input`; a refusal is a broken test.
 export function parsedWith(parsePlan: ParsePlan, input: unknown, label: string): Plan {
   const parsed = parsePlan(input);
-  if (!parsed.ok) throw new Error(`${label} was refused: ${JSON.stringify(parsed.error)}`);
+  if (!parsed.ok) {throw new Error(`${label} was refused: ${JSON.stringify(parsed.error)}`);}
   return parsed.value;
 }
 
 // The reading of `text`; a refusal is a broken test.
 export function readingOf(text: string, label: string): TextReading {
   const read = readPlanText(text, unsafeLimits());
-  if (!read.ok) throw new Error(`${label}: the text was refused: ${JSON.stringify(read.error)}\n${text}`);
+  if (!read.ok) {throw new Error(`${label}: the text was refused: ${JSON.stringify(read.error)}\n${text}`);}
   return read.value;
 }
 
@@ -64,7 +64,7 @@ export const planFromText = (text: string, label: string): Plan => parsedWith(pa
 // The text errors of a refused reading; an accepted one is a broken test.
 export function textErrorsOf(text: string): readonly DraftError[] {
   const read = readPlanText(text, unsafeLimits());
-  if (read.ok) throw new Error(`the text was accepted:\n${text}`);
+  if (read.ok) {throw new Error(`the text was accepted:\n${text}`);}
   return read.error;
 }
 
@@ -229,10 +229,10 @@ export function unsafeFeaturesUsed(plan: JsonRecord): Set<string> {
   const features = new Set<string>();
   const visitLocator = (locator: JsonRecord, depth: number): void => {
     const kind = String(locator['by']);
-    if (kind !== 'css' && kind !== 'xpath') return;
+    if (kind !== 'css' && kind !== 'xpath') {return;}
     features.add(`locator ${kind}`);
-    if (Object.hasOwn(locator, 'position')) features.add(`locator ${kind} position`);
-    if (Object.hasOwn(locator, 'hasText')) features.add(`locator ${kind} containing text`);
+    if (Object.hasOwn(locator, 'position')) {features.add(`locator ${kind} position`);}
+    if (Object.hasOwn(locator, 'hasText')) {features.add(`locator ${kind} containing text`);}
     const inner = locator['inside'];
     if (isRecord(inner)) {
       features.add(`inside depth ${depth + 1}`);
@@ -240,26 +240,26 @@ export function unsafeFeaturesUsed(plan: JsonRecord): Set<string> {
     }
   };
   const visitSource = (source: string): void => {
-    if (source.includes('\n')) features.add('inline source with several lines');
-    if (source.includes('\t')) features.add('inline source with tab');
-    if (source.includes('\r')) features.add('inline source with carriage return');
-    if (source.endsWith('\n')) features.add('inline source ending with a line break');
-    if (source.includes('\n\n')) features.add('inline source with an empty line');
-    if (source.includes('"') && source.includes('\\')) features.add('inline source with quotes and backslashes');
-    if (/(^|\n)#/.test(source)) features.add('inline source with a line starting with #');
-    if (/:($|\r?\n)/.test(source)) features.add('inline source with a line ending with a colon');
-    if (/(^|\n) /.test(source) && / (\r?\n|$)/.test(source)) features.add('inline source with leading and trailing spaces');
+    if (source.includes('\n')) {features.add('inline source with several lines');}
+    if (source.includes('\t')) {features.add('inline source with tab');}
+    if (source.includes('\r')) {features.add('inline source with carriage return');}
+    if (source.endsWith('\n')) {features.add('inline source ending with a line break');}
+    if (source.includes('\n\n')) {features.add('inline source with an empty line');}
+    if (source.includes('"') && source.includes('\\')) {features.add('inline source with quotes and backslashes');}
+    if (/(^|\n)#/.test(source)) {features.add('inline source with a line starting with #');}
+    if (/:($|\r?\n)/.test(source)) {features.add('inline source with a line ending with a colon');}
+    if (/(^|\n) /.test(source) && / (\r?\n|$)/.test(source)) {features.add('inline source with leading and trailing spaces');}
   };
   const visitScriptStep = (step: JsonRecord, type: string): void => {
     const script = step['script'];
-    if (typeof script === 'string') features.add(`${type} named`);
+    if (typeof script === 'string') {features.add(`${type} named`);}
     if (isRecord(script) && isRecord(script['inline'])) {
       const inline = script['inline'];
       features.add(`${type} inline ${String(inline['effect'])}`);
       const fields = inline['fields'];
       features.add(fields === undefined ? 'inline without returning' : isRecord(fields) && Object.keys(fields).length === 0 ? 'inline returning nothing' : 'inline returning');
-      if (isRecord(fields) && Object.values(fields).includes('')) features.add('inline returning the whole result');
-      if (typeof inline['source'] === 'string') visitSource(inline['source']);
+      if (isRecord(fields) && Object.values(fields).includes('')) {features.add('inline returning the whole result');}
+      if (typeof inline['source'] === 'string') {visitSource(inline['source']);}
     }
   };
   const visitStep = (step: JsonRecord, where: string): void => {
@@ -267,16 +267,16 @@ export function unsafeFeaturesUsed(plan: JsonRecord): Set<string> {
     const locator = step['locator'];
     if (isRecord(locator)) {
       visitLocator(locator, 0);
-      if (type === 'frame' && (locator['by'] === 'css' || locator['by'] === 'xpath')) features.add('frame structural');
+      if (type === 'frame' && (locator['by'] === 'css' || locator['by'] === 'xpath')) {features.add('frame structural');}
     }
     const assertion = step['assert'];
     if (isRecord(assertion)) {
       const kind = String(assertion['kind']);
-      if (['hasClass', 'lacksClass', 'computedStyleEquals', 'attributeEquals', 'attributeAbsent'].includes(kind)) features.add(`dom ${kind}`);
-      if (type === 'expectScript' || type === 'expectDatabase') features.add(`${type} ${kind}`);
+      if (['hasClass', 'lacksClass', 'computedStyleEquals', 'attributeEquals', 'attributeAbsent'].includes(kind)) {features.add(`dom ${kind}`);}
+      if (type === 'expectScript' || type === 'expectDatabase') {features.add(`${type} ${kind}`);}
     }
-    if (type === 'remember' && isRecord(step['from']) && step['from']['read'] === 'attribute') features.add('remember attribute');
-    if (type === 'evaluate' || type === 'expectScript') visitScriptStep(step, type);
+    if (type === 'remember' && isRecord(step['from']) && step['from']['read'] === 'attribute') {features.add('remember attribute');}
+    if (type === 'evaluate' || type === 'expectScript') {visitScriptStep(step, type);}
     if (type === 'evaluate' || type === 'database') {
       const remember = step['remember'];
       features.add(remember === undefined ? `${type} without remembering` : isRecord(remember) && Object.keys(remember).length === 0
@@ -286,15 +286,15 @@ export function unsafeFeaturesUsed(plan: JsonRecord): Set<string> {
       features.add(`step ${type} in ${where}`);
       const args = step['arguments'];
       if (isRecord(args)) {
-        if (Object.keys(args).length === 0) features.add(`${type} with no arguments`);
-        for (const value of Object.values(args)) features.add(`argument ${isRecord(value) ? 'reference' : typeof value}`);
+        if (Object.keys(args).length === 0) {features.add(`${type} with no arguments`);}
+        for (const value of Object.values(args)) {features.add(`argument ${isRecord(value) ? 'reference' : typeof value}`);}
       }
     }
     const nested = step['steps'];
-    if (Array.isArray(nested)) for (const inner of nested) if (isRecord(inner)) visitStep(inner, type === 'frame' ? 'frame' : 'tab');
+    if (Array.isArray(nested)) {for (const inner of nested) {if (isRecord(inner)) {visitStep(inner, type === 'frame' ? 'frame' : 'tab');}}}
   };
-  for (const step of (plan['steps'] ?? []) as unknown[]) if (isRecord(step)) visitStep(step, 'steps');
-  for (const step of (plan['cleanup'] ?? []) as unknown[]) if (isRecord(step)) visitStep(step, 'cleanup');
+  for (const step of (plan['steps'] ?? []) as unknown[]) {if (isRecord(step)) {visitStep(step, 'steps');}}
+  for (const step of (plan['cleanup'] ?? []) as unknown[]) {if (isRecord(step)) {visitStep(step, 'cleanup');}}
   return features;
 }
 
@@ -335,7 +335,7 @@ const SOURCE_PIECES = [
 function pick(next: () => number, pieces: readonly string[], minimum: number, maximum: number): string {
   const count = minimum + Math.floor(next() * (maximum - minimum + 1));
   let result = '';
-  for (let index = 0; index < count; index += 1) result += pieces[Math.floor(next() * pieces.length)] ?? 'x';
+  for (let index = 0; index < count; index += 1) {result += pieces[Math.floor(next() * pieces.length)] ?? 'x';}
   return result;
 }
 
@@ -344,14 +344,14 @@ const awkwardSource = (next: () => number): string => pick(next, SOURCE_PIECES, 
 
 function replaceUnsafeText(value: unknown, next: () => number, key: string): unknown {
   if (typeof value === 'string') {
-    if (key === 'selector' || key === 'expression') return awkwardSelector(next);
-    if (key === 'source') return awkwardSource(next);
+    if (key === 'selector' || key === 'expression') {return awkwardSelector(next);}
+    if (key === 'source') {return awkwardSource(next);}
     return value;
   }
-  if (Array.isArray(value)) return value.map((item) => replaceUnsafeText(item, next, ''));
+  if (Array.isArray(value)) {return value.map((item) => replaceUnsafeText(item, next, ''));}
   if (isRecord(value)) {
     // A class token holds no white space; keep the rest of a DOM check as it is.
-    if (value['kind'] === 'hasClass' || value['kind'] === 'lacksClass') return { ...value, value: `c${pick(next, ['"', '\\', '{x}', ',', '#', '日'], 1, 4)}` };
+    if (value['kind'] === 'hasClass' || value['kind'] === 'lacksClass') {return { ...value, value: `c${pick(next, ['"', '\\', '{x}', ',', '#', '日'], 1, 4)}` };}
     return Object.fromEntries(Object.entries(value).map(([childKey, child]) => [childKey, replaceUnsafeText(child, next, childKey)]));
   }
   return value;
@@ -364,9 +364,9 @@ export function generatedUnsafePlans(firstSeed: number, count: number): readonly
   const generated: { seed: number; name: string; plan: JsonRecord }[] = [];
   for (let seed = firstSeed; seed < firstSeed + count; seed += 1) {
     const example = examples[seed % examples.length];
-    if (example === undefined) continue;
+    if (example === undefined) {continue;}
     const plan = replaceUnsafeText(example.plan, seededNumbers(seed), '') as JsonRecord;
-    if (parseAll(plan).ok) generated.push({ seed, name: example.name, plan });
+    if (parseAll(plan).ok) {generated.push({ seed, name: example.name, plan });}
   }
   return generated;
 }

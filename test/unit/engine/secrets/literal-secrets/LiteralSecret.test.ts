@@ -43,7 +43,7 @@ function assertAccepted(raw: unknown): void {
 
 const letters = (count: number, alphabet: RegExp): string => {
   let text = '';
-  while (text.length < count) text += randomBytes(32).toString('base64').replace(alphabet, '');
+  while (text.length < count) {text += randomBytes(32).toString('base64').replace(alphabet, '');}
   return text.slice(0, count);
 };
 const base64url = (text: string): string => Buffer.from(text).toString('base64url');

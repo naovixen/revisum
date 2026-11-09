@@ -15,8 +15,8 @@ const readJson = <Value>(path: string): Value => JSON.parse(readFileSync(path, '
 function sourceFiles(folder: string, found: string[] = []): string[] {
   for (const entry of readdirSync(folder, { withFileTypes: true })) {
     const path = join(folder, entry.name);
-    if (entry.isDirectory()) sourceFiles(path, found);
-    else if (path.endsWith('.ts')) found.push(path);
+    if (entry.isDirectory()) {sourceFiles(path, found);}
+    else if (path.endsWith('.ts')) {found.push(path);}
   }
   return found;
 }
@@ -36,7 +36,7 @@ test('the engine has no third-party runtime dependency, and its sources import o
 });
 
 test('no engine source mentions or imports axe-core, which stays pinned at 4.14.0 in its own auditor', () => {
-  for (const file of ENGINE_SOURCES) assert.ok(!/axe/i.test(readFileSync(file, 'utf8')), `${basename(file)} mentions axe`);
+  for (const file of ENGINE_SOURCES) {assert.ok(!/axe/i.test(readFileSync(file, 'utf8')), `${basename(file)} mentions axe`);}
   const axeAuditor = readJson<{ dependencies?: Record<string, string> }>(join(PACKAGES, 'auditor-axe', 'package.json'));
   assert.equal(axeAuditor.dependencies?.['axe-core'], '4.14.0');
 });
@@ -53,7 +53,7 @@ test('every ACT rule records its id, W3C source URL and success criteria, and th
     assert.ok(rule.meta.successCriteria.length > 0 && rule.meta.successCriteria.every((criterion) => /^\d\.\d\.\d{1,2}$/.test(criterion)));
     assert.ok(existsSync(join(ACT_TEST_CASES, 'rules', `${rule.meta.id}.html`)), `rule text pinned for ${rule.meta.id}`);
   }
-  for (const rule of ALL_RULES.filter((candidate) => candidate.meta.kind === 'probe')) assert.match(rule.meta.source, /^https:\/\/www\.w3\.org\/TR\/WCAG22\/#/);
+  for (const rule of ALL_RULES.filter((candidate) => candidate.meta.kind === 'probe')) {assert.match(rule.meta.source, /^https:\/\/www\.w3\.org\/TR\/WCAG22\/#/);}
 });
 
 const covered = new Set(ALL_RULES.flatMap((rule) => rule.meta.successCriteria));
@@ -64,8 +64,8 @@ test('the rule set covers every success criterion where axe-core detected a seed
   const uncovered = readJson<{ criteria: { criterion: string }[] }>(join(FIXTURES, 'accessibility', 'mapping-pairs', 'criteria-without-own-rule.json'));
   const listed = uncovered.criteria.map((entry) => entry.criterion);
   assert.ok(axeCriteria.length >= 15);
-  for (const criterion of axeCriteria) assert.ok(covered.has(criterion) || listed.includes(criterion), `SC ${criterion} neither covered nor listed`);
-  for (const criterion of listed) assert.ok(!covered.has(criterion), `SC ${criterion} listed as uncovered but covered`);
+  for (const criterion of axeCriteria) {assert.ok(covered.has(criterion) || listed.includes(criterion), `SC ${criterion} neither covered nor listed`);}
+  for (const criterion of listed) {assert.ok(!covered.has(criterion), `SC ${criterion} listed as uncovered but covered`);}
 });
 
 test('at least 3 success criteria with no axe-core rule in the WCAG mapping are covered', () => {
@@ -83,10 +83,10 @@ test('ACT data is pinned with date, sha256, licence and every case file for the 
   assert.equal(createHash('sha256').update(raw).digest('hex'), pin.sha256_testcases);
   const pinnedCases = JSON.parse(raw.toString('utf8')) as { testcases: { ruleId: string; relativePath: string }[] };
   const implemented = new Set(ALL_RULES.filter((rule) => rule.meta.kind === 'act-rule').map((rule) => rule.meta.id));
-  for (const id of implemented) assert.ok(pin.rules.includes(id), `pinned rule list includes ${id}`);
+  for (const id of implemented) {assert.ok(pin.rules.includes(id), `pinned rule list includes ${id}`);}
   const casesOfImplemented = pinnedCases.testcases.filter((testCase) => implemented.has(testCase.ruleId));
   assert.ok(casesOfImplemented.length > 300);
-  for (const testCase of casesOfImplemented) assert.ok(existsSync(join(ACT_TEST_CASES, testCase.relativePath)), testCase.relativePath);
+  for (const testCase of casesOfImplemented) {assert.ok(existsSync(join(ACT_TEST_CASES, testCase.relativePath)), testCase.relativePath);}
 });
 
 test('the Finding type guard accepts a well-formed finding and rejects malformed ones', () => {

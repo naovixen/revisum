@@ -56,7 +56,7 @@ const actor = () => unverified({ kind: ApprovalSubjectKind.Plan, hash: 'unsafe-r
 
 function parserErrors(text: string, parsePlan: ParsePlan = parseAll): readonly DraftError[] {
   const admitted = admitDraft(textDraft(text), parsePlan, memoryEventSink(), actor());
-  if (admitted.ok) assert.fail(`the draft was admitted:\n${text}`);
+  if (admitted.ok) {assert.fail(`the draft was admitted:\n${text}`);}
   return admitted.error;
 }
 

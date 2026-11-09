@@ -46,7 +46,7 @@ const reviewedInPullRequest = (subject: SubjectFixture) => (repository: FixtureR
   onProtectedBranch(subject)(repository);
   repository.protectedFiles[CODE_OWNERS_PATH] = `${String(repository.protectedFiles[CODE_OWNERS_PATH])}${subject.codeOwnersLine}\n`;
   const pullRequest = repository.pullRequests['12'];
-  if (pullRequest === undefined) throw new Error('the team repository has no pull request 12');
+  if (pullRequest === undefined) {throw new Error('the team repository has no pull request 12');}
   pullRequest.changedFiles.push({ path: subject.path, authors: ['dev-ada'] });
   pullRequest.lastCommitTouching[subject.path] = 'commit-pull-head';
 };
@@ -56,10 +56,10 @@ async function approvalIn(name: RepositoryName, subject: SubjectFixture): Promis
   await withRepository(name, async (repository) => {
     const proof = name === 'solo' ? repository.lockdownProof() : repository.codeOwnerProof('review-grace');
     const verified = await repository.verify(subjectOf(subject), proof);
-    if (!verified.ok) throw new Error(`the ${subject.kind} was not approved in the ${name} repository: ${verified.error}`);
+    if (!verified.ok) {throw new Error(`the ${subject.kind} was not approved in the ${name} repository: ${verified.error}`);}
     approval = verified.value.approval;
   }, name === 'solo' ? onProtectedBranch(subject) : reviewedInPullRequest(subject));
-  if (approval === undefined) throw new Error('no approval');
+  if (approval === undefined) {throw new Error('no approval');}
   return approval;
 }
 

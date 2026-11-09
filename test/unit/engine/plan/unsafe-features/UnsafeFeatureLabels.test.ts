@@ -60,7 +60,7 @@ for (const feature of FEATURES) {
     const statement = statementFor([feature], true);
     assert.equal(statement.level, 'host');
     assert.deepEqual(lostIds(statement), [...LOST_BY_FEATURE[feature]].sort());
-    for (const guarantee of LOST_BY_FEATURE[feature]) assert.deepEqual(reasonsFor(statement, guarantee), [feature], guarantee);
+    for (const guarantee of LOST_BY_FEATURE[feature]) {assert.deepEqual(reasonsFor(statement, guarantee), [feature], guarantee);}
     assert.deepEqual([...statement.holds].sort(), GUARANTEE_IDS.filter((guarantee) => !LOST_BY_FEATURE[feature].includes(guarantee)).sort());
   });
 }
@@ -85,7 +85,7 @@ test('with all six features, the lost guarantees are the union of the table\'s r
 
 test('egress control, ambient credentials and secret redaction hold whatever unsafe features a plan uses', () => {
   const statement = statementFor(SORTED_FEATURES, true);
-  for (const guarantee of ['egress-enforced', 'no-ambient-credentials', 'secrets-redacted'] as const) assert.ok(statement.holds.includes(guarantee), guarantee);
+  for (const guarantee of ['egress-enforced', 'no-ambient-credentials', 'secrets-redacted'] as const) {assert.ok(statement.holds.includes(guarantee), guarantee);}
 });
 
 test('PII masking holds for every feature but page scripts', () => {

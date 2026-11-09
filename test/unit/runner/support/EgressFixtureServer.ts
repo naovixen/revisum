@@ -24,7 +24,7 @@ export type EgressFixtureServer = {
 
 export async function startEgressFixtureServer(): Promise<EgressFixtureServer> {
   const files = new Map<string, Buffer>();
-  for (const name of readdirSync(EGRESS_APP)) files.set(`/${name}`, readFileSync(join(EGRESS_APP, name)));
+  for (const name of readdirSync(EGRESS_APP)) {files.set(`/${name}`, readFileSync(join(EGRESS_APP, name)));}
   const requested: string[] = [];
   const server = createServer((incoming, response) => {
     const path = new URL(incoming.url ?? '/', 'http://localhost').pathname;

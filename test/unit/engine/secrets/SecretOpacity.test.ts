@@ -42,7 +42,7 @@ test('a secret exposes its name but no form of its value through its own propert
   const secret = resolvedSecret('ACCOUNT_TOKEN', value);
   assert.equal(secret.name, secretName('ACCOUNT_TOKEN'));
   const ownValues = Reflect.ownKeys(secret).map((key) => String(Reflect.get(secret, key)));
-  for (const own of ownValues) assert.deepEqual(echoesIn(own, value), [], `an own property holds ${own}`);
+  for (const own of ownValues) {assert.deepEqual(echoesIn(own, value), [], `an own property holds ${own}`);}
   assert.deepEqual(echoesIn(JSON.stringify(Object.entries(secret)), value), []);
 });
 

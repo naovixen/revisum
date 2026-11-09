@@ -75,7 +75,7 @@ const parseForProduction = planParser(productionProject());
 
 function parsedForProduction(input: JsonRecord): Plan {
   const parsed = parseForProduction(input);
-  if (!parsed.ok) throw new Error(`the plan was rejected: ${JSON.stringify(parsed.error)}`);
+  if (!parsed.ok) {throw new Error(`the plan was rejected: ${JSON.stringify(parsed.error)}`);}
   return parsed.value;
 }
 
@@ -84,10 +84,10 @@ async function declaredApprovalOf(plan: Plan): Promise<Approval> {
   let approval: Approval | undefined;
   await withRepository('solo', async (repository) => {
     const verified = await repository.verify({ kind: ApprovalSubjectKind.Plan, hash: planHash(plan), path: PLAN_PATH }, repository.lockdownProof());
-    if (!verified.ok) throw new Error(`the plan was not approved: ${verified.error}`);
+    if (!verified.ok) {throw new Error(`the plan was not approved: ${verified.error}`);}
     approval = verified.value.approval;
   }, (fixture) => { fixture.protectedFiles[PLAN_PATH] = plan; });
-  if (approval === undefined) throw new Error('no approval');
+  if (approval === undefined) {throw new Error('no approval');}
   return approval;
 }
 

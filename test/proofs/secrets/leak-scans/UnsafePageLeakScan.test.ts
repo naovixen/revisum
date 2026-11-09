@@ -54,7 +54,7 @@ function writeOutputs(name: string, ran: BrowserRun): string[] {
   writeFileSync(paths[2] ?? '', auditLines(ran));
   for (const artifact of ran.store.references()) {
     const bytes = ran.store.get(artifact.name);
-    if (bytes === undefined) continue;
+    if (bytes === undefined) {continue;}
     const path = join(folder, `${name}.artifact-${paths.length}.bin`);
     writeFileSync(path, bytes);
     paths.push(path);

@@ -6,7 +6,7 @@ export type DecodedImage = { readonly width: number; readonly height: number; re
 
 export function decodePng(bytes: Uint8Array): DecodedImage {
   const buffer = Buffer.from(bytes);
-  if (buffer.readUInt32BE(0) !== 0x89504e47) throw new Error('not a PNG');
+  if (buffer.readUInt32BE(0) !== 0x89504e47) {throw new Error('not a PNG');}
   let offset = 8;
   let width = 0;
   let height = 0;

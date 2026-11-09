@@ -124,7 +124,7 @@ for (const { title, scenario, record, claims } of AT_THE_ISOLATED_LEVEL) {
   test(`at the isolated level, a run with ${title} ${claims ? 'claims a replay that replay allows' : 'claims no replay'}`, async () => {
     const ran = await runScenario(scenario, { record });
     assert.equal(ran.result.guarantees.holds.includes('replay-identical'), claims, JSON.stringify(ran.result.guarantees));
-    if (claims) assert.equal(replayManifest(ran.manifest).ok, true, 'the run claims a replay that replay refuses');
+    if (claims) {assert.equal(replayManifest(ran.manifest).ok, true, 'the run claims a replay that replay refuses');}
   });
 }
 

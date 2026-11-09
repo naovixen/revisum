@@ -21,8 +21,8 @@ export type EchoPageCalls = { navigations: number; actions: number; probes: numb
 
 // Fields are found by their label, shown texts by their test id; anything else is a key of its own.
 function elementKey(locator: ResolvedLocator): string {
-  if (locator.by === SemanticLocatorKind.Label) return `label:${locator.label}`;
-  if (locator.by === 'testId') return `testId:${locator.testId}`;
+  if (locator.by === SemanticLocatorKind.Label) {return `label:${locator.label}`;}
+  if (locator.by === 'testId') {return `testId:${locator.testId}`;}
   return JSON.stringify(locator);
 }
 
@@ -55,7 +55,7 @@ export function echoPageDriver(page: EchoPage): BrowserDriver & { readonly calls
       calls.probes++;
       const key = elementKey(locator);
       const typed = fieldValues.get(key);
-      if (typed !== undefined) return Promise.resolve(shown('', typed));
+      if (typed !== undefined) {return Promise.resolve(shown('', typed));}
       const text = locator.by === SemanticLocatorKind.TestId ? page.texts?.[locator.testId] : undefined;
       return Promise.resolve(text === undefined ? { count: 0 } : shown(text, null));
     },

@@ -66,7 +66,7 @@ describe('the wording names engine, version, device and fidelity', () => {
   });
 
   test('the wording is a pure function of its inputs', () => {
-    for (const each of allTargets) assert.equal(testedOn(each, BUILD), testedOn(each, BUILD));
+    for (const each of allTargets) {assert.equal(testedOn(each, BUILD), testedOn(each, BUILD));}
   });
 });
 

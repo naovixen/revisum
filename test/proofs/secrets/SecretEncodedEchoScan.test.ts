@@ -52,7 +52,7 @@ before(async () => {
   server = await startFixtureServer(join(FIXTURES, 'sites', 'encoded-echo-app'));
   const projectFile = { ...makeProjectFile(server.origin), secretNames: [SECRET] };
   const parsed = parseProject(projectFile);
-  if (!parsed.ok) throw new Error(`bad test project: ${JSON.stringify(parsed.error)}`);
+  if (!parsed.ok) {throw new Error(`bad test project: ${JSON.stringify(parsed.error)}`);}
   project = parsed.value;
   trusted = await trustedProjectFrom(projectFile);
   folder = mkdtempSync(join(tmpdir(), 'encoded-echo-scan-'));
@@ -66,7 +66,7 @@ after(async () => {
 // for 8, "ab/cd efg!" for 10. Letters only, so the privacy masker never mistakes digits for a number.
 function encodableText(length: number): string {
   let letters = '';
-  while (letters.length < length - 3) letters += fakeSecretOfLength(32).replace(/[^A-Za-z]/g, '');
+  while (letters.length < length - 3) {letters += fakeSecretOfLength(32).replace(/[^A-Za-z]/g, '');}
   return `${letters.slice(0, 2)}/${letters.slice(2, 4)} ${letters.slice(4, length - 3)}!`;
 }
 
@@ -84,7 +84,7 @@ const echoPlan = (targetId: string, echo: string, value: unknown, field: string)
 
 function parsed(raw: unknown): Plan {
   const outcome = planParser(project)(raw);
-  if (!outcome.ok) throw new Error(`test plan rejected: ${JSON.stringify(outcome.error)}`);
+  if (!outcome.ok) {throw new Error(`test plan rejected: ${JSON.stringify(outcome.error)}`);}
   return outcome.value;
 }
 

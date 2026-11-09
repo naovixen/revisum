@@ -54,7 +54,7 @@ for (const clockCase of CLOCK_CASES) {
 test('a clock time of "00:00" and "23:59" is accepted; "24:00", "9:00", "09:60" and "09:00:00" are refused at the time', () => {
   const parse = parserFor();
   const withTime = (time: string): JsonRecord => planOf([], { clock: { day: { from: 'today', addDays: 0 }, time } });
-  for (const time of ['00:00', '23:59']) accepted(parse, withTime(time));
+  for (const time of ['00:00', '23:59']) {accepted(parse, withTime(time));}
   for (const time of ['24:00', '9:00', '09:60', '09:00:00']) {
     const errors = rejection(parse, withTime(time));
     assert.equal(errors.length, 1, `${time}: ${JSON.stringify(errors)}`);

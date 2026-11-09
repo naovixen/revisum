@@ -26,7 +26,7 @@ const FIRST_SEED = 2810;
 
 function reading(text: string, label: string): TextReading {
   const read = readPlanText(text, limits);
-  if (!read.ok) assert.fail(`${label}: the text was refused: ${JSON.stringify(read.error)}\n${text}`);
+  if (!read.ok) {assert.fail(`${label}: the text was refused: ${JSON.stringify(read.error)}\n${text}`);}
   return read.value;
 }
 
@@ -37,7 +37,7 @@ const throughText = (plan: Plan, label: string): Plan => planFromText(writePlanT
 
 // A deep copy of plain JSON with every object's keys in reverse order.
 const keysReversed = (value: unknown): unknown => {
-  if (Array.isArray(value)) return value.map(keysReversed);
+  if (Array.isArray(value)) {return value.map(keysReversed);}
   if (typeof value === 'object' && value !== null) {
     return Object.fromEntries(Object.entries(value as JsonRecord).reverse().map(([key, child]) => [key, keysReversed(child)]));
   }
@@ -48,7 +48,7 @@ const keysReversed = (value: unknown): unknown => {
 
 test('the conversion examples use every step type, locator kind, role, assertion kind, key and plan field', () => {
   const used = new Set<string>();
-  for (const { plan } of EXAMPLES) for (const feature of featuresOf(plan)) used.add(feature);
+  for (const { plan } of EXAMPLES) {for (const feature of featuresOf(plan)) {used.add(feature);}}
   assert.deepEqual(languageFeatures().filter((feature) => !used.has(feature)), [], 'features no conversion example uses');
 });
 
@@ -101,7 +101,7 @@ test('seeded plans with awkward page text survive the trip through text byte for
     if (!read.ok) { failures.push(`seed ${seed} (${name}): the text was refused: ${JSON.stringify(read.error)}`); continue; }
     const parsed = parsePlan(read.value.json);
     if (!parsed.ok) { failures.push(`seed ${seed} (${name}): the read JSON was refused: ${JSON.stringify(parsed.error)}`); continue; }
-    if (writePlanJson(parsed.value) !== canonical) failures.push(`seed ${seed} (${name}): the canonical JSON changed`);
+    if (writePlanJson(parsed.value) !== canonical) {failures.push(`seed ${seed} (${name}): the canonical JSON changed`);}
   }
   assert.deepEqual(failures, []);
 });
@@ -114,7 +114,7 @@ test('seeded plans with awkward page text keep their canonical text when it is r
     if (!read.ok) { failures.push(`seed ${seed} (${name}): the text was refused: ${JSON.stringify(read.error)}`); continue; }
     const parsed = parsePlan(read.value.json);
     if (!parsed.ok) { failures.push(`seed ${seed} (${name}): the read JSON was refused: ${JSON.stringify(parsed.error)}`); continue; }
-    if (writePlanText(parsed.value) !== text) failures.push(`seed ${seed} (${name}): the text changed`);
+    if (writePlanText(parsed.value) !== text) {failures.push(`seed ${seed} (${name}): the text changed`);}
   }
   assert.deepEqual(failures, []);
 });
@@ -159,7 +159,7 @@ const RELAYOUTS: readonly { readonly name: string; readonly relayout: (text: str
     name: 'statement words in lower and upper case',
     relayout: (text) => joinLines(linesOf(text).map((line, index) => {
       const statement = /^(\s*)(\S+)(.*)$/.exec(line);
-      if (statement === null || !STATEMENT_WORDS.includes(statement[2] ?? '')) return line;
+      if (statement === null || !STATEMENT_WORDS.includes(statement[2] ?? '')) {return line;}
       const word = statement[2] ?? '';
       return `${statement[1] ?? ''}${index % 2 === 0 ? word.toLowerCase() : word.toUpperCase()}${statement[3] ?? ''}`;
     })),
@@ -186,7 +186,7 @@ const RELAYOUTS: readonly { readonly name: string; readonly relayout: (text: str
     name: 'three spaces after the first word of every step statement',
     relayout: (text) => joinLines(linesOf(text).map((line) => {
       const statement = /^(\s*)(\S+) (.*)$/.exec(line);
-      if (statement === null || !STATEMENT_WORDS.includes(statement[2] ?? '')) return line;
+      if (statement === null || !STATEMENT_WORDS.includes(statement[2] ?? '')) {return line;}
       return `${statement[1] ?? ''}${statement[2] ?? ''}   ${statement[3] ?? ''}`;
     })),
   },

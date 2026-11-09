@@ -17,15 +17,15 @@ export function withEdits<Result>(root: string, edits: Readonly<Record<string, F
       const original = existsSync(path) ? readFileSync(path, 'utf8') : null;
       originals.set(path, original);
       const edited = typeof edit === 'string' ? edit : edit(original ?? '');
-      if (edited === original) throw new Error(`the edit left ${relativePath} unchanged`);
+      if (edited === original) {throw new Error(`the edit left ${relativePath} unchanged`);}
       mkdirSync(dirname(path), { recursive: true });
       writeFileSync(path, edited);
     }
     return run();
   } finally {
     for (const [path, original] of originals) {
-      if (original === null) rmSync(path, { force: true });
-      else writeFileSync(path, original);
+      if (original === null) {rmSync(path, { force: true });}
+      else {writeFileSync(path, original);}
     }
   }
 }

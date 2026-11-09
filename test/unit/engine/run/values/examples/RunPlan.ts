@@ -46,7 +46,7 @@ export const projectFileWith = (fields: JsonRecord = {}, limits: Readonly<Record
 
 export function projectWith(fields: JsonRecord = {}, limits: Readonly<Record<string, number>> = {}): Project {
   const parsed = parseProject(projectFileWith(fields, limits));
-  if (!parsed.ok) throw new Error(`bad test project: ${JSON.stringify(parsed.error)}`);
+  if (!parsed.ok) {throw new Error(`bad test project: ${JSON.stringify(parsed.error)}`);}
   return parsed.value;
 }
 
@@ -131,7 +131,7 @@ export const DEFAULT_CLOCK_START = Date.UTC(2026, 9, 28, 12, 0, 0);
 export async function runPlan(raw: unknown, options: RunOptions = {}): Promise<{ readonly result: RunResult; readonly recording: Recording }> {
   const projectFile = options.projectFile ?? projectFileWith();
   const parsedProject = parseProject(projectFile);
-  if (!parsedProject.ok) throw new Error(`bad test project: ${JSON.stringify(parsedProject.error)}`);
+  if (!parsedProject.ok) {throw new Error(`bad test project: ${JSON.stringify(parsedProject.error)}`);}
   const project = parsedProject.value;
   const plan = accepted(planParser(project), raw);
   const trusted = await trustedProjectFrom(projectFile);

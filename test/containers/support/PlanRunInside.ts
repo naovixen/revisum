@@ -37,7 +37,7 @@ async function main(): Promise<number> {
       }],
     };
     const project = parseProject(projectFile);
-    if (!project.ok) throw new Error(`bad project: ${JSON.stringify(project.error)}`);
+    if (!project.ok) {throw new Error(`bad project: ${JSON.stringify(project.error)}`);}
     const parsed = planParser(project.value)({
       version: '1.3',
       meta: { featureId: 'ISOLATION-1', specReference: 'specs/isolation.md#egress', title: 'An undeclared WebSocket is blocked' },
@@ -48,7 +48,7 @@ async function main(): Promise<number> {
         { type: 'expect', locator: { by: 'testId', testId: 'socket-state' }, assert: { kind: 'textEquals', value: 'closed' }, criterionId: 'isolation.socket-refused' },
       ],
     });
-    if (!parsed.ok) throw new Error(`plan rejected: ${JSON.stringify(parsed.error)}`);
+    if (!parsed.ok) {throw new Error(`plan rejected: ${JSON.stringify(parsed.error)}`);}
     const trusted = await trustedProjectFrom(projectFile);
     // The fixture app is on the container's own loopback, which the proxy, in another container,
     // cannot reach; everything else goes through the proxy.
@@ -68,4 +68,4 @@ async function main(): Promise<number> {
   }
 }
 
-if (import.meta.main) process.exitCode = await main();
+if (import.meta.main) {process.exitCode = await main();}

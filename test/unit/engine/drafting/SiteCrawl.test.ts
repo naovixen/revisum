@@ -67,7 +67,7 @@ const crawl = async (spySite: FakeSite = site(), bounds: Parameters<typeof optio
 };
 
 const mapOf = (outcome: CrawlOutcome): PageMap => {
-  if (!outcome.ok) assert.fail(`the crawl failed with ${outcome.code}`);
+  if (!outcome.ok) {assert.fail(`the crawl failed with ${outcome.code}`);}
   return outcome.map;
 };
 const visited = (map: PageMap): readonly (readonly [string, number])[] => map.pages.map((entry) => [entry.path, entry.depth] as const);
@@ -123,7 +123,7 @@ test('the crawl makes only navigation, page, accessibility-tree and link-target 
   const methods = new Set(spy.calls.map((call) => call.method));
   assert.deepEqual([...methods].filter((method) => !CRAWL_METHODS.includes(method)), [], JSON.stringify(spy.calls));
   // Each page opened is read: its title, its tree and its links.
-  for (const method of CRAWL_METHODS) assert.ok(methods.has(method), `the crawl never called ${method}`);
+  for (const method of CRAWL_METHODS) {assert.ok(methods.has(method), `the crawl never called ${method}`);}
 });
 
 test('counter-example: the spy records a click that a crawl makes, though the port has no such method', async () => {

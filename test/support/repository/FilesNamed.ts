@@ -31,12 +31,12 @@ export function filesChangedSince(since: number, roots: readonly string[] = down
     for (const entry of entriesOf(folder)) {
       const path = join(folder, entry);
       const stats = statOf(path);
-      if (stats === undefined || stats.isSymbolicLink() || stats.mtimeMs < earliest) continue;
-      if (stats.isFile()) found.push(path);
-      else if (stats.isDirectory() && depth < MAXIMUM_DEPTH) visit(path, depth + 1);
+      if (stats === undefined || stats.isSymbolicLink() || stats.mtimeMs < earliest) {continue;}
+      if (stats.isFile()) {found.push(path);}
+      else if (stats.isDirectory() && depth < MAXIMUM_DEPTH) {visit(path, depth + 1);}
     }
   };
-  for (const root of roots) visit(root, 0);
+  for (const root of roots) {visit(root, 0);}
   return found;
 }
 
@@ -45,7 +45,7 @@ export function filesHolding(marker: string, since: number, roots?: readonly str
   const needle = Buffer.from(marker, 'utf8');
   return filesChangedSince(since, roots).filter((path) => {
     const stats = statOf(path);
-    if (stats === undefined || stats.size > MAXIMUM_READ_BYTES) return false;
+    if (stats === undefined || stats.size > MAXIMUM_READ_BYTES) {return false;}
     try { return readFileSync(path).includes(needle); } catch { return false; }
   });
 }

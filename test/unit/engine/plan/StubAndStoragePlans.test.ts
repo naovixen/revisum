@@ -195,7 +195,7 @@ test('a request count of atLeast 0, which any page passes, is refused as vacuous
 
 // Counter-example: equals 0 says something (no request was sent), so it is accepted; atLeast 1 too.
 test('a request count of equals 0 or atLeast 1 is accepted', () => {
-  for (const count of [{ equals: 0 }, { atLeast: 1 }, { atMost: 0 }]) accepted(parsePlan, planOf([OPEN_LOGIN, expectRequests('likes', count)]));
+  for (const count of [{ equals: 0 }, { atLeast: 1 }, { atMost: 0 }]) {accepted(parsePlan, planOf([OPEN_LOGIN, expectRequests('likes', count)]));}
 });
 
 test('a statusEquals value that is not a whole number is refused with wrong_type at the value', () => {

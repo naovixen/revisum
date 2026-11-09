@@ -128,7 +128,7 @@ export const testProjectInput = (limits: Readonly<Record<string, number>> = {}, 
 
 export function testProject(limits: Readonly<Record<string, number>> = {}, fields: JsonRecord = {}): Project {
   const parsed = parseProject(testProjectInput(limits, fields));
-  if (!parsed.ok) throw new Error(`bad test project: ${JSON.stringify(parsed.error)}`);
+  if (!parsed.ok) {throw new Error(`bad test project: ${JSON.stringify(parsed.error)}`);}
   return parsed.value;
 }
 
@@ -142,13 +142,13 @@ export function withValue(input: unknown, path: readonly (string | number)[], va
   let holder: unknown = copy;
   for (const segment of path.slice(0, -1)) {
     holder = (holder as Record<string | number, unknown>)[segment];
-    if (typeof holder !== 'object' || holder === null) throw new Error(`no object at ${String(segment)} in ${path.join('.')}`);
+    if (typeof holder !== 'object' || holder === null) {throw new Error(`no object at ${String(segment)} in ${path.join('.')}`);}
   }
   const last = path.at(-1);
-  if (last === undefined) throw new Error('an empty path names no value');
+  if (last === undefined) {throw new Error('an empty path names no value');}
   const target = holder as Record<string | number, unknown>;
-  if (value === REMOVE) delete target[last];
-  else target[last] = value;
+  if (value === REMOVE) {delete target[last];}
+  else {target[last] = value;}
   return copy;
 }
 

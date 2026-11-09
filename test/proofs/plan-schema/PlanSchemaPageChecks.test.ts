@@ -24,8 +24,8 @@ const goldenPlans = (): JsonRecord[] =>
 
 // Every object inside a JSON value, depth first.
 const objectsIn = (value: unknown): JsonRecord[] => {
-  if (Array.isArray(value)) return value.flatMap(objectsIn);
-  if (typeof value !== 'object' || value === null) return [];
+  if (Array.isArray(value)) {return value.flatMap(objectsIn);}
+  if (typeof value !== 'object' || value === null) {return [];}
   const record: JsonRecord = { ...value };
   return [record, ...Object.values(record).flatMap(objectsIn)];
 };

@@ -41,14 +41,14 @@ export type GuardedDriver = {
 
 // The element a step's literal locator names, unless the page says otherwise.
 function elementFor(step: JsonRecord, seen: PageView | undefined): ResolvedElement {
-  if (seen?.element !== undefined) return element(seen.element);
-  if (step['type'] === 'dialog') return element();
+  if (seen?.element !== undefined) {return element(seen.element);}
+  if (step['type'] === 'dialog') {return element();}
   const locator = step['locator'];
-  if (typeof locator !== 'object' || locator === null) return element();
+  if (typeof locator !== 'object' || locator === null) {return element();}
   const fields = locator as JsonRecord;
-  if (fields['by'] === 'role') return element({ role: String(fields['role']), name: String(fields['name']) });
-  if (fields['by'] === 'label') return element({ role: 'textbox', name: String(fields['label']) });
-  if (fields['by'] === 'text') return element({ name: String(fields['text']) });
+  if (fields['by'] === 'role') {return element({ role: String(fields['role']), name: String(fields['name']) });}
+  if (fields['by'] === 'label') {return element({ role: 'textbox', name: String(fields['label']) });}
+  if (fields['by'] === 'text') {return element({ name: String(fields['text']) });}
   return element();
 }
 
@@ -73,8 +73,8 @@ export function guardedDriver(steps: readonly JsonRecord[], page: PageViews = {}
       // A guard may read the open dialog's text as a second argument; one that does not ignores it.
       const ask: (resolved: ResolvedElement, dialogText: string | null) => GuardVerdict = guard;
       const verdict = ask(elementFor(raw, seen), kind === 'dialog' ? (seen?.dialogText ?? null) : null);
-      if (verdict.kind === PolicyVerdictKind.Deny) return Promise.resolve(failure({ code: DriverErrorCode.PolicyDenied, detail: verdict.rule }));
-      if (index >= 0) inputEvents[index] = (inputEvents[index] ?? 0) + 1;
+      if (verdict.kind === PolicyVerdictKind.Deny) {return Promise.resolve(failure({ code: DriverErrorCode.PolicyDenied, detail: verdict.rule }));}
+      if (index >= 0) {inputEvents[index] = (inputEvents[index] ?? 0) + 1;}
       return Promise.resolve(success(undefined));
     },
   });
@@ -105,9 +105,9 @@ export type UntrustedOutcome = Awaited<ReturnType<RunService["runUntrusted"]>>;
 
 // The state a runUntrusted outcome ended in: Rejected or Denied before any run, or the one run's state.
 export function finalState(outcome: UntrustedOutcome): string {
-  if (outcome.kind !== UntrustedRunOutcomeKind.Ran) return outcome.state;
+  if (outcome.kind !== UntrustedRunOutcomeKind.Ran) {return outcome.state;}
   const runs = outcome.results;
-  if (runs.length !== 1) throw new Error(`expected one run, got ${runs.length}`);
+  if (runs.length !== 1) {throw new Error(`expected one run, got ${runs.length}`);}
   return runs[0]?.state ?? 'none';
 }
 

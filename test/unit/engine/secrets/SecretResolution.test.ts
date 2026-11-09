@@ -87,7 +87,7 @@ test('control: when the store resolves every named secret, the run goes on to op
 // The manifest's `secrets` entries, in name order.
 function recordedSecrets(result: RunResult): unknown {
   const recorded = manifestField(result, 'secrets');
-  if (!Array.isArray(recorded)) return recorded;
+  if (!Array.isArray(recorded)) {return recorded;}
   const entries: readonly unknown[] = recorded;
   return [...entries].sort((left, right) =>
     String(Reflect.get(Object(left), 'name')).localeCompare(String(Reflect.get(Object(right), 'name'))));
@@ -111,7 +111,7 @@ test('secrets of exactly the minimum length and longer are redacted by value, an
     { name: 'ACCOUNT_TOKEN', mode: 'value' },
     { name: 'EIGHT_CHARACTER_CODE', mode: 'value' },
   ]);
-  for (const value of Object.values(environment)) assert.deepEqual(echoesIn(JSON.stringify(ran.result.manifest), value), []);
+  for (const value of Object.values(environment)) {assert.deepEqual(echoesIn(JSON.stringify(ran.result.manifest), value), []);}
 });
 
 test('lengthening a short secret by one character turns its recorded mode from key-only to value', async () => {

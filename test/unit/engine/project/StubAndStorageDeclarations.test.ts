@@ -63,7 +63,7 @@ test('a parsed stub keeps its matcher and its responses in the order declared', 
 test('a project with no stubs, observedRequests or storageEntries section declares none', () => {
   const parsed = parseProject(stubProjectFile({}, {}, { fixtures: undefined, stubs: undefined, observedRequests: undefined, storageEntries: undefined }));
   assert.ok(parsed.ok, JSON.stringify(parsed));
-  for (const section of ['stubs', 'observedRequests', 'storageEntries'] as const) assert.deepEqual(sectionOf(parsed.value, section), {}, section);
+  for (const section of ['stubs', 'observedRequests', 'storageEntries'] as const) {assert.deepEqual(sectionOf(parsed.value, section), {}, section);}
 });
 
 // ---- Matcher origins -------------------------------------------------------------------------------
@@ -213,7 +213,7 @@ test('a stub status outside 200 to 599 is refused with unknown_value at the stat
   for (const status of [100, 199, 600, 1000]) {
     assert.deepEqual(projectRefusal(withStub('loginNeedsCode', loginWithFirstResponse({ status }))), ['unknown_value $.stubs.loginNeedsCode.responses[0].status'], String(status));
   }
-  for (const status of [200, 599]) accepts(withStub('loginNeedsCode', loginWithFirstResponse({ status })));
+  for (const status of [200, 599]) {accepts(withStub('loginNeedsCode', loginWithFirstResponse({ status })));}
 });
 
 test('a stub status that is not a whole number is refused with wrong_type at the status', () => {

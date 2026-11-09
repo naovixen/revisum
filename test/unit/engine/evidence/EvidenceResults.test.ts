@@ -88,7 +88,7 @@ test('finding ids are not shared between the failed and the timed-out test', () 
 test('each test id is a sha256, the same for the same test in two results', () => {
   const first = testsOf(evidenceRun(recordedReport('each-outcome'))).map((entry) => entry.id);
   const second = testsOf(evidenceRun(recordedReport('each-outcome'))).map((entry) => entry.id);
-  for (const id of first) assert.match(id, SHA256_HEX);
+  for (const id of first) {assert.match(id, SHA256_HEX);}
   assert.deepEqual(first, second);
   assert.equal(new Set(first).size, first.length, 'two tests share an id');
 });

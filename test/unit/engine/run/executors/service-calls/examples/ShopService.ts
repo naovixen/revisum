@@ -151,7 +151,7 @@ export const callProjectFile = (
 
 export function callProject(calls: JsonRecord = {}, limits: Readonly<Record<string, number>> = {}, fields: JsonRecord = {}): Project {
   const parsed = parseProject(callProjectFile(calls, limits, fields));
-  if (!parsed.ok) throw new Error(`bad test project: ${JSON.stringify(parsed.error)}`);
+  if (!parsed.ok) {throw new Error(`bad test project: ${JSON.stringify(parsed.error)}`);}
   return parsed.value;
 }
 
@@ -223,11 +223,11 @@ export const requestLine = (request: ServiceRequest): string => `${request.metho
 // administrator session opens.
 export const SHOP_ROUTE: Route = (request) => {
   const line = requestLine(request);
-  if (line === 'POST /api/orders') return jsonReply(201, { id: ORDER_ID, status: 'pending' });
-  if (line === `GET /api/orders/${ORDER_ID}`) return jsonReply(200, { status: 'paid', total: 42 });
-  if (line === `DELETE /api/orders/${ORDER_ID}`) return emptyReply(204);
-  if (line === 'POST /api/test/reset') return emptyReply(204);
-  if (line === 'POST /api/test/sessions') return jsonReply(201, { session: 'session_7' });
+  if (line === 'POST /api/orders') {return jsonReply(201, { id: ORDER_ID, status: 'pending' });}
+  if (line === `GET /api/orders/${ORDER_ID}`) {return jsonReply(200, { status: 'paid', total: 42 });}
+  if (line === `DELETE /api/orders/${ORDER_ID}`) {return emptyReply(204);}
+  if (line === 'POST /api/test/reset') {return emptyReply(204);}
+  if (line === 'POST /api/test/sessions') {return jsonReply(201, { session: 'session_7' });}
   return jsonReply(404, { error: 'no such route' });
 };
 
@@ -281,7 +281,7 @@ const serviceCallPorts = (ports: RunPorts, hasCaller: boolean): RunPorts => (has
 export async function runWithCalls(raw: unknown, options: CallRunOptions = {}): Promise<CallRun> {
   const projectFile = options.projectFile ?? callProjectFile();
   const parsedProject = parseProject(projectFile);
-  if (!parsedProject.ok) throw new Error(`bad test project: ${JSON.stringify(parsedProject.error)}`);
+  if (!parsedProject.ok) {throw new Error(`bad test project: ${JSON.stringify(parsedProject.error)}`);}
   const project = parsedProject.value;
   const plan = accepted(planParser(project), raw);
   const trusted = await trustedProjectFrom(projectFile);
@@ -330,7 +330,7 @@ export function cleanupRecords(result: RunResult): readonly CleanupRecord[] {
 export function reviewItemCodes(result: RunResult): readonly string[] {
   const fields: Readonly<Record<string, unknown>> = result;
   const items = fields['reviewItems'];
-  if (items === undefined) return [];
+  if (items === undefined) {return [];}
   assert.ok(Array.isArray(items), JSON.stringify(items));
   return items.map((item: unknown) => (typeof item === 'object' && item !== null && 'code' in item ? String(item.code) : ''));
 }

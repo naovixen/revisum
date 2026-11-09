@@ -115,5 +115,5 @@ test('the leak scan finds its canary and no cookie or token value from the stora
   const leaks = leakScanner().scan([resultPath, eventsPath, canaryPath], [cookie, token, whole, canary]);
   assert.deepEqual(leaks.filter((leak) => leak.secret !== canary.name), [], 'storage-state values in the outputs');
   assert.ok(leaks.some((leak) => leak.secret === canary.name && leak.file.endsWith('canary.json')), 'the scan found its planted canary');
-  for (const value of [state.cookieValue, state.tokenValue]) assert.deepEqual(echoesIn(ran.everything, value), []);
+  for (const value of [state.cookieValue, state.tokenValue]) {assert.deepEqual(echoesIn(ran.everything, value), []);}
 });

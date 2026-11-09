@@ -80,7 +80,7 @@ function generatedArgumentSets(total: number): readonly ArgumentSet[] {
     let text = NAMED_TEXTS[index] ?? Array.from({ length: 2 + Math.floor(random() * 8) }, () => pick(PIECES)).join('');
     // Cut by code point, so no surrogate pair is split.
     text = Array.from(text).slice(0, ECHO_TEXT_MAXIMUM_LENGTH).join('');
-    if (text.trim() === '') text = `${text}x`;
+    if (text.trim() === '') {text = `${text}x`;}
     sets.push({ text, count: Math.floor(random() * (ECHO_COUNT_MAXIMUM + 1)), flag: random() < 0.5 });
   }
   return sets;
@@ -122,7 +122,7 @@ test('the declared script file is one function expression with nothing around it
 test('the generated argument sets hold quotes, "); fetch(, template-literal text and non-Latin text, and almost all differ', () => {
   const texts = ALL_SETS.map((set) => set.text);
   assert.equal(ALL_SETS.length, ARGUMENT_SETS);
-  for (const needle of ['"', '\'', '"); fetch(', '${', '`']) assert.ok(texts.filter((text) => text.includes(needle)).length >= 50, `at least 50 sets hold ${needle}`);
+  for (const needle of ['"', '\'', '"); fetch(', '${', '`']) {assert.ok(texts.filter((text) => text.includes(needle)).length >= 50, `at least 50 sets hold ${needle}`);}
   assert.ok(texts.filter((text) => NON_LATIN.test(text)).length >= 100, 'at least 100 sets hold non-Latin text');
   assert.ok(new Set(texts).size > 990, `only ${new Set(texts).size} distinct texts`);
 });

@@ -17,7 +17,7 @@ import { PACKAGES } from '../../../support/repository/RepositoryRoot.ts';
 const REPORT_SOURCES = join(PACKAGES, 'report', 'src');
 const sourceFiles = (folder: string): string[] => readdirSync(folder, { withFileTypes: true })
   .flatMap((entry) => {
-    if (entry.isDirectory()) return sourceFiles(join(folder, entry.name));
+    if (entry.isDirectory()) {return sourceFiles(join(folder, entry.name));}
     return entry.name.endsWith('.ts') ? [join(folder, entry.name)] : [];
   });
 
@@ -65,7 +65,7 @@ test('generation needs no network: sockets, fetch and WebSocket throw, all three
   net.Socket.prototype.connect = refuse;
   dns.lookup = refuse;
   try {
-    for (const report of loaded.reports) assert.ok(generate(report.input, { png: report.assets }, loaded.history).length === 4);
+    for (const report of loaded.reports) {assert.ok(generate(report.input, { png: report.assets }, loaded.history).length === 4);}
   } finally {
     Object.assign(globalThis, { fetch: saved.fetch, WebSocket: saved.webSocket });
     net.Socket.prototype.connect = saved.connect;
@@ -124,8 +124,8 @@ test('the banner counts equal an independent count and sum to the number of crit
   const accessibility = byKind('a11y');
   for (const criterion of accessibility.acceptance) {
     const mine = accessibility.findings.filter((finding) => finding.criterionIds.includes(criterion.id));
-    if (mine.some((finding) => finding.status === Verdict.Failed)) assert.equal(criterion.status, 'failed', criterion.id);
-    else if (criterion.status === Verdict.Passed) assert.equal(mine.length, 0, criterion.id);
+    if (mine.some((finding) => finding.status === Verdict.Failed)) {assert.equal(criterion.status, 'failed', criterion.id);}
+    else if (criterion.status === Verdict.Passed) {assert.equal(mine.length, 0, criterion.id);}
   }
 });
 
@@ -232,8 +232,8 @@ test('callouts plus page-level entries equal the findings on each screenshot', (
       assert.equal(figure.callouts.length + figure.pageLevel.length, onImage, figure.imageId);
     }
     const drawn = new Set<number>();
-    for (const figure of figures(html)) for (const callout of figure.callouts) drawn.add(callout.number);
-    for (const figure of view.figures) for (const entry of figure.pageLevel) assert.ok(!drawn.has(entry.number), `page-level finding ${entry.number} has no callout`);
+    for (const figure of figures(html)) {for (const callout of figure.callouts) {drawn.add(callout.number);}}
+    for (const figure of view.figures) {for (const entry of figure.pageLevel) {assert.ok(!drawn.has(entry.number), `page-level finding ${entry.number} has no callout`);}}
   }
   const accessibility = deriveView(byKind('a11y'));
   assert.ok(accessibility.figures.some((figure) => figure.pageLevel.length > 0), 'the accessibility run has page-level findings (meta, html, empty link, off-screen)');
@@ -252,7 +252,7 @@ test('every finding has a caption of 15 words or fewer, shown by its number', ()
       assert.ok(html.includes(`href="#f-${entry.number}"`));
     }
     for (const figure of view.figures) {
-      for (const callout of figure.callouts) assert.ok(html.includes(`<span class="num">${callout.number}</span>`), 'caption list beside the screenshot shows the number');
+      for (const callout of figure.callouts) {assert.ok(html.includes(`<span class="num">${callout.number}</span>`), 'caption list beside the screenshot shows the number');}
     }
   }
 });
@@ -269,8 +269,8 @@ test('every finding card shows severity, rule, criterion, numbered steps and, fo
       assert.ok(card.includes(`<strong>Severity</strong><div>${entry.finding.severity ?? 'unrated'}</div>`));
       assert.ok(card.includes('<strong>Rule or probe</strong>') && card.includes('<strong>Criterion</strong>'));
       assert.ok((card.match(/<li>/g) ?? []).length >= 2, 'at least 2 steps');
-      if (entry.finding.criterion.kind === 'wcag') assert.ok(card.includes(`SC ${entry.finding.criterion.successCriterion}`));
-      else assert.ok(card.includes('Assertion:'));
+      if (entry.finding.criterion.kind === 'wcag') {assert.ok(card.includes(`SC ${entry.finding.criterion.successCriterion}`));}
+      else {assert.ok(card.includes('Assertion:'));}
       if (entry.finding.exchanges.length > 0) {
         assert.ok(card.includes('<h4>Request</h4>') && card.includes('<h4>Response</h4>'));
         assert.ok(card.includes('<strong>Log</strong>'));
@@ -314,8 +314,8 @@ test('the review queue lists exactly the needs-review findings, with reason and 
     assert.match(section, new RegExp(`Review queue \\(${view.review.length}\\)`));
     const expected = report.findings.filter((finding) => finding.status === Verdict.NeedsReview).length;
     assert.equal(view.review.length, expected);
-    if (expected === 0) assert.match(section, /Nothing to review/);
-    else assert.equal((section.match(/<tr><th scope="row" class="n">/g) ?? []).length, expected);
+    if (expected === 0) {assert.match(section, /Nothing to review/);}
+    else {assert.equal((section.match(/<tr><th scope="row" class="n">/g) ?? []).length, expected);}
     for (const entry of view.review) {
       assert.ok((entry.finding.reason ?? '') !== '' && (entry.finding.action ?? '') !== '');
       assert.ok(section.includes(`<th scope="row" class="n">${entry.number}</th>`));
@@ -337,7 +337,7 @@ test('every criterion has a step and evidence, and every in-page link resolves',
     const ids = idsIn(html);
     assert.equal(new Set(ids).size, ids.length, `${kind}: ids are unique`);
     const present = new Set(ids);
-    for (const link of hrefsIn(html)) assert.ok(present.has(link), `${kind}: #${link} resolves`);
+    for (const link of hrefsIn(html)) {assert.ok(present.has(link), `${kind}: #${link} resolves`);}
     assert.equal((html.match(/<ol class="strip"/g) ?? []).length, 1);
     assert.equal((html.match(/<li class="st-(?:passed|failed|needs-review)">/g) ?? []).length, report.acceptance.length);
   }
@@ -350,7 +350,7 @@ test('the metrics panel shows the escaped defects, shares, level and the demo la
     const section = html.slice(start, html.indexOf('</section>', start));
     assert.match(section, /DEMO DATA: Synthetic numbers invented for this demo/);
     assert.match(section, /Escaped defects, latest period/);
-    for (const severity of SEVERITIES) assert.ok(section.includes(`<span class="sev sev-${severity}">${severity}</span>`));
+    for (const severity of SEVERITIES) {assert.ok(section.includes(`<span class="sev sev-${severity}">${severity}</span>`));}
     assert.match(section, /Verified without manual review<\/span><b>75\.0%<\/b>/);
     assert.match(section, /Flaky run rate<\/span><b>3\.5%<\/b>/);
     assert.match(section, /Acceptance criteria traced<\/span><b>89\.3%<\/b>/);
@@ -366,7 +366,7 @@ test('each chart has a title and its numbers are in a table', () => {
   const html = reportHtml(byKind('a11y'));
   const charts = [...html.matchAll(/<svg class="chart"[^>]*>(.*?)<\/svg>/gs)];
   assert.equal(charts.length, 2);
-  for (const chart of charts) assert.match(chart[1] ?? '', /<title id="ch-[a-z]+-t">[^<]+<\/title><desc id="ch-[a-z]+-d">[^<]+<\/desc>/);
+  for (const chart of charts) {assert.match(chart[1] ?? '', /<title id="ch-[a-z]+-t">[^<]+<\/title><desc id="ch-[a-z]+-d">[^<]+<\/desc>/);}
   const table = html.slice(html.indexOf('Values behind the charts'));
   for (const period of loaded.history.periods) {
     const row = new RegExp(`<tr><th scope="row">${period.id}</th><td>${period.escaped.P1}</td><td>${period.escaped.P2}</td><td>${period.escaped.P3}</td><td>${period.escaped.P4}</td>`);
@@ -408,7 +408,7 @@ test('the generator has no wall-clock, random or environment access', () => {
   assert.ok(generatorFiles.length >= 10);
   for (const file of generatorFiles) {
     const code = readFileSync(file, 'utf8').split('\n').filter((line) => !line.trim().startsWith('//')).join('\n');
-    for (const pattern of banned) assert.equal(pattern.test(code), false, `${file}: ${pattern}`);
+    for (const pattern of banned) {assert.equal(pattern.test(code), false, `${file}: ${pattern}`);}
   }
   for (const kind of ALL_KINDS) {
     assert.equal(/20\d\d-\d\d-\d\dT\d\d:\d\d/.test(reportHtml(byKind(kind)).replace(/<strong>Recorded<\/strong><div>[^<]*<\/div>/, '')), false);
@@ -421,7 +421,7 @@ const HOSTILE = ['<script>alert(1)</script>', '"onmouseover="alert(1)', "'><img 
 const TEXT_KEYS = new Set(['title', 'subject', 'note', 'tool', 'target', 'alt', 'caption', 'rule', 'reason', 'action', 'text', 'result', 'label', 'path']);
 const TEXT_ARRAYS = new Set(['steps', 'log', 'requestLines', 'responseLines']);
 function poison(value: unknown, key: string, counter: { next: number }): unknown {
-  if (typeof value === 'string') return TEXT_KEYS.has(key) ? HOSTILE[counter.next++ % HOSTILE.length] : value;
+  if (typeof value === 'string') {return TEXT_KEYS.has(key) ? HOSTILE[counter.next++ % HOSTILE.length] : value;}
   if (Array.isArray(value)) {
     return value.map((item) => (typeof item === 'string' && TEXT_ARRAYS.has(key) ? HOSTILE[counter.next++ % HOSTILE.length] : poison(item, key, counter)));
   }
@@ -457,7 +457,7 @@ test('hostile strings in every free-text field are escaped or neutralised', () =
     assert.ok(html.includes('&lt;script&gt;alert(1)&lt;/script&gt;') || kind === 'api' || true);
     const ids = idsIn(html);
     assert.equal(new Set(ids).size, ids.length, 'ids stay unique');
-    for (const link of hrefsIn(html)) assert.ok(new Set(ids).has(link));
+    for (const link of hrefsIn(html)) {assert.ok(new Set(ids).has(link));}
   }
 });
 
@@ -484,9 +484,9 @@ test('the accessibility report covers all 102 mapping-pair pages with the right 
   assert.equal(view.counts.failed, 24);
   assert.equal(view.counts.needsReview, 27);
   for (const criterion of report.acceptance) {
-    if (criterion.id.endsWith('.clean')) assert.equal(criterion.status, 'passed', criterion.id);
-    else assert.ok(criterion.status !== 'passed', `${criterion.id}: a fixture page with a seeded failure is never "passed"`);
-    if (criterion.status === Verdict.Failed) assert.ok(criterion.evidence.some((evidence) => evidence.kind === 'image'), `${criterion.id} has a screenshot`);
+    if (criterion.id.endsWith('.clean')) {assert.equal(criterion.status, 'passed', criterion.id);}
+    else {assert.ok(criterion.status !== 'passed', `${criterion.id}: a fixture page with a seeded failure is never "passed"`);}
+    if (criterion.status === Verdict.Failed) {assert.ok(criterion.evidence.some((evidence) => evidence.kind === 'image'), `${criterion.id} has a screenshot`);}
   }
   const annotated = new Set(report.findings.filter((finding) => finding.status === Verdict.Failed && (finding.image?.box ?? null) !== null).map((finding) => finding.image?.imageId));
   assert.ok(annotated.size >= 20, `${annotated.size} pages carry a callout`);
@@ -527,11 +527,11 @@ test('the API report covers all 60 API and identity cases and has all three verd
 });
 
 test('each HTML file is at most 2 MB', () => {
-  for (const kind of ALL_KINDS) assert.ok((outputs(byKind(kind)).find((file) => file.name === 'report.html')?.bytes.length ?? 0) <= 2_000_000, kind);
+  for (const kind of ALL_KINDS) {assert.ok((outputs(byKind(kind)).find((file) => file.name === 'report.html')?.bytes.length ?? 0) <= 2_000_000, kind);}
 });
 
 test('white text on every severity badge has at least 4.5:1 contrast (axe cannot measure it over a screenshot)', () => {
-  for (const [severity, style] of Object.entries(SEVERITY_STYLE)) assert.ok(contrast(style.color, '#ffffff') >= 4.5, `${severity}: ${contrast(style.color, '#ffffff').toFixed(2)}`);
+  for (const [severity, style] of Object.entries(SEVERITY_STYLE)) {assert.ok(contrast(style.color, '#ffffff') >= 4.5, `${severity}: ${contrast(style.color, '#ffffff').toFixed(2)}`);}
   assert.ok(Math.abs(contrast('#000000', '#ffffff') - 21) < 1e-9);
   assert.ok(Math.abs(contrast('#777777', '#ffffff') - 4.48) < 0.01);
 });

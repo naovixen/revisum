@@ -35,7 +35,7 @@ export async function startFixtureServer(
   folder: string, onRequest?: (path: string) => void, routes: ReadonlyMap<string, FixtureRoute> = new Map(), port = 0,
 ): Promise<FixtureServer> {
   const files = new Map<string, Buffer>();
-  for (const name of readdirSync(folder)) files.set(`/${name}`, readFileSync(join(folder, name)));
+  for (const name of readdirSync(folder)) {files.set(`/${name}`, readFileSync(join(folder, name)));}
   const server = createServer((request, response) => {
     const url = new URL(request.url ?? '/', 'http://localhost');
     const requested = url.pathname;
@@ -49,7 +49,7 @@ export async function startFixtureServer(
       if (chunks === undefined) { response.end(answer.body ?? ''); return; }
       let next = 0;
       const sendNext = (): void => {
-        if (response.destroyed) return;
+        if (response.destroyed) {return;}
         const chunk = chunks[next];
         next += 1;
         if (chunk === undefined) { response.end(); return; }

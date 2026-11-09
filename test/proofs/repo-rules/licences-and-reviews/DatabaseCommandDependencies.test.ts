@@ -50,7 +50,7 @@ function declaredDependencies(packageName: string): Readonly<Record<string, unkn
   const declared: Record<string, unknown> = {};
   for (const field of DEPENDENCY_FIELDS) {
     const value = fields.get(field);
-    if (typeof value === 'object' && value !== null) Object.assign(declared, value);
+    if (typeof value === 'object' && value !== null) {Object.assign(declared, value);}
   }
   return declared;
 }

@@ -30,7 +30,7 @@ function relicense(folder: string, licence: string, choice?: LintChoice): LintOu
   return lintWithEdits(scratch, {
     'licences.json': editJson((map) => {
       const packages = map['packages'];
-      if (typeof packages !== 'object' || packages === null) throw new Error('licences.json has no packages map');
+      if (typeof packages !== 'object' || packages === null) {throw new Error('licences.json has no packages map');}
       Object.assign(packages, { [folder]: licence });
     }),
     [`packages/${folder}/package.json`]: editJson((manifest) => { manifest['license'] = licence; }),

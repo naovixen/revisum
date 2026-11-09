@@ -87,7 +87,7 @@ for (const path of ['/api/orders/order-{orderId}', '/api/orders/{orderId}.json',
 
 // Counter-example: whole-segment placeholders, in any position, are accepted.
 test('placeholders that each fill a whole segment are accepted', () => {
-  for (const path of ['/{orderId}', '/api/orders/{orderId}', '/api/{orderId}/lines']) accepts(withCall('getOrder', { ...getOrder(), path }));
+  for (const path of ['/{orderId}', '/api/orders/{orderId}', '/api/{orderId}/lines']) {accepts(withCall('getOrder', { ...getOrder(), path }));}
 });
 
 // ---- Interpolation inside a string ------------------------------------------------------------------
@@ -243,8 +243,8 @@ test('a project that sets no call limits allows 20 calls and backend checks of 1
 });
 
 test('maximumCalls may be 1 to 200 and backendCheckTimeoutMilliseconds 1 to 120000', () => {
-  for (const maximumCalls of [1, 200]) assert.equal(limitsOf({ maximumCalls })['maximumCalls'], maximumCalls);
-  for (const timeout of [1, 120_000]) assert.equal(limitsOf({ backendCheckTimeoutMilliseconds: timeout })['backendCheckTimeoutMilliseconds'], timeout);
+  for (const maximumCalls of [1, 200]) {assert.equal(limitsOf({ maximumCalls })['maximumCalls'], maximumCalls);}
+  for (const timeout of [1, 120_000]) {assert.equal(limitsOf({ backendCheckTimeoutMilliseconds: timeout })['backendCheckTimeoutMilliseconds'], timeout);}
 });
 
 test('a call limit over its ceiling, of 0, or not a whole number is refused at the limit', () => {

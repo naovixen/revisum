@@ -101,7 +101,7 @@ for (const targetId of Object.values(BrowserTarget)) {
         tree = processTree(session.processId);
         const renderers = rendererProcesses(session.processId);
         assert.ok(renderers.length > 0, 'the page has a renderer');
-        for (const renderer of renderers) endAtOnce(renderer.processId);
+        for (const renderer of renderers) {endAtOnce(renderer.processId);}
         const acted = await session.act(capability.actionStep(click(role('button', 'Ask a question'))), allowEveryAction);
         assert.equal(acted.ok ? 'passed' : acted.error.code, 'target-crashed');
       } finally {

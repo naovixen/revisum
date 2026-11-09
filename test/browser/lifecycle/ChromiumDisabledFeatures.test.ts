@@ -23,7 +23,7 @@ function lastDisabledFeatures(commandLine: readonly string[]): readonly string[]
     .map((argument) => argument.replace(/^"|"$/g, ''))
     .filter((argument) => argument.startsWith(DISABLE_FEATURES));
   const last = flags.at(-1);
-  if (last === undefined) return [];
+  if (last === undefined) {return [];}
   return last.slice(DISABLE_FEATURES.length).split(',').filter((feature) => feature !== '');
 }
 

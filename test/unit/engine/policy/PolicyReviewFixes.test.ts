@@ -71,7 +71,7 @@ async function runClearedUnderA(copiedUnder?: Record<string, unknown>) {
   const projectA = await trustedProject(ALLOWS_DELETE);
   const plan = parsedPlan(planOf(DELETE_STEPS), ALLOWS_DELETE);
   const targetId = plan.targets[0];
-  if (targetId === undefined) throw new Error('the test plan has no target');
+  if (targetId === undefined) {throw new Error('the test plan has no target');}
   const decision = policyGate({ project: projectA, events: memoryEventSink() }).clear(plan, targetId);
   assert.equal(decision.kind, 'allow', JSON.stringify(decision));
   const cleared = copiedUnder === undefined ? decision.run : ({ ...decision.run, project: parserProject(copiedUnder) } as ClearedRun);
@@ -164,7 +164,7 @@ test('when the audit sink fails to record a static denial, the outcome says so r
   const settled = await settle(createRunService(fakePorts({ drivers: driversOf(driven.driver), audit: sink })).runUntrusted(DELETE_PLAN, parserFor(), runBase()));
   assert.ok(sink.calls.count('append') > 0, 'the denial was never offered to the sink');
   assert.equal(driven.opens(), 0, 'a denied plan opened a browser');
-  if (settled.thrown !== undefined) return;
+  if (settled.thrown !== undefined) {return;}
   assert.notDeepEqual(settled.value, RECORDED_STATIC_DENIAL,
     'the denial went unrecorded, yet the outcome looks exactly like a recorded one');
 });
@@ -189,7 +189,7 @@ test('when the audit sink fails to record a runtime denial, the run result diffe
   const unrecorded = await runtimeDenial(sink);
   assert.ok(sink.calls.count('append') > 0, 'the denial was never offered to the sink');
   assert.equal(unrecorded.driven.inputEvents[1], 0, 'the denied click sent an input event');
-  if (unrecorded.settled.thrown !== undefined) return;
+  if (unrecorded.settled.thrown !== undefined) {return;}
   const failed = onlyRun(unrecorded.settled.value ?? NOTHING_RAN);
   assert.ok(failed !== undefined && failed.state !== 'Passed', JSON.stringify(failed?.steps));
   assert.notEqual(failed.resultHash, onlyRun(recorded.settled.value ?? NOTHING_RAN)?.resultHash,

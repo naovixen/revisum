@@ -43,7 +43,7 @@ test('a verified review appends one plan.approved event with the subject hash, p
     const approved = eventsOfKind(repository.events, 'plan.approved');
     assert.equal(approved.length, 1, JSON.stringify(repository.events.recorded));
     const [recorded] = approved;
-    if (recorded === undefined) return;
+    if (recorded === undefined) {return;}
     assert.equal(recorded.event.subjectHash, subject.hash);
     assert.equal(recorded.event.proofKind, 'code-owner-review');
     assert.equal(recorded.actor.actor, verified.value.approval.approver);
@@ -84,7 +84,7 @@ test('a code owner who opened the change cannot approve it, though she wrote no 
     assertRefused(repository, await repository.verify(repository.subject('plan'), repository.codeOwnerProof('review-grace')), 'self-approval');
   }, (fixture) => {
     const pullRequest = fixture.pullRequests['12'];
-    if (pullRequest !== undefined) pullRequest.author = PLAN_OWNER;
+    if (pullRequest !== undefined) {pullRequest.author = PLAN_OWNER;}
   });
 });
 
@@ -140,7 +140,7 @@ test('a reviewer named for the path of the subject passes the code-owner check',
     fixture.protectedFiles['docs/guide.md'] = fixture.protectedFiles['plans/signup.json'];
     const pullRequest = fixture.pullRequests['12'];
     pullRequest?.changedFiles.push({ path: 'docs/guide.md', authors: ['dev-ada'] });
-    if (pullRequest !== undefined) pullRequest.lastCommitTouching['docs/guide.md'] = 'commit-pull-head';
+    if (pullRequest !== undefined) {pullRequest.lastCommitTouching['docs/guide.md'] = 'commit-pull-head';}
   });
 });
 
@@ -168,7 +168,7 @@ test('once the subject last changed in the reviewed commit, the same review is n
     assert.equal(verified.ok, true, JSON.stringify(verified));
   }, (fixture) => {
     const pullRequest = fixture.pullRequests['12'];
-    if (pullRequest !== undefined) pullRequest.lastCommitTouching['plans/signup.json'] = 'commit-pull-first';
+    if (pullRequest !== undefined) {pullRequest.lastCommitTouching['plans/signup.json'] = 'commit-pull-first';}
   });
 });
 

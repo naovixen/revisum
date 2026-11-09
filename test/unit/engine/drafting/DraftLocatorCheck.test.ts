@@ -90,9 +90,9 @@ const lineOf = (text: string): number => {
 
 async function warningsFor(draft: string, map: PageMap = MAP): Promise<readonly LineWarning[]> {
   const reading = readPlanText(draft, project.limits);
-  if (!reading.ok) assert.fail(`the draft was not read: ${JSON.stringify(reading.error)}`);
+  if (!reading.ok) {assert.fail(`the draft was not read: ${JSON.stringify(reading.error)}`);}
   const parsed = planParser(project)(reading.value.json);
-  if (!parsed.ok) assert.fail(`the draft was not parsed: ${JSON.stringify(parsed.error)}`);
+  if (!parsed.ok) {assert.fail(`the draft was not parsed: ${JSON.stringify(parsed.error)}`);}
   return checkDraftLocators(parsed.value, reading.value, map);
 }
 

@@ -67,7 +67,7 @@ test('a test-id locator naming an attribute the project does not declare is refu
 test('a project that declares no attributes allows data-testid, and a declared attribute is accepted', () => {
   accepted(parsePlan, planOf([OPEN_ORDERS, click(byTestId('save', 'data-testid'))]));
   const declaring = parserFor({ testIdAttributes: ['data-testid', 'data-qa', 'id'] });
-  for (const attribute of ['data-testid', 'data-qa', 'id']) accepted(declaring, planOf([OPEN_ORDERS, click(byTestId('save', attribute))]));
+  for (const attribute of ['data-testid', 'data-qa', 'id']) {accepted(declaring, planOf([OPEN_ORDERS, click(byTestId('save', attribute))]));}
 });
 
 const ALLOWED_ATTRIBUTES = ['id', 'data-testid', 'data-qa', 'data-test-id', 'data-cy', 'data-x1'];

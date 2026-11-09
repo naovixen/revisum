@@ -18,31 +18,31 @@ async function approvedStore(): Promise<ApprovalStore> {
   let approval: Approval | undefined;
   await withRepository('solo', async (repository) => {
     const verified = await repository.verify(repository.subject('plan'), repository.lockdownProof());
-    if (!verified.ok) throw new Error(`the sign-up plan was not approved: ${verified.error}`);
+    if (!verified.ok) {throw new Error(`the sign-up plan was not approved: ${verified.error}`);}
     approval = verified.value.approval;
   });
-  if (approval === undefined) throw new Error('no approval');
+  if (approval === undefined) {throw new Error('no approval');}
   return memoryApprovalStore([approval]);
 }
 
 function fromText(text: string): Plan {
   const read = readPlanText(text, testProject().limits);
-  if (!read.ok) assert.fail(`the text was refused: ${JSON.stringify(read.error)}\n${text}`);
+  if (!read.ok) {assert.fail(`the text was refused: ${JSON.stringify(read.error)}\n${text}`);}
   const parsed = parsePlan(read.value.json);
-  if (!parsed.ok) assert.fail(`the read JSON was refused: ${JSON.stringify(parsed.error)}`);
+  if (!parsed.ok) {assert.fail(`the read JSON was refused: ${JSON.stringify(parsed.error)}`);}
   return parsed.value;
 }
 
 function fromJson(json: unknown): Plan {
   const parsed = parsePlan(json);
-  if (!parsed.ok) assert.fail(`the JSON was refused: ${JSON.stringify(parsed.error)}`);
+  if (!parsed.ok) {assert.fail(`the JSON was refused: ${JSON.stringify(parsed.error)}`);}
   return parsed.value;
 }
 
 const signupText = (): string => writePlanText(parsedSignupPlan());
 
 const keysReversed = (value: unknown): unknown => {
-  if (Array.isArray(value)) return value.map(keysReversed);
+  if (Array.isArray(value)) {return value.map(keysReversed);}
   if (typeof value === 'object' && value !== null) {
     return Object.fromEntries(Object.entries(value as JsonRecord).reverse().map(([key, child]) => [key, keysReversed(child)]));
   }

@@ -65,7 +65,7 @@ before(async () => {
 }, { timeout: TIMEOUT });
 
 after(async () => {
-  if (fixtureName !== undefined) await runDocker(['stop', '--time', '1', fixtureName]);
+  if (fixtureName !== undefined) {await runDocker(['stop', '--time', '1', fixtureName]);}
 }, { timeout: TIMEOUT });
 
 // Runs once with this policy, asks the proxy for the fixture's page, and gives back the answer and

@@ -29,7 +29,7 @@ const tracedExpect = { type: 'expect', locator: { by: 'label', label: 'Name' }, 
 // A frame step nested `depth` deep, with `innermost` as the deepest frame's steps.
 function nestedFrames(depth: number, innermost: readonly unknown[]): JsonRecord {
   let step = frame(innermost);
-  for (let level = 1; level < depth; level++) step = frame([step]);
+  for (let level = 1; level < depth; level++) {step = frame([step]);}
   return step;
 }
 

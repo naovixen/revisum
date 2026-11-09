@@ -41,7 +41,7 @@ test("the maintainer's merge appends one plan.approved event with proof kind age
     const approved = eventsOfKind(repository.events, 'plan.approved');
     assert.equal(approved.length, 1, JSON.stringify(repository.events.recorded));
     const [recorded] = approved;
-    if (recorded === undefined) return;
+    if (recorded === undefined) {return;}
     assert.equal(recorded.event.subjectHash, subject.hash);
     assert.equal(recorded.event.proofKind, 'agent-lockdown-merge');
     assert.equal(recorded.actor.actorType, 'person-declared');
@@ -153,7 +153,7 @@ const REFUSALS: readonly Refusal[] = [
     code: 'lockdown-not-declared',
     edit: (fixture) => {
       const lockdown = approversOf(fixture).agentLockdown;
-      if (lockdown !== undefined) lockdown.deniedActions = lockdown.deniedActions.filter((action) => action !== 'merge');
+      if (lockdown !== undefined) {lockdown.deniedActions = lockdown.deniedActions.filter((action) => action !== 'merge');}
     },
   },
   {
@@ -203,7 +203,7 @@ test('a lock-down approval is labelled "declared, not verified", whatever the ma
       assert.equal(approvalLabel(verified.value.approval), 'declared, not verified');
     }, (fixture) => {
       const lockdown = approversOf(fixture).agentLockdown;
-      if (lockdown !== undefined) lockdown.agentHasGithubCredentials = agentHasGithubCredentials;
+      if (lockdown !== undefined) {lockdown.agentHasGithubCredentials = agentHasGithubCredentials;}
     });
   }
 });
@@ -214,7 +214,7 @@ test('the same plan approved by a code owner is labelled verified, so the label 
     const reviewed = await repository.verify(subject, repository.codeOwnerProof('review-grace'));
     const merged = await repository.verify(subject, repository.lockdownProof());
     assert.equal(reviewed.ok && merged.ok, true, JSON.stringify({ reviewed, merged }));
-    if (!reviewed.ok || !merged.ok) return;
+    if (!reviewed.ok || !merged.ok) {return;}
     assert.deepEqual([approvalLabel(reviewed.value.approval), approvalLabel(merged.value.approval)], ['verified', 'declared, not verified']);
   });
 });
@@ -284,6 +284,6 @@ test('nothing the trust and approval surface produces for the solo repository me
     texts.push(unverified(repository.subject('plan'), 'local'));
     texts.push(repository.events.recorded, loaderEvents.recorded);
     const produced = JSON.stringify(texts).toLowerCase();
-    for (const word of SECOND_APPROVER_WORDS) assert.ok(!word.test(produced), `the solo repository's output matches ${word}: ${produced}`);
+    for (const word of SECOND_APPROVER_WORDS) {assert.ok(!word.test(produced), `the solo repository's output matches ${word}: ${produced}`);}
   });
 });

@@ -27,7 +27,7 @@ export async function trustedProjectFrom(projectFile: unknown): Promise<TrustedP
         },
     );
     if (!loaded.ok)
-        throw new Error(`the test project was not trusted: ${JSON.stringify(loaded.error)}`);
+        {throw new Error(`the test project was not trusted: ${JSON.stringify(loaded.error)}`);}
     return loaded.value.project;
 }
 
@@ -62,6 +62,6 @@ export function clearRun(
 // A test's base URL, parsed as run() takes it. A test base URL the parser refuses is a broken test.
 export function baseUrlOf(url: string): BaseUrl {
     const parsed = parseBaseUrl(url);
-    if (!parsed.ok) throw new Error(`the test base URL ${url} was refused: ${parsed.error}`);
+    if (!parsed.ok) {throw new Error(`the test base URL ${url} was refused: ${parsed.error}`);}
     return parsed.value;
 }

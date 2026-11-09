@@ -22,7 +22,7 @@ const ORIGIN_HEADER = 'Origin: https://staging.example.org';
 
 function readExample(text: string = EXAMPLE_TEXT): TextReading {
   const read = readPlanText(text, DEFAULT_LIMITS);
-  if (!read.ok) assert.fail(`the example was refused: ${JSON.stringify(read.error)}`);
+  if (!read.ok) {assert.fail(`the example was refused: ${JSON.stringify(read.error)}`);}
   return read.value;
 }
 

@@ -51,7 +51,7 @@ test(`${REPLAYS} replays of a plan with downloads and a newTab give one result h
   }
   assert.equal(hashes.size, 1, 'every replay gives the same result hash');
   assert.equal(reused.environments.length, REPLAYS, 'every replay asked for its session');
-  for (const environment of reused.environments) assert.deepEqual(environment, reused.environments[0]);
+  for (const environment of reused.environments) {assert.deepEqual(environment, reused.environments[0]);}
 });
 
 // Counter-example: a plan that differs in one check gives another hash, so one hash across the

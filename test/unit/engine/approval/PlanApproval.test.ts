@@ -22,21 +22,21 @@ const PRODUCTION_ORIGIN = 'https://shop.example.com';
 // The maintainer's declared approval of the sign-up plan, from the solo repository.
 async function declaredPlanApproval(repository: TestRepository): Promise<Approval> {
   const verified = await repository.verify(repository.subject('plan'), repository.lockdownProof());
-  if (!verified.ok) throw new Error(`the plan was not approved: ${verified.error}`);
+  if (!verified.ok) {throw new Error(`the plan was not approved: ${verified.error}`);}
   return verified.value.approval;
 }
 
 // A code owner's verified approval of the same plan, from the team repository.
 async function verifiedPlanApproval(repository: TestRepository): Promise<Approval> {
   const verified = await repository.verify(repository.subject('plan'), repository.codeOwnerProof('review-grace'));
-  if (!verified.ok) throw new Error(`the plan was not approved: ${verified.error}`);
+  if (!verified.ok) {throw new Error(`the plan was not approved: ${verified.error}`);}
   return verified.value.approval;
 }
 
 const approvalIn = async (name: 'solo' | 'team', get: (repository: TestRepository) => Promise<Approval>): Promise<Approval> => {
   let approval: Approval | undefined;
   await withRepository(name, async (repository) => { approval = await get(repository); });
-  if (approval === undefined) throw new Error('no approval');
+  if (approval === undefined) {throw new Error('no approval');}
   return approval;
 };
 
@@ -45,8 +45,8 @@ const oneByteChanged = (text: string): string => `${text.slice(0, -1)}${text.end
 
 const stringAt = (plan: JsonRecord, path: readonly (string | number)[]): string => {
   let value: unknown = plan;
-  for (const segment of path) value = (value as Record<string | number, unknown>)[segment];
-  if (typeof value !== 'string') throw new Error(`no text at ${path.join('.')}`);
+  for (const segment of path) {value = (value as Record<string | number, unknown>)[segment];}
+  if (typeof value !== 'string') {throw new Error(`no text at ${path.join('.')}`);}
   return value;
 };
 
@@ -152,7 +152,7 @@ test('a local decision with no proof is recorded as unverified, which is not a p
 
 test('a plan with only unverified decisions stands as a proposal and does not open the merge gate', () => {
   const plan = parsedSignupPlan();
-  for (const source of ['local', 'mcp', 'token'] as const) unverified({ kind: ApprovalSubjectKind.Plan, hash: planHash(plan) }, source);
+  for (const source of ['local', 'mcp', 'token'] as const) {unverified({ kind: ApprovalSubjectKind.Plan, hash: planHash(plan) }, source);}
   const standing = planStanding(plan, memoryApprovalStore([]));
   assert.equal(mergeGateOpen(standing), false);
 });

@@ -42,15 +42,15 @@ function generated(name: string, seed = SEED, clockStart = CLOCK_START, from: Pl
 // ---- Same inputs, same values; new inputs, new values -------------------------------------------
 
 test('computing every generated value twice from the same seed, clock start, target and project gives identical text', () => {
-  for (const name of Object.keys(VALUES)) assert.equal(generated(name), generated(name), name);
+  for (const name of Object.keys(VALUES)) {assert.equal(generated(name), generated(name), name);}
 });
 
 test('a different seed changes every unique value', () => {
-  for (const name of UNIQUE_NAMES) assert.notEqual(generated(name, SEED), generated(name, SEED + 1), name);
+  for (const name of UNIQUE_NAMES) {assert.notEqual(generated(name, SEED), generated(name, SEED + 1), name);}
 });
 
 test('a different clock start changes every unique value', () => {
-  for (const name of UNIQUE_NAMES) assert.notEqual(generated(name, SEED, CLOCK_START), generated(name, SEED, CLOCK_START + 1), name);
+  for (const name of UNIQUE_NAMES) {assert.notEqual(generated(name, SEED, CLOCK_START), generated(name, SEED, CLOCK_START + 1), name);}
 });
 
 test('two unique texts with the same prefix but different names differ within one run', () => {
@@ -65,12 +65,12 @@ test('a date value is the same for every seed with the same clock start', () => 
 
 test('across 10,000 seeds no two unique texts collide', () => {
   const seen = new Set<string>();
-  for (let seed = 0; seed < 10_000; seed++) seen.add(generated('orderCode', seed));
+  for (let seed = 0; seed < 10_000; seed++) {seen.add(generated('orderCode', seed));}
   assert.equal(seen.size, 10_000);
 });
 
 test('a unique text is its prefix, a hyphen and 10 base-36 characters', () => {
-  for (let seed = 0; seed < 50; seed++) assert.match(generated('orderCode', seed), new RegExp(`^order-${UNIQUE_PART}$`));
+  for (let seed = 0; seed < 50; seed++) {assert.match(generated('orderCode', seed), new RegExp(`^order-${UNIQUE_PART}$`));}
 });
 
 // The unique part comes from the seed, the clock start and the value's name only, so the prefix,
@@ -111,7 +111,7 @@ test('a unique number of 3 or 13 digits, or a fractional digit count, is refused
 
 test('every generated value passes the safe-text rules', () => {
   for (const name of Object.keys(VALUES)) {
-    for (let seed = 0; seed < 100; seed++) assert.equal(isUnsafeText(generated(name, seed)), false, `${name} with seed ${seed}`);
+    for (let seed = 0; seed < 100; seed++) {assert.equal(isUnsafeText(generated(name, seed)), false, `${name} with seed ${seed}`);}
   }
 });
 
@@ -133,7 +133,7 @@ test('the refusal of an undeclared email domain does not echo the domain', () =>
 });
 
 test('with no domain declared in the project, a unique email is <localPrefix>-<unique part>@example.com', () => {
-  for (let seed = 0; seed < 50; seed++) assert.match(generated('contact', seed), new RegExp(`^ada-${UNIQUE_PART}@example\\.com$`));
+  for (let seed = 0; seed < 50; seed++) {assert.match(generated('contact', seed), new RegExp(`^ada-${UNIQUE_PART}@example\\.com$`));}
 });
 
 test('a unique email takes the first declared domain by default, and a named declared domain when given', () => {
@@ -146,7 +146,7 @@ test('a unique email takes the first declared domain by default, and a named dec
 });
 
 test('every generated email address passes the safe-text rules', () => {
-  for (let seed = 0; seed < 200; seed++) assert.equal(isUnsafeText(generated('contact', seed)), false);
+  for (let seed = 0; seed < 200; seed++) {assert.equal(isUnsafeText(generated('contact', seed)), false);}
 });
 
 // ---- Dates from the fixture table ---------------------------------------------------------------
@@ -161,7 +161,7 @@ const table: DateTable = JSON.parse(readFileSync(join(FIXTURES, 'plans', 'date-v
 
 function dateProject(): Project {
   const parsed = parseProject({ origins: [ORIGIN], matrix: table.targets });
-  if (!parsed.ok) throw new Error(`bad date project: ${JSON.stringify(parsed.error)}`);
+  if (!parsed.ok) {throw new Error(`bad date project: ${JSON.stringify(parsed.error)}`);}
   return parsed.value;
 }
 
@@ -206,7 +206,7 @@ test('a timestamp and epoch milliseconds name midnight at the start of the day i
 
 test('offsets of -3660 and 3660 days are accepted; -3661, 3661 and a fraction of a day are refused at addDays', () => {
   const datePlan = (addDays: number): JsonRecord => planOf([], { values: { due: { kind: 'date', day: { from: 'today', addDays }, format: 'yearMonthDay' } } });
-  for (const addDays of [-3660, 0, 3660]) accepted(parsePlan, datePlan(addDays));
+  for (const addDays of [-3660, 0, 3660]) {accepted(parsePlan, datePlan(addDays));}
   for (const addDays of [-3661, 3661, 1.5]) {
     const errors = rejection(parsePlan, datePlan(addDays));
     assert.equal(errors.length, 1, JSON.stringify(errors));

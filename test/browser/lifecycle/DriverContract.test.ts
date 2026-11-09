@@ -51,7 +51,7 @@ for (const targetId of CONTRACT_TARGETS) {
       assert.equal(result.state, 'Passed', JSON.stringify(result.steps.filter((step) => step.outcome !== 'passed')));
       const shots = store.references();
       assert.deepEqual(shots.map((reference) => reference.name), [`${targetId}/form-filled.png`, `${targetId}/signed-up.png`]);
-      for (const reference of shots) assert.deepEqual([...(store.get(reference.name) ?? []).slice(0, 4)], PNG_SIGNATURE);
+      for (const reference of shots) {assert.deepEqual([...(store.get(reference.name) ?? []).slice(0, 4)], PNG_SIGNATURE);}
     });
 
     test('pins locale, time zone, clock, randomness, motion and colour scheme', onTarget(targetId), async () => {

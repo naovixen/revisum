@@ -28,10 +28,10 @@ function built(fields: Readonly<Record<string, unknown>> = {}): BuiltArguments {
     for (const entry of environment) {
       const name: unknown = Reflect.get(entry, 'name');
       const text: unknown = Reflect.get(entry, 'value');
-      if (typeof name === 'string' && typeof text === 'string') entries.push([name, text]);
+      if (typeof name === 'string' && typeof text === 'string') {entries.push([name, text]);}
     }
   } else if (typeof environment === 'object' && environment !== null) {
-    for (const [name, text] of Object.entries(environment)) if (typeof text === 'string') entries.push([name, text]);
+    for (const [name, text] of Object.entries(environment)) {if (typeof text === 'string') {entries.push([name, text]);}}
   }
   return { argv, environment: Object.fromEntries(entries) };
 }
@@ -40,8 +40,8 @@ function built(fields: Readonly<Record<string, unknown>> = {}): BuiltArguments {
 function selectedProjects(argv: readonly string[]): string[] {
   const projects: string[] = [];
   argv.forEach((word, index) => {
-    if (word.startsWith('--project=')) projects.push(word.slice('--project='.length));
-    else if (word === '--project') projects.push(argv[index + 1] ?? '');
+    if (word.startsWith('--project=')) {projects.push(word.slice('--project='.length));}
+    else if (word === '--project') {projects.push(argv[index + 1] ?? '');}
   });
   return projects;
 }
