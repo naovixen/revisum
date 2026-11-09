@@ -41,17 +41,17 @@ export async function findElements<Handle>(
     return locator.position === undefined ? found : atPosition(operations, found, locator.position);
 }
 
-// The elements a locator matches, or null when the document it was asked of has gone, which says
-// nothing of what was in it. Any other failure says more than that, so it goes on up.
+// The elements a locator matches, or the failure when the document it was asked of has gone, which
+// says nothing of what was in it, so it must not read as no elements. Any other failure goes on up.
 export async function findElementsUnlessDocumentGone<Handle>(
     operations: PageOperations<Handle>,
     locator: ResolvedLocator,
-): Promise<Handle[] | null> {
+): Promise<Handle[] | DocumentGone> {
     try {
         return await findElements(operations, locator);
     } catch (error) {
         if (error instanceof DocumentGone) {
-            return null;
+            return error;
         }
         throw error;
     }

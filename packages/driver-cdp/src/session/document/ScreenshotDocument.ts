@@ -16,6 +16,7 @@ import {
     unmaskElements,
 } from "../../in-page/elements/MaskElements.ts";
 import type { CheckedDocument } from "../../page/checks/HitChecks.ts";
+import { DocumentGone } from "../../page/failures/DocumentGone.ts";
 import type { PageOperations } from "../../page/PageOperations.ts";
 import { failureOfRead, readWithinStep, type DocumentScope } from "./DocumentScope.ts";
 import { findElementsUnlessDocumentGone } from "./FindElements.ts";
@@ -97,14 +98,24 @@ async function screenshotWithFieldsHidden<Handle>(
     const toPaint: ElementsToPaint<Handle>[] = [];
     for (const field of fields) {
         let isFound = false;
-        let isEveryDocumentRead = true;
+        let goneDocument: DocumentGone | null = null;
         for (const framed of scope.masked) {
             const elements = await findElementsUnlessDocumentGone(framed, field);
-            isEveryDocumentRead &&= elements !== null;
-            isFound ||= elements !== null && elements.length > 0;
-            toPaint.push({ framed, elements: elements ?? [] });
+            if (elements instanceof DocumentGone) {
+                goneDocument = elements;
+                toPaint.push({ framed, elements: [] });
+            } else {
+                isFound ||= elements.length > 0;
+                toPaint.push({ framed, elements });
+            }
         }
-        if (!isFound && !(isEveryDocumentRead && (await canBeLeftUnmasked(field)))) {
+        if (isFound) {
+            continue;
+        }
+        if (goneDocument !== null) {
+            throw goneDocument;
+        }
+        if (!(await canBeLeftUnmasked(field))) {
             return failure({
                 code: DriverErrorCode.NotFound,
                 detail: "a field a secret was typed into cannot be found to hide it",
@@ -126,8 +137,8 @@ async function screenshotWithFieldsHidden<Handle>(
 // Each field is found before anything is painted, so no image exists for a field that cannot be. A
 // field its locator no longer finds holds nothing on screen only if the element typed into has gone
 // and no other field holds what was typed: one still on the page may still show it, and a page may
-// have rendered it afresh under another label. A document that has gone shows neither, and any other
-// failure to read says nothing of the fields at all, so it is the capture's failure.
+// have rendered it afresh under another label. A document that has gone while it was asked, like any
+// other failure to read, says nothing of the fields at all, so it is the capture's failure.
 export async function screenshotHidingFields<Handle>(
     scope: DocumentScope<Handle>,
     mask: readonly string[],
