@@ -3,7 +3,6 @@
 // whose names mark them as irreversible), and the driver asks it again just before every action,
 // once the page shows which element the action would touch.
 import type { Locale } from "./Target.ts";
-import type { Plan } from "../plan/Plan.ts";
 
 // Why the gate denied a plan or an action. Each rule has a heading in docs/errors.md.
 export const PolicyRuleId = {
@@ -22,16 +21,6 @@ export const PolicyRuleId = {
     UndeclaredSecret: "undeclared-secret",
 } as const;
 export type PolicyRuleId = (typeof PolicyRuleId)[keyof typeof PolicyRuleId];
-
-// The key of the Authorised mark. It is a unique symbol that is declared here and never exported,
-// so no code outside this file can name the key, and an object written by hand, by spreading a
-// plan or by Object.assign, never has it. Only a type exists: nothing is emitted.
-declare const authorisedMark: unique symbol;
-
-// A plan the policy gate cleared for its targets. Only the gate makes one, inside the run it
-// clears. It is marked with a key of its own, not with Brand, so it stays a narrower Plan: a second
-// `__brand` would conflict with the Plan brand and reduce the type to never.
-export type Authorised = Plan & { readonly [authorisedMark]: "policy-gate" };
 
 export const PolicyVerdictKind = {
     Allow: "allow",

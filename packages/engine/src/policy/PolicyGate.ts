@@ -22,7 +22,6 @@
 // nothing ran; a denial the audit sink failed to record is marked unrecorded.
 import { AuditEventKind, PolicyRuleId, PolicyVerdictKind } from "@revisum/contracts";
 import type {
-    Authorised,
     EventSink,
     GuardVerdict,
     Locale,
@@ -104,9 +103,6 @@ type Denial = { readonly rule: PolicyRuleId; readonly stepIndex: number | null }
 
 // The gate does not know who wrote the plan it denies, so its events carry no person.
 const POLICY_GATE_ACTOR = deriveActor(sourceActorId("policy gate"), "unverified");
-
-// A plan is Authorised only here, as decide() clears it into its runs.
-const authorised = (plan: Plan): Authorised => plan as Authorised;
 
 // The steps a plan holds, including those inside frames and second tabs, each with the index of
 // its top-level step. A second tab's steps are judged exactly as the first tab's would be.
@@ -232,7 +228,7 @@ const UNRECORDED = { unrecorded: true } as const;
 // A plan the static check found nothing to deny in, with the standing it was judged as.
 type Judged = {
     readonly kind: typeof PolicyVerdictKind.Allow;
-    readonly plan: Authorised;
+    readonly plan: Plan;
     readonly standing: PlanStanding;
 };
 
@@ -264,7 +260,7 @@ export function policyGate(options: PolicyGateOptions): PolicyGate {
         const judged = ownStanding(plan, standing);
         const denial = staticDenial(plan, targets, judged, project);
         if (denial === null) {
-            return { kind: PolicyVerdictKind.Allow, plan: authorised(plan), standing: judged };
+            return { kind: PolicyVerdictKind.Allow, plan, standing: judged };
         }
         const recorded = record(denial.rule, plan);
         return {

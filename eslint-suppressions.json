@@ -1645,11 +1645,6 @@
       "count": 2
     }
   },
-  "test/proofs/runs/AuthorisedIsARealType.ts": {
-    "@typescript-eslint/naming-convention": {
-      "count": 1
-    }
-  },
   "test/proofs/runs/DownloadFileNames.test.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1

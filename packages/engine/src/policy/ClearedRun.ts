@@ -2,12 +2,12 @@
 // and the plan's own standing, held together, so a run under any other project, target or standing
 // cannot be expressed. Only the gate makes one, only for a target both the plan and the project's
 // matrix declare, and run() takes nothing else.
-import type { Authorised, Target, TargetId } from "@revisum/contracts";
+import type { Plan, Target, TargetId } from "@revisum/contracts";
 import type { PlanStanding } from "../approval/PlanStanding.ts";
 import type { Project } from "../project/ParseProject.ts";
 
 export type ClearedRunFields = {
-    readonly plan: Authorised;
+    readonly plan: Plan;
     // A trusted project is a Project too.
     readonly project: Project;
     // The project's matrix entry for a target the plan names too, as the gate judged it.
@@ -24,7 +24,7 @@ export const ClearedRunKind = "cleared";
 // type, and only the gate calls the constructor.
 export class ClearedRun {
     readonly kind = ClearedRunKind;
-    readonly plan: Authorised;
+    readonly plan: Plan;
     readonly project: Project;
     readonly target: Target;
     // The target's id, as results and logs name it.
