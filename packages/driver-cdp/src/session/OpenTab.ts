@@ -44,6 +44,7 @@ export async function openTab(
     // Never rejects: what stops a tab closing is for the session's close to report, and must not take
     // the place of what a step found.
     const close = async (): Promise<void> => {
+        watch.markClosedByDriver();
         browser.openPages.delete(watch);
         watch.stop();
         for (const stop of stops) {

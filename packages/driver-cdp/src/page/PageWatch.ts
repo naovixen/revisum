@@ -35,6 +35,8 @@ const POPUP_REQUEST_WAIT_MILLISECONDS = 1_000;
 // How a command fails when a target closed itself first, or the browser or the session has gone.
 // Nothing is left to act on then, so there is nothing to report.
 const TARGET_ALREADY_GONE = /Session with given id not found|No target with given id|connection closed/i;
+// What the browser answers about a tab that has gone, so a tab the driver closed reads as one.
+const SESSION_GONE = 'Session with given id not found.';
 // How a decision on a request fails when nothing is held any more: the page gave up on the request or
 // died, its tab or browser context has gone, or the session has closed. Each is the browser's exact
 // answer, so no other refusal can pass for one.
@@ -81,6 +83,7 @@ export class PageWatch implements PageEvents {
   readonly #connection: CdpConnection;
   readonly #page: WatchedPage;
   #crashed = false;
+  #isClosedByDriver = false;
   #dialog: string | null = null;
   #openings = 0;
   #isNavigationUnderWay = false;
@@ -183,6 +186,13 @@ export class PageWatch implements PageEvents {
     for (const stopListening of this.#stopListening.splice(0)) {stopListening();}
     this.#tabClaim = null;
     this.#notifyNavigationWaiters();
+  }
+
+  // From now on nothing more is sent to this page. Called before the close is sent: the browser answers
+  // a close before the tab detaches, and may never answer a command sent in between. A closed tab has
+  // not crashed, so crashed() stays false.
+  markClosedByDriver(): void {
+    this.#isClosedByDriver = true;
   }
 
   // Counts the page as gone once its session has closed, so every later call says so as a crash does.
@@ -328,10 +338,19 @@ export class PageWatch implements PageEvents {
   }
 
   // Sends a command to the page, with its reply parsed before anyone sees it. It fails at once on a
-  // crashed page, and as soon as the page crashes while it waits.
+  // crashed page or one the driver has closed, and as soon as the page crashes while it waits.
   ask<CommandParameters, Reply>(command: BrowserCommand<CommandParameters, Reply>, parameters: NoInfer<CommandParameters>): Promise<Reply> {
     if (this.#crashed) {return Promise.reject(new CdpError(command.method, 'the page\'s renderer died'));}
+    if (this.#isClosedByDriver) {return Promise.reject(new CdpError(command.method, SESSION_GONE));}
     return this.failingOnCrash(command.method, this.#connection.ask(this.#page.sessionId, command, parameters));
+  }
+
+  // Sends a decision on, or a question about, a request the page holds. A crash does not fail it as it
+  // does ask: only the browser's own answer says whether the request is still held, and a decision that
+  // failed any other way counts as refused.
+  askAboutHeldRequest<CommandParameters, Reply>(command: BrowserCommand<CommandParameters, Reply>, parameters: NoInfer<CommandParameters>): Promise<Reply> {
+    if (this.#isClosedByDriver) {return Promise.reject(new CdpError(command.method, SESSION_GONE));}
+    return this.#connection.ask(this.#page.sessionId, command, parameters);
   }
 
   // Sends a command only the running page can answer. On top of what ask does, it fails at once with

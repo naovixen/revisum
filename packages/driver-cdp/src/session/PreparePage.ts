@@ -15,7 +15,6 @@ import {
     SET_USER_AGENT,
 } from "../connection/BrowserCommand.ts";
 import type { RequestAtResponseStage, RequestPaused } from "../connection/BrowserEvent.ts";
-import type { CdpSessionClient } from "../connection/CdpConnection.ts";
 import {
     CONTINUE_REQUEST,
     ENABLE_REQUEST_HOLDING,
@@ -81,7 +80,7 @@ export async function preparePage(
         worldName: WorldName.ClickCheck,
     });
     watch.onRequestPaused(sessionId, (paused) => {
-        decideOnRequest(browser, page, paused, watch);
+        decideOnRequest(browser, paused, watch);
     });
     await page.ask(ENABLE_REQUEST_HOLDING, {
         patterns: [{ urlPattern: "*", requestStage: "Request" }],
@@ -91,14 +90,9 @@ export async function preparePage(
 // Every request is paused and either let through (allowed origin) or failed and recorded. An allowed
 // fetch or XHR request an active stub matches is answered by the stub instead. A request whose
 // response fields a plan may read is held again once its response is in, for its body.
-function decideOnRequest(
-    browser: SessionBrowser,
-    page: CdpSessionClient,
-    paused: RequestPaused,
-    watch: PageWatch,
-): void {
+function decideOnRequest(browser: SessionBrowser, paused: RequestPaused, watch: PageWatch): void {
     if (paused.stage === "response") {
-        void takeResponseBody(page, browser.network, paused, watch);
+        void takeResponseBody(browser.network, paused, watch);
         return;
     }
     const url = URL.parse(paused.request.url);
@@ -110,18 +104,21 @@ function decideOnRequest(
     const stubbed = isAllowed ? browser.network.answer(paused) : null;
     const sendDecision = async (): Promise<void> => {
         if (stubbed !== null) {
-            await page.ask(FULFIL_REQUEST, { requestId: paused.requestId, ...stubbed.response });
+            await watch.askAboutHeldRequest(FULFIL_REQUEST, {
+                requestId: paused.requestId,
+                ...stubbed.response,
+            });
             stubbed.onAccepted();
             return;
         }
         if (!isAllowed) {
-            await page.ask(FAIL_REQUEST, {
+            await watch.askAboutHeldRequest(FAIL_REQUEST, {
                 requestId: paused.requestId,
                 errorReason: "BlockedByClient",
             });
             return;
         }
-        await page.ask(CONTINUE_REQUEST, {
+        await watch.askAboutHeldRequest(CONTINUE_REQUEST, {
             requestId: paused.requestId,
             ...(browser.network.wantsResponseBody(paused)
                 ? { interceptResponse: true as const }
@@ -137,14 +134,15 @@ function decideOnRequest(
 // fields, then lets the page have it unchanged. A body that cannot be taken is left out: the
 // exchange still counts, with no body to read.
 async function takeResponseBody(
-    page: CdpSessionClient,
     network: BrowserNetwork,
     held: RequestAtResponseStage,
     watch: PageWatch,
 ): Promise<void> {
     if (!held.hasFailed && held.networkId !== undefined) {
         try {
-            const fetched = await page.ask(GET_RESPONSE_BODY, { requestId: held.requestId });
+            const fetched = await watch.askAboutHeldRequest(GET_RESPONSE_BODY, {
+                requestId: held.requestId,
+            });
             network.keepResponseBody(
                 held.networkId,
                 Buffer.from(fetched.body, fetched.base64Encoded ? "base64" : "utf8"),
@@ -157,7 +155,9 @@ async function takeResponseBody(
             }
         }
     }
-    await page.ask(CONTINUE_REQUEST, { requestId: held.requestId }).catch((error: unknown) => {
-        watch.noteDecisionFailure(error);
-    });
+    await watch
+        .askAboutHeldRequest(CONTINUE_REQUEST, { requestId: held.requestId })
+        .catch((error: unknown) => {
+            watch.noteDecisionFailure(error);
+        });
 }
