@@ -125,7 +125,7 @@ function brandedTypeNames(fileTokens: readonly (readonly Token[])[]): Set<string
     tokens.forEach((token, index) => {
       const name = tokens[index + 1];
       if (isIdentifier(token, 'type') && name?.kind === TokenKind.Identifier
-        && isPunctuator(tokens[index + 2], '=') && isIdentifier(tokens[index + 3], 'Brand')) names.add(name.text);
+        && isPunctuator(tokens[index + 2], '=') && isIdentifier(tokens[index + 3], 'Brand')) {names.add(name.text);}
     });
   }
   return names;
@@ -138,11 +138,11 @@ function brandCallName(tokens: readonly Token[], openIndex: number): string | un
   let name: string | undefined;
   for (let index = openIndex; index < tokens.length; index++) {
     const token = tokens[index];
-    if (isPunctuator(token, '<')) depth += 1;
+    if (isPunctuator(token, '<')) {depth += 1;}
     // A ">" straight after "=" closes an arrow in a function type, not the type arguments.
-    else if (isPunctuator(token, '>') && !isPunctuator(tokens[index - 1], '=')) depth -= 1;
-    else if (token?.kind === TokenKind.String && depth === 1) name = token.text;
-    if (depth === 0) return name;
+    else if (isPunctuator(token, '>') && !isPunctuator(tokens[index - 1], '=')) {depth -= 1;}
+    else if (token?.kind === TokenKind.String && depth === 1) {name = token.text;}
+    if (depth === 0) {return name;}
   }
   return undefined;
 }
@@ -268,7 +268,7 @@ function brandCreations(tokens: readonly Token[], brands: ReadonlySet<string>): 
     // brand<Value, 'Name'>(value): the engine's helper that applies a brand.
     if (isIdentifier(token, 'brand') && isPunctuator(tokens[index + 1], '<')) {
       const name = brandCallName(tokens, index + 1);
-      if (name !== undefined) found.push({ name, line: token.line, how: 'brand()' });
+      if (name !== undefined) {found.push({ name, line: token.line, how: 'brand()' });}
     }
   });
   return found;
@@ -281,7 +281,7 @@ export function checkBrandedCasts(root: string): string[] {
   for (const file of files) {
     for (const creation of brandCreations(file.tokens, brands)) {
       const owners = BRAND_OWNERS[creation.name] ?? [];
-      if (owners.includes(file.path)) continue;
+      if (owners.includes(file.path)) {continue;}
       const allowed = owners.length === 0 ? 'no module owns it yet; list its parser in BRAND_OWNERS' : `only ${owners.join(', ')} may create one`;
       const why = ACTOR_BRANDS.has(creation.name) ? ', which would let a caller choose its own actor' : '';
       problems.push(`${file.path}:${creation.line} creates the branded type ${creation.name} with ${creation.how}${why}; ${allowed}`);
@@ -290,4 +290,4 @@ export function checkBrandedCasts(root: string): string[] {
   return problems;
 }
 
-if (import.meta.main) process.exitCode = reportProblems('branded-type check', checkBrandedCasts(process.cwd()));
+if (import.meta.main) {process.exitCode = reportProblems('branded-type check', checkBrandedCasts(process.cwd()));}

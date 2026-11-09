@@ -80,14 +80,14 @@ export function parseSuiteReport(
   input: unknown, limits: EvidenceLimits, options: SuiteReportOptions = {},
 ): Result<SuiteReport, readonly SuiteDecodeError[]> {
   const walked = walk(input, limits);
-  if (walked !== undefined) return failure([walked]);
+  if (walked !== undefined) {return failure([walked]);}
   const outputPrefix = options.outputDirectory === undefined ? undefined : `${options.outputDirectory.replace(/\/+$/, '')}/`;
   const context: DecodeContext = { issues: [], tests: [], maximumTests: limits.maximumTests, outputPrefix };
   const report = readObject(input, '$', context);
-  if (report === INVALID) return failure(context.issues);
+  if (report === INVALID) {return failure(context.issues);}
   const suites = readList(report['suites'], '$.suites', context);
-  if (suites !== INVALID) suites.forEach((suite, index) => readSuite(suite, `$.suites[${index}]`, undefined, context));
-  if (context.issues.length > 0) return failure(context.issues);
+  if (suites !== INVALID) {suites.forEach((suite, index) => readSuite(suite, `$.suites[${index}]`, undefined, context));}
+  if (context.issues.length > 0) {return failure(context.issues);}
   const playwrightVersion = reportedVersion(report['config']);
   return success(brand<SuiteReportFields, 'SuiteReport'>({ tests: context.tests, ...(playwrightVersion === undefined ? {} : { playwrightVersion }) }));
 }
@@ -95,7 +95,7 @@ export function parseSuiteReport(
 // The Playwright version the report's config gives, when it is there and looks like one. It only
 // labels the run, so a report without one is not refused.
 function reportedVersion(config: unknown): string | undefined {
-  if (typeof config !== 'object' || config === null || Array.isArray(config)) return undefined;
+  if (typeof config !== 'object' || config === null || Array.isArray(config)) {return undefined;}
   const version: unknown = Object.getOwnPropertyDescriptor(config, 'version')?.value;
   return typeof version === 'string' && VERSION_TEXT.test(version) ? version : undefined;
 }
@@ -115,9 +115,9 @@ function walk(input: unknown, limits: EvidenceLimits): SuiteDecodeError | undefi
 // `segments` is the path so far, kept as a list and joined only for a refusal.
 function walkValue(value: unknown, segments: string[], state: WalkState): SuiteDecodeError | undefined {
   // Every nested list or object adds one segment, so the depth is the path's length.
-  if (segments.length > state.maximumDepth) return { code: SuiteDecodeErrorCode.TooLarge, path: segments.join('') };
+  if (segments.length > state.maximumDepth) {return { code: SuiteDecodeErrorCode.TooLarge, path: segments.join('') };}
   if (value === null || typeof value === 'boolean' || typeof value === 'number' || typeof value === 'string') {
-    if (typeof value === 'number' && !Number.isFinite(value)) return invalidAt(segments);
+    if (typeof value === 'number' && !Number.isFinite(value)) {return invalidAt(segments);}
     state.bytes += Buffer.byteLength(JSON.stringify(value), 'utf8');
     return state.bytes > state.maximumBytes ? tooLarge() : undefined;
   }
@@ -127,20 +127,20 @@ function walkValue(value: unknown, segments: string[], state: WalkState): SuiteD
       segments.push(`[${index}]`);
       const found = walkValue(item, segments, state);
       segments.pop();
-      if (found !== undefined) return found;
+      if (found !== undefined) {return found;}
     }
     return state.bytes > state.maximumBytes ? tooLarge() : undefined;
   }
-  if (!isPlainObject(value)) return invalidAt(segments);
+  if (!isPlainObject(value)) {return invalidAt(segments);}
   const keys = Object.keys(value);
   state.bytes += 1 + Math.max(keys.length, 1);
   for (const key of keys) {
     segments.push(`.${READ_KEYS.has(key) ? key : '*'}`);
-    if (PROTOTYPE_KEYS.includes(key)) return invalidAt(segments);
+    if (PROTOTYPE_KEYS.includes(key)) {return invalidAt(segments);}
     state.bytes += Buffer.byteLength(JSON.stringify(key), 'utf8') + 1;
     const found = walkValue(Object.getOwnPropertyDescriptor(value, key)?.value, segments, state);
     segments.pop();
-    if (found !== undefined) return found;
+    if (found !== undefined) {return found;}
   }
   return state.bytes > state.maximumBytes ? tooLarge() : undefined;
 }
@@ -163,7 +163,7 @@ function refuse(path: string, context: DecodeContext): typeof INVALID {
 }
 
 function readObject(input: unknown, path: string, context: DecodeContext): Parsed<Fields> {
-  if (typeof input !== 'object' || input === null || Array.isArray(input)) return refuse(path, context);
+  if (typeof input !== 'object' || input === null || Array.isArray(input)) {return refuse(path, context);}
   return Object.fromEntries(Object.entries(input));
 }
 
@@ -191,32 +191,32 @@ function readCount(input: unknown, path: string, context: DecodeContext): Parsed
 // not part of a test's title path.
 function readSuite(input: unknown, path: string, describeTitles: readonly string[] | undefined, context: DecodeContext): void {
   const fields = readObject(input, path, context);
-  if (fields === INVALID) return;
+  if (fields === INVALID) {return;}
   const title = readString(fields['title'], `${path}.title`, context);
   const specs = readList(fields['specs'], `${path}.specs`, context);
   const suites = readOptionalList(fields, 'suites', path, context);
-  if (title === INVALID) return;
+  if (title === INVALID) {return;}
   const titles = describeTitles === undefined ? [] : [...describeTitles, title];
-  if (specs !== INVALID) specs.forEach((spec, index) => readSpec(spec, `${path}.specs[${index}]`, titles, context));
-  if (suites !== INVALID) suites.forEach((suite, index) => readSuite(suite, `${path}.suites[${index}]`, titles, context));
+  if (specs !== INVALID) {specs.forEach((spec, index) => readSpec(spec, `${path}.specs[${index}]`, titles, context));}
+  if (suites !== INVALID) {suites.forEach((suite, index) => readSuite(suite, `${path}.suites[${index}]`, titles, context));}
 }
 
 // A test as written in a file: one entry per project it ran in.
 function readSpec(input: unknown, path: string, describeTitles: readonly string[], context: DecodeContext): void {
   const fields = readObject(input, path, context);
-  if (fields === INVALID) return;
+  if (fields === INVALID) {return;}
   const title = readString(fields['title'], `${path}.title`, context);
   const file = readString(fields['file'], `${path}.file`, context);
   const tests = readList(fields['tests'], `${path}.tests`, context);
-  if (title === INVALID || file === INVALID || tests === INVALID) return;
+  if (title === INVALID || file === INVALID || tests === INVALID) {return;}
   for (const [index, test] of tests.entries()) {
     if (context.tests.length >= context.maximumTests) {
       // One refusal is enough: the rest of the report is not read.
-      if (!context.issues.some((issue) => issue.code === SuiteDecodeErrorCode.TooLarge)) context.issues.push({ code: SuiteDecodeErrorCode.TooLarge, path: '$' });
+      if (!context.issues.some((issue) => issue.code === SuiteDecodeErrorCode.TooLarge)) {context.issues.push({ code: SuiteDecodeErrorCode.TooLarge, path: '$' });}
       return;
     }
     const decoded = readTest(test, `${path}.tests[${index}]`, { file, titlePath: [...describeTitles, title] }, context);
-    if (decoded !== INVALID) context.tests.push(decoded);
+    if (decoded !== INVALID) {context.tests.push(decoded);}
   }
 }
 
@@ -224,7 +224,7 @@ function readTest(
   input: unknown, path: string, spec: { readonly file: string; readonly titlePath: readonly string[] }, context: DecodeContext,
 ): Parsed<SuiteReportTest> {
   const fields = readObject(input, path, context);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const project = readString(fields['projectName'], `${path}.projectName`, context);
   const rawAnnotations = readOptionalList(fields, 'annotations', path, context);
   const annotations = rawAnnotations === INVALID
@@ -236,7 +236,7 @@ function readTest(
     ? expected : refuse(`${path}.expectedStatus`, context);
   const result = readOnlyResult(fields['results'], `${path}.results`, context);
   if (project === INVALID || annotations === INVALID || !allValid(annotations) || knownStatus === INVALID || expectedStatus === INVALID
-    || result === INVALID) return INVALID;
+    || result === INVALID) {return INVALID;}
   // A test the suite expects to fail, which failed, is Playwright's "expected" outcome: kept apart
   // from both a pass and an ordinary failure.
   const finished: SuiteTestOutcome = expectedStatus === 'failed' && result.outcome === SuiteTestOutcome.Failed ? 'expected-failure' : result.outcome;
@@ -248,10 +248,10 @@ function readTest(
 
 function readAnnotation(input: unknown, path: string, context: DecodeContext): Parsed<SuiteAnnotation> {
   const fields = readObject(input, path, context);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const type = readString(fields['type'], `${path}.type`, context);
   const description = readOptionalString(fields, 'description', path, context);
-  if (type === INVALID || description === INVALID) return INVALID;
+  if (type === INVALID || description === INVALID) {return INVALID;}
   return description === undefined ? { type } : { type, description };
 }
 
@@ -261,15 +261,15 @@ type ResultParts = Pick<SuiteReportTest, 'outcome' | 'errors' | 'attachments' | 
 // finished, which counts as interrupted, so it can never pass.
 function readOnlyResult(input: unknown, path: string, context: DecodeContext): Parsed<ResultParts> {
   const results = readList(input, path, context);
-  if (results === INVALID) return INVALID;
-  if (results.length > 1) return refuse(path, context);
-  if (results.length === 0) return { outcome: SuiteTestOutcome.Interrupted, errors: [], attachments: [], durationMilliseconds: 0 };
+  if (results === INVALID) {return INVALID;}
+  if (results.length > 1) {return refuse(path, context);}
+  if (results.length === 0) {return { outcome: SuiteTestOutcome.Interrupted, errors: [], attachments: [], durationMilliseconds: 0 };}
   const resultPath = `${path}[0]`;
   const fields = readObject(results[0], resultPath, context);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const status = fields['status'];
   const outcome = typeof status === 'string' && Object.hasOwn(RESULT_OUTCOMES, status) ? RESULT_OUTCOMES[status] : undefined;
-  if (outcome === undefined) refuse(`${resultPath}.status`, context);
+  if (outcome === undefined) {refuse(`${resultPath}.status`, context);}
   const rawErrors = readOptionalList(fields, 'errors', resultPath, context);
   const errors = rawErrors === INVALID ? INVALID : rawErrors.map((error, index) => readError(error, `${resultPath}.errors[${index}]`, context));
   const rawAttachments = readOptionalList(fields, 'attachments', resultPath, context);
@@ -277,7 +277,7 @@ function readOnlyResult(input: unknown, path: string, context: DecodeContext): P
     ? INVALID : rawAttachments.map((attachment, index) => readAttachment(attachment, `${resultPath}.attachments[${index}]`, context));
   const durationMilliseconds = readDuration(fields['duration'], `${resultPath}.duration`, context);
   if (outcome === undefined || errors === INVALID || !allValid(errors) || attachments === INVALID || !allValid(attachments)
-    || durationMilliseconds === INVALID) return INVALID;
+    || durationMilliseconds === INVALID) {return INVALID;}
   return { outcome, errors, attachments, durationMilliseconds };
 }
 
@@ -291,16 +291,16 @@ function readDuration(input: unknown, path: string, context: DecodeContext): Par
 
 function readError(input: unknown, path: string, context: DecodeContext): Parsed<SuiteReportError> {
   const fields = readObject(input, path, context);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const message = readOptionalString(fields, 'message', path, context);
   const location = Object.hasOwn(fields, 'location') ? readLocation(fields['location'], `${path}.location`, context) : undefined;
-  if (message === INVALID || location === INVALID) return INVALID;
+  if (message === INVALID || location === INVALID) {return INVALID;}
   return { ...(message === undefined ? {} : { message }), ...(location === undefined ? {} : { location }) };
 }
 
 function readLocation(input: unknown, path: string, context: DecodeContext): Parsed<SuiteErrorLocation> {
   const fields = readObject(input, path, context);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const parts = [
     readString(fields['file'], `${path}.file`, context),
     readCount(fields['line'], `${path}.line`, context),
@@ -313,13 +313,13 @@ function readLocation(input: unknown, path: string, context: DecodeContext): Par
 // An attachment carried inline, with no path, is fine.
 function readAttachment(input: unknown, path: string, context: DecodeContext): Parsed<SuiteAttachment> {
   const fields = readObject(input, path, context);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const name = readString(fields['name'], `${path}.name`, context);
   const contentType = readString(fields['contentType'], `${path}.contentType`, context);
   const written = readOptionalString(fields, 'path', path, context);
   const prefix = context.outputPrefix;
   const filePath = written !== INVALID && written !== undefined && prefix !== undefined && written.startsWith(prefix) ? written.slice(prefix.length) : written;
   const inside = filePath === INVALID || filePath === undefined || staysInside(filePath) ? filePath : refuse(`${path}.path`, context);
-  if (name === INVALID || contentType === INVALID || inside === INVALID) return INVALID;
+  if (name === INVALID || contentType === INVALID || inside === INVALID) {return INVALID;}
   return inside === undefined ? { name, contentType } : { name, contentType, path: inside };
 }

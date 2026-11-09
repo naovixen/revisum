@@ -106,10 +106,10 @@ export function tickedSpecs(startText: string): Set<number> {
   const unticked = new Set<number>();
   for (const match of startText.matchAll(/^\s*-\s*\[([ xX])\]\s+SPEC-(\d{2})\b/gm)) {
     const spec = Number(match[2]);
-    if (match[1] === ' ') unticked.add(spec);
-    else ticked.add(spec);
+    if (match[1] === ' ') {unticked.add(spec);}
+    else {ticked.add(spec);}
   }
-  for (const spec of unticked) ticked.delete(spec);
+  for (const spec of unticked) {ticked.delete(spec);}
   return ticked;
 }
 
@@ -166,7 +166,7 @@ export function checkGuarantees(root: string, map: GuaranteeMap = GUARANTEE_MAP)
   const outcomes = rows.map((row) => judgeRow(row, map[row], results, ticked));
   const table = guaranteeTable(outcomes);
   const problems = outcomes.flatMap((outcome) => (outcome.problem === undefined ? [] : [outcome.problem]));
-  if (results.files.length === 0) problems.unshift(`no test results in ${RESULTS_FOLDER}/; run the tests first`);
+  if (results.files.length === 0) {problems.unshift(`no test results in ${RESULTS_FOLDER}/; run the tests first`);}
   const publishedPath = join(root, PUBLISHED_TABLE);
   const published = existsSync(publishedPath) ? readFileSync(publishedPath, 'utf8') : undefined;
   if (published !== table) {
@@ -183,7 +183,7 @@ function main(words: readonly string[]): number {
   if (words.includes('--write')) {
     const blocking = problems.filter((problem) => !problem.startsWith(PUBLISHED_TABLE));
     if (blocking.length > 0) {
-      for (const problem of blocking) console.error(`guarantee map: ${problem}`);
+      for (const problem of blocking) {console.error(`guarantee map: ${problem}`);}
       console.error(`guarantee map: ${PUBLISHED_TABLE} is written only from a green run`);
       return 1;
     }
@@ -191,9 +191,9 @@ function main(words: readonly string[]): number {
     console.log(`wrote ${PUBLISHED_TABLE}`);
     return 0;
   }
-  for (const problem of problems) console.error(`guarantee map: ${problem}`);
+  for (const problem of problems) {console.error(`guarantee map: ${problem}`);}
   console.log(problems.length === 0 ? 'guarantee map passed' : `guarantee map failed: ${problems.length} problem(s)`);
   return problems.length === 0 ? 0 : 1;
 }
 
-if (import.meta.main) process.exitCode = main(process.argv.slice(2));
+if (import.meta.main) {process.exitCode = main(process.argv.slice(2));}

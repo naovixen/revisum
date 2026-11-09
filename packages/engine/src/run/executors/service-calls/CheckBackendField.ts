@@ -25,8 +25,8 @@ export const isGatewayStatus = (response: ServiceResponse): boolean => GATEWAY_S
 
 // The body as JSON. The caller stops reading at the cap; a body over it is refused here as well.
 export function responseJson(response: ServiceResponse, maximumResponseBytes: number): Result<unknown, ResponseReadErrorCode> {
-  if (response.body.length > maximumResponseBytes) return failure('response-too-large');
-  if (response.mediaType !== null && !JSON_MEDIA_TYPE.test(response.mediaType)) return failure('response-not-json');
+  if (response.body.length > maximumResponseBytes) {return failure('response-too-large');}
+  if (response.mediaType !== null && !JSON_MEDIA_TYPE.test(response.mediaType)) {return failure('response-not-json');}
   try {
     return success(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(response.body)));
   } catch {
@@ -36,13 +36,13 @@ export function responseJson(response: ServiceResponse, maximumResponseBytes: nu
 
 // The value a JSON pointer names (RFC 6901), or field-missing when it names nothing.
 export function fieldAt(document: unknown, pointer: JsonPointer): Result<unknown, 'field-missing'> {
-  if (pointer === '') return success(document);
+  if (pointer === '') {return success(document);}
   let current: unknown = document;
   for (const raw of pointer.slice(1).split('/')) {
     const token = raw.replaceAll('~1', '/').replaceAll('~0', '~');
     if (Array.isArray(current)) {
       const index = /^(0|[1-9][0-9]*)$/.test(token) ? Number(token) : Number.NaN;
-      if (!(index < current.length)) return failure('field-missing');
+      if (!(index < current.length)) {return failure('field-missing');}
       current = current[index];
     } else if (typeof current === 'object' && current !== null && Object.hasOwn(current, token)) {
       current = Object.entries(current).find(([key]) => key === token)?.[1];
@@ -67,7 +67,7 @@ export function checkBackendField(assertion: BackendAssertion, found: { readonly
     case BackendAssertionKind.NumberEquals: return typeof found?.value === 'number' && found.value === assertion.value;
     case BackendAssertionKind.Equals: case BackendAssertionKind.Contains: {
       const text = found === undefined ? undefined : fieldText(found.value);
-      if (text === undefined || expected === null) return false;
+      if (text === undefined || expected === null) {return false;}
       // Backend data is not rendered text, so it is compared exactly, spaces and case included.
       return assertion.kind === BackendAssertionKind.Equals ? text === expected : text.includes(expected);
     }

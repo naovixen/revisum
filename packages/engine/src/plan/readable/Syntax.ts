@@ -72,9 +72,9 @@ export const newMap = (): Fields => Object.create(null) as Fields;
 
 // True when two plain JSON values are the same, whatever the order of their keys.
 function sameJson(left: unknown, right: unknown): boolean {
-  if (Array.isArray(left)) return Array.isArray(right) && left.length === right.length && left.every((item, index) => sameJson(item, right[index]));
+  if (Array.isArray(left)) {return Array.isArray(right) && left.length === right.length && left.every((item, index) => sameJson(item, right[index]));}
   if (isRecord(left)) {
-    if (!isRecord(right) || Object.keys(left).length !== Object.keys(right).length) return false;
+    if (!isRecord(right) || Object.keys(left).length !== Object.keys(right).length) {return false;}
     return Object.keys(left).every((key) => Object.hasOwn(right, key) && sameJson(left[key], right[key]));
   }
   return left === right;
@@ -84,7 +84,7 @@ function sameJson(left: unknown, right: unknown): boolean {
 
 export const skipSpaces = (line: string, index: number): number => {
   let at = index;
-  while (line[at] === ' ') at += 1;
+  while (line[at] === ' ') {at += 1;}
   return at;
 };
 
@@ -92,7 +92,7 @@ export const skipSpaces = (line: string, index: number): number => {
 const BARE_WORD_END = new Set([' ', '"', '{', '}', ',']);
 const bareWordEnd = (line: string, start: number): number => {
   let at = start;
-  while (at < line.length && !BARE_WORD_END.has(line[at] ?? ' ')) at += 1;
+  while (at < line.length && !BARE_WORD_END.has(line[at] ?? ' ')) {at += 1;}
   return at;
 };
 const isBareWord = (value: unknown): value is string => typeof value === 'string' && /^[^ "{},]+$/.test(value);
@@ -112,9 +112,9 @@ const read = <Value>(value: Value, next: number, furthest?: TextFailure): Readin
 // The failure that explains a line better: the one that got further, and at the same place a
 // specific code rather than the general unknown-statement.
 export function better(left: TextFailure | undefined, right: TextFailure | undefined): TextFailure | undefined {
-  if (left === undefined) return right;
-  if (right === undefined) return left;
-  if (left.reach !== right.reach) return left.reach > right.reach ? left : right;
+  if (left === undefined) {return right;}
+  if (right === undefined) {return left;}
+  if (left.reach !== right.reach) {return left.reach > right.reach ? left : right;}
   return left.code === TextErrorCode.UnknownStatement ? right : left;
 }
 
@@ -149,15 +149,15 @@ function quotedWith(escapes: Readonly<Record<string, string>>): Syntax {
   return {
     read(line, index) {
       const start = skipSpaces(line, index);
-      if (line[start] !== '"') return refused(notThisStatement(start));
+      if (line[start] !== '"') {return refused(notThisStatement(start));}
       let text = '';
       for (let at = start + 1; at < line.length; at += 1) {
         const character = line[at] ?? '';
-        if (character === '"') return read(text, at + 1);
+        if (character === '"') {return read(text, at + 1);}
         if (character === '\\') {
           const letter = line[at + 1] ?? '';
           const escaped = Object.hasOwn(escapes, letter) ? escapes[letter] : undefined;
-          if (escaped === undefined) return refused({ code: TextErrorCode.BadString, column: at + 1, reach: at });
+          if (escaped === undefined) {return refused({ code: TextErrorCode.BadString, column: at + 1, reach: at });}
           text += escaped;
           at += 1;
         } else {
@@ -183,13 +183,13 @@ export const SCRIPT_LINE: Syntax = quotedWith({ '"': '"', '\\': '\\', 't': '\t',
 export const REFERENCE: Syntax = {
   read(line, index) {
     const start = skipSpaces(line, index);
-    if (line[start] !== '{') return refused(notThisStatement(start));
+    if (line[start] !== '{') {return refused(notThisStatement(start));}
     const end = bareWordEnd(line, start + 1);
-    if (end === start + 1 || line[end] !== '}') return refused({ code: TextErrorCode.BadString, column: start + 1, reach: end });
+    if (end === start + 1 || line[end] !== '}') {return refused({ code: TextErrorCode.BadString, column: start + 1, reach: end });}
     return read({ valueName: line.slice(start + 1, end) }, end + 1);
   },
   write(value) {
-    if (!isRecord(value) || Object.keys(value).length !== 1 || !isBareWord(value['valueName'])) return undefined;
+    if (!isRecord(value) || Object.keys(value).length !== 1 || !isBareWord(value['valueName'])) {return undefined;}
     return `{${value['valueName']}}`;
   },
 };
@@ -240,7 +240,7 @@ export function words(phrase: string): RecordPart {
       for (const word of expected) {
         const start = skipSpaces(line, at);
         const end = bareWordEnd(line, start);
-        if (line.slice(start, end).toLowerCase() !== word) return refused(notThisStatement(start));
+        if (line.slice(start, end).toLowerCase() !== word) {return refused(notThisStatement(start));}
         at = end;
       }
       return read(null, at);
@@ -258,7 +258,7 @@ export function phrases(entries: readonly (readonly [unknown, string])[]): Synta
       let failure: TextFailure | undefined;
       for (const [value, phrase] of byLength) {
         const reading = words(phrase).read(line, index, {});
-        if (reading.ok) return read(value, reading.next);
+        if (reading.ok) {return read(value, reading.next);}
         failure = better(failure, reading.failure);
       }
       return refused(failure ?? notThisStatement(index));
@@ -295,13 +295,13 @@ export function unitOf(key: string, amountKey: string, units: readonly string[])
     keys: [key],
     read(line, index, into) {
       const reading = forms.read(line, index);
-      if (!reading.ok) return reading;
+      if (!reading.ok) {return reading;}
       into[key] = reading.value;
       return read(null, reading.next);
     },
     write(fields) {
       const unit = units.find((candidate) => candidate === fields[key]);
-      if (unit === undefined) return undefined;
+      if (unit === undefined) {return undefined;}
       return fields[amountKey] === 1 ? singular(unit) : unit;
     },
   };
@@ -316,7 +316,7 @@ export function choice(...alternatives: readonly Syntax[]): Syntax {
       let failure: TextFailure | undefined;
       for (const alternative of alternatives) {
         const reading = alternative.read(line, index);
-        if (reading.ok) return read(reading.value, reading.next, better(failure, reading.furthest));
+        if (reading.ok) {return read(reading.value, reading.next, better(failure, reading.furthest));}
         failure = better(failure, reading.failure);
       }
       return refused(failure ?? notThisStatement(index));
@@ -324,7 +324,7 @@ export function choice(...alternatives: readonly Syntax[]): Syntax {
     write(value) {
       for (const alternative of alternatives) {
         const text = alternative.write(value);
-        if (text !== undefined) return text;
+        if (text !== undefined) {return text;}
       }
       return undefined;
     },
@@ -342,7 +342,7 @@ export function group(parts: readonly RecordPart[]): RecordPart {
       let furthest: TextFailure | undefined;
       for (const part of parts) {
         const reading = part.read(line, at, scratch);
-        if (!reading.ok) return refused(better(furthest, reading.failure) ?? reading.failure);
+        if (!reading.ok) {return refused(better(furthest, reading.failure) ?? reading.failure);}
         at = reading.next;
         furthest = better(furthest, reading.furthest);
       }
@@ -353,8 +353,8 @@ export function group(parts: readonly RecordPart[]): RecordPart {
       const pieces: string[] = [];
       for (const part of parts) {
         const piece = part.write(fields);
-        if (piece === undefined) return undefined;
-        if (piece !== '') pieces.push(piece);
+        if (piece === undefined) {return undefined;}
+        if (piece !== '') {pieces.push(piece);}
       }
       return pieces.join(' ');
     },
@@ -381,7 +381,7 @@ export function field(key: string, syntax: Syntax): RecordPart {
     keys: [key],
     read(line, index, into) {
       const reading = syntax.read(line, index);
-      if (!reading.ok) return reading;
+      if (!reading.ok) {return reading;}
       into[key] = reading.value;
       return read(null, reading.next, reading.furthest);
     },
@@ -424,12 +424,12 @@ export function orElse(key: string, fallback: unknown, ...parts: readonly Record
     keys: [...new Set([key, ...inner.keys])],
     read(line, index, into) {
       const reading = inner.read(line, index, into);
-      if (reading.ok) return reading;
+      if (reading.ok) {return reading;}
       into[key] = copyOf(fallback);
       return read(null, index, reading.failure);
     },
     write(fields) {
-      if (!Object.hasOwn(fields, key)) return undefined;
+      if (!Object.hasOwn(fields, key)) {return undefined;}
       return sameJson(fields[key], fallback) ? '' : inner.write(fields);
     },
   };
@@ -445,16 +445,16 @@ export function either(...alternatives: readonly RecordPart[]): RecordPart {
       let failure: TextFailure | undefined;
       for (const alternative of alternatives) {
         const reading = alternative.read(line, index, into);
-        if (reading.ok) return read(null, reading.next, better(failure, reading.furthest));
+        if (reading.ok) {return read(null, reading.next, better(failure, reading.furthest));}
         failure = better(failure, reading.failure);
       }
       return refused(failure ?? notThisStatement(index));
     },
     write(fields) {
       for (const alternative of alternatives) {
-        if (keys.some((key) => !alternative.keys.includes(key) && Object.hasOwn(fields, key))) continue;
+        if (keys.some((key) => !alternative.keys.includes(key) && Object.hasOwn(fields, key))) {continue;}
         const text = alternative.write(fields);
-        if (text !== undefined) return text;
+        if (text !== undefined) {return text;}
       }
       return undefined;
     },
@@ -467,13 +467,13 @@ export function list(item: Syntax, separator = ','): Syntax {
   return {
     read(line, index) {
       const first = item.read(line, index);
-      if (!first.ok) return first;
+      if (!first.ok) {return first;}
       const items: unknown[] = [first.value];
       let at = first.next;
       let furthest = first.furthest;
       for (let next = skipSpaces(line, at); line[next] === separator; next = skipSpaces(line, at)) {
         const reading = item.read(line, next + 1);
-        if (!reading.ok) return refused(better(furthest, reading.failure) ?? reading.failure);
+        if (!reading.ok) {return refused(better(furthest, reading.failure) ?? reading.failure);}
         items.push(reading.value);
         at = reading.next;
         furthest = better(furthest, reading.furthest);
@@ -481,7 +481,7 @@ export function list(item: Syntax, separator = ','): Syntax {
       return read(items, at, furthest);
     },
     write(value) {
-      if (!Array.isArray(value) || value.length === 0) return undefined;
+      if (!Array.isArray(value) || value.length === 0) {return undefined;}
       const pieces = value.map((entry) => item.write(entry));
       return pieces.every((piece) => piece !== undefined) ? pieces.join(joiner) : undefined;
     },
@@ -498,11 +498,11 @@ export function entry(layout: readonly (RecordPart | 'name' | 'value')[], value:
       let found: unknown;
       let furthest: TextFailure | undefined;
       for (const piece of layout) {
-        if (piece === 'name') nameColumn = skipSpaces(line, at) + 1;
+        if (piece === 'name') {nameColumn = skipSpaces(line, at) + 1;}
         const reading = piece === 'name' ? BARE.read(line, at) : piece === 'value' ? value.read(line, at) : piece.read(line, at, {});
-        if (!reading.ok) return refused(better(furthest, reading.failure) ?? reading.failure);
-        if (piece === 'name' && typeof reading.value === 'string') name = reading.value;
-        if (piece === 'value') found = reading.value;
+        if (!reading.ok) {return refused(better(furthest, reading.failure) ?? reading.failure);}
+        if (piece === 'name' && typeof reading.value === 'string') {name = reading.value;}
+        if (piece === 'value') {found = reading.value;}
         at = reading.next;
         furthest = better(furthest, reading.furthest);
       }
@@ -526,10 +526,10 @@ export function map(item: EntrySyntax): Syntax {
       let furthest: TextFailure | undefined;
       for (let next = index, first = true; first || line[next] === ','; next = skipSpaces(line, at), first = false) {
         const reading = item.read(line, first ? next : next + 1);
-        if (!reading.ok) return refused(better(furthest, reading.failure) ?? reading.failure);
+        if (!reading.ok) {return refused(better(furthest, reading.failure) ?? reading.failure);}
         const { name, value, nameColumn } = reading.value;
         // A duplicate is certain once read, so it outweighs any other failure on the line.
-        if (Object.hasOwn(entries, name)) return refused({ code: TextErrorCode.DuplicateKey, column: nameColumn, reach: line.length + 1 });
+        if (Object.hasOwn(entries, name)) {return refused({ code: TextErrorCode.DuplicateKey, column: nameColumn, reach: line.length + 1 });}
         entries[name] = value;
         at = reading.next;
         furthest = better(furthest, reading.furthest);
@@ -537,7 +537,7 @@ export function map(item: EntrySyntax): Syntax {
       return read(entries, at, furthest);
     },
     write(value) {
-      if (!isRecord(value) || Object.keys(value).length === 0) return undefined;
+      if (!isRecord(value) || Object.keys(value).length === 0) {return undefined;}
       const pieces = entriesInKeyOrder(value).map(([name, entryValue]) => item.write(name, entryValue));
       return pieces.every((piece) => piece !== undefined) ? pieces.join(', ') : undefined;
     },
@@ -553,7 +553,7 @@ export function reportedAs(code: TextErrorCode, syntax: Syntax): Syntax {
     read(line, index) {
       const start = skipSpaces(line, index);
       const reading = syntax.read(line, index);
-      if (reading.ok) return read(reading.value, reading.next, restate(start, reading.furthest));
+      if (reading.ok) {return read(reading.value, reading.next, restate(start, reading.furthest));}
       return refused(restate(start, reading.failure) ?? reading.failure);
     },
     write: syntax.write,

@@ -43,7 +43,7 @@ const errorText = (error: unknown): string => (error instanceof Error ? error.me
 export async function hashExecutable(path: string): Promise<Result<string, string>> {
   try {
     const hash = createHash('sha256');
-    for await (const chunk of createReadStream(path) as AsyncIterable<Buffer>) hash.update(chunk);
+    for await (const chunk of createReadStream(path) as AsyncIterable<Buffer>) {hash.update(chunk);}
     return success(hash.digest('hex'));
   } catch (error) {
     return failure(`cannot read the browser executable at ${path}: ${errorText(error)}`);
@@ -52,7 +52,7 @@ export async function hashExecutable(path: string): Promise<Result<string, strin
 
 function readLockEntry(input: unknown, path: string, issues: Issues): Parsed<LockEntry> {
   const fields = readRecord(input, path, issues, ENTRY_KEYS);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const parts = [
     readId<'TargetId'>(fields['targetId'], `${path}.targetId`, issues),
     readBuildVersion(fields['version'], `${path}.version`, issues),
@@ -62,7 +62,7 @@ function readLockEntry(input: unknown, path: string, issues: Issues): Parsed<Loc
   if (!hashValid) {
     issues.push({ code: typeof executableSha256 === 'string' ? PlanErrorCode.UnknownValue : PlanErrorCode.WrongType, path: `${path}.executableSha256` });
   }
-  if (!allValid(parts) || !hashValid) return INVALID;
+  if (!allValid(parts) || !hashValid) {return INVALID;}
   const [targetId, version] = parts;
   return { targetId, version, executableSha256 };
 }
@@ -72,18 +72,18 @@ function readLockEntry(input: unknown, path: string, issues: Issues): Parsed<Loc
 function parseLockfile(input: unknown): Result<readonly LockEntry[], readonly PlanError[]> {
   const issues: Issues = [];
   const fields = readRecord(input, '$', issues, ['schema', 'entries']);
-  if (fields === INVALID) return failure(issues);
-  if (fields['schema'] !== LOCKFILE_SCHEMA) issues.push({ code: PlanErrorCode.VersionUnsupported, path: '$.schema' });
+  if (fields === INVALID) {return failure(issues);}
+  if (fields['schema'] !== LOCKFILE_SCHEMA) {issues.push({ code: PlanErrorCode.VersionUnsupported, path: '$.schema' });}
   const raw = readList(fields['entries'], '$.entries', issues, MAXIMUM_LOCK_ENTRIES, 0);
-  if (raw === INVALID) return failure(issues);
+  if (raw === INVALID) {return failure(issues);}
   const entries = raw.map((entry, index) => readLockEntry(entry, `$.entries[${index}]`, issues));
   const seen = new Set<TargetId>();
   entries.forEach((entry, index) => {
-    if (entry === INVALID) return;
-    if (seen.has(entry.targetId)) issues.push({ code: PlanErrorCode.Duplicate, path: `$.entries[${index}].targetId` });
+    if (entry === INVALID) {return;}
+    if (seen.has(entry.targetId)) {issues.push({ code: PlanErrorCode.Duplicate, path: `$.entries[${index}].targetId` });}
     seen.add(entry.targetId);
   });
-  if (issues.length > 0 || !allValid(entries)) return failure(issues);
+  if (issues.length > 0 || !allValid(entries)) {return failure(issues);}
   return success([...entries].sort(byTargetId));
 }
 
@@ -98,7 +98,7 @@ export async function readLockfile(folder: string): Promise<Result<readonly Lock
   try {
     text = await readFile(join(folder, LOCKFILE_NAME), 'utf8');
   } catch (error) {
-    if (error instanceof Error && Reflect.get(error, 'code') === 'ENOENT') return success([]);
+    if (error instanceof Error && Reflect.get(error, 'code') === 'ENOENT') {return success([]);}
     return failure({ targetId: null, code: LockfileFailureCode.LockfileInvalid, detail: `cannot read ${LOCKFILE_NAME}: ${errorText(error)}` });
   }
   let input: unknown;
@@ -108,7 +108,7 @@ export async function readLockfile(folder: string): Promise<Result<readonly Lock
     return failure({ targetId: null, code: LockfileFailureCode.LockfileInvalid, detail: `${LOCKFILE_NAME} is not JSON` });
   }
   const parsed = parseLockfile(input);
-  if (parsed.ok) return parsed;
+  if (parsed.ok) {return parsed;}
   const where = parsed.error.map((error) => `${error.code} at ${error.path}`).join(', ');
   return failure({ targetId: null, code: LockfileFailureCode.LockfileInvalid, detail: `${LOCKFILE_NAME} does not parse: ${where}` });
 }
@@ -127,19 +127,19 @@ export async function lock(
       return failure({ targetId: target.id, code: UnavailableReason.AdapterNotRegistered, detail: `no adapter '${target.adapter}' is registered` });
     }
     const supported = driver.supports(target);
-    if (!supported.ok) return failure({ targetId: target.id, code: supported.error.reason, detail: supported.error.detail });
+    if (!supported.ok) {return failure({ targetId: target.id, code: supported.error.reason, detail: supported.error.detail });}
     // An adapter that cannot report its build cannot be pinned; its runs record the browser build
     // as a non-hermetic input instead.
-    if (driver.build === undefined) continue;
+    if (driver.build === undefined) {continue;}
     const built = await driver.build(target);
-    if (!built.ok) return failure({ targetId: target.id, code: built.error.code, detail: built.error.detail });
+    if (!built.ok) {return failure({ targetId: target.id, code: built.error.code, detail: built.error.detail });}
     // The version goes into the lockfile, so it must pass the lockfile's own decoder.
     const version = readBuildVersion(built.value.version, '$.version', []);
     if (version === INVALID) {
       return failure({ targetId: target.id, code: BuildFetchFailureCode.LockDownloadFailed, detail: 'the adapter reported a build with no usable version number' });
     }
     const hashed = await hashExecutable(built.value.executablePath);
-    if (!hashed.ok) return failure({ targetId: target.id, code: BuildFetchFailureCode.LockDownloadFailed, detail: hashed.error });
+    if (!hashed.ok) {return failure({ targetId: target.id, code: BuildFetchFailureCode.LockDownloadFailed, detail: hashed.error });}
     const pinned = previous.find((entry) => entry.targetId === target.id);
     if (pinned !== undefined && pinned.version === version && pinned.executableSha256 !== hashed.value) {
       return failure({
@@ -159,9 +159,9 @@ export async function lockToFile(
   folder: string, project: TrustedProject, registry: AdapterRegistry,
 ): Promise<Result<readonly LockEntry[], LockFailure>> {
   const previous = await readLockfile(folder);
-  if (!previous.ok) return previous;
+  if (!previous.ok) {return previous;}
   const locked = await lock(project, registry, previous.value);
-  if (!locked.ok) return locked;
+  if (!locked.ok) {return locked;}
   const temporary = join(folder, `.${LOCKFILE_NAME}.${randomUUID()}.tmp`);
   try {
     await writeFile(temporary, lockfileText(locked.value), { encoding: 'utf8', flag: 'wx' });
@@ -198,9 +198,9 @@ async function hashLaunchedExecutable(path: string): Promise<Result<string, stri
     return failure(`cannot read the browser executable at ${path}: ${errorText(error)}`);
   }
   const known = launchedHashes.get(key);
-  if (known !== undefined) return success(known);
+  if (known !== undefined) {return success(known);}
   const hashed = await hashExecutable(path);
-  if (hashed.ok) launchedHashes.set(key, hashed.value);
+  if (hashed.ok) {launchedHashes.set(key, hashed.value);}
   return hashed;
 }
 
@@ -212,12 +212,12 @@ export async function checkPinnedBuild(
   driver: Pick<GuardedDriver, 'build'>, target: Target, entries: readonly LockEntry[] | undefined,
 ): Promise<Result<CheckedBuild, Unavailable | BrokenDriver>> {
   const pinned = entries?.find((entry) => entry.targetId === target.id);
-  if (driver.build === undefined) return success({ unpinned: entries !== undefined });
+  if (driver.build === undefined) {return success({ unpinned: entries !== undefined });}
   const built = await driver.build(target);
-  if (!built.ok) return isBrokenDriver(built.error) ? failure(built.error) : failure({ reason: runTimeReason(built.error.code), detail: built.error.detail });
+  if (!built.ok) {return isBrokenDriver(built.error) ? failure(built.error) : failure({ reason: runTimeReason(built.error.code), detail: built.error.detail });}
   const hashed = await hashLaunchedExecutable(built.value.executablePath);
-  if (!hashed.ok) return failure({ reason: UnavailableReason.LaunchFailed, detail: hashed.error });
-  if (pinned === undefined) return success({ executableSha256: hashed.value, unpinned: entries !== undefined });
+  if (!hashed.ok) {return failure({ reason: UnavailableReason.LaunchFailed, detail: hashed.error });}
+  if (pinned === undefined) {return success({ executableSha256: hashed.value, unpinned: entries !== undefined });}
   if (built.value.version !== pinned.version || hashed.value !== pinned.executableSha256) {
     return failure({
       reason: UnavailableReason.BuildMismatch,

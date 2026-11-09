@@ -24,7 +24,7 @@ const DECIMAL_INTEGER = /^-?[0-9]{1,15}$/;
 // True for a real calendar day, so "2026-02-30" is refused.
 function isCalendarDay(text: string): boolean {
   const parts = YEAR_MONTH_DAY.exec(text);
-  if (parts === null) return false;
+  if (parts === null) {return false;}
   const [year, month, day] = [Number(parts[1]), Number(parts[2]), Number(parts[3])];
   const date = new Date(Date.UTC(year, month - 1, day));
   return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
@@ -35,24 +35,24 @@ function isCalendarDay(text: string): boolean {
 export function argumentProblem(type: ParameterType, value: ArgumentValue): ArgumentProblem | undefined {
   switch (type.kind) {
     case ParameterKind.Text:
-      if (typeof value !== 'string') return 'wrong_type';
+      if (typeof value !== 'string') {return 'wrong_type';}
       return value.length > type.maximumLength ? 'too_long' : undefined;
     case ParameterKind.Identifier:
-      if (typeof value !== 'string') return 'wrong_type';
+      if (typeof value !== 'string') {return 'wrong_type';}
       return IDENTIFIER.test(value) ? undefined : 'unknown_value';
     case ParameterKind.Integer:
-      if (typeof value !== 'number' || !Number.isSafeInteger(value)) return 'wrong_type';
+      if (typeof value !== 'number' || !Number.isSafeInteger(value)) {return 'wrong_type';}
       return value < type.minimum || value > type.maximum ? 'unknown_value' : undefined;
     case ParameterKind.Boolean:
       return typeof value === 'boolean' ? undefined : 'wrong_type';
     case ParameterKind.Email:
-      if (typeof value !== 'string') return 'wrong_type';
+      if (typeof value !== 'string') {return 'wrong_type';}
       return value.length <= MAXIMUM_EMAIL_LENGTH && EMAIL.test(value) ? undefined : 'unknown_value';
     case ParameterKind.YearMonthDay:
-      if (typeof value !== 'string') return 'wrong_type';
+      if (typeof value !== 'string') {return 'wrong_type';}
       return isCalendarDay(value) ? undefined : 'unknown_value';
     case ParameterKind.OneOf:
-      if (typeof value !== 'string') return 'wrong_type';
+      if (typeof value !== 'string') {return 'wrong_type';}
       return type.values.includes(value) ? undefined : 'unknown_value';
     case ParameterKind.Secret:
       return 'wrong_type';

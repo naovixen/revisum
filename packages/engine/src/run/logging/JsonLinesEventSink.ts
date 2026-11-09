@@ -48,11 +48,11 @@ export function jsonLinesEventSink(path: string): EventSink {
   return {
     append(event, actor) {
       const current = readCurrent(path);
-      if (!current.ok) return current;
+      if (!current.ok) {return current;}
       const content = current.value;
       if (expected === undefined) {
         // A last line with no newline is a torn write: appending would merge two entries.
-        if (content.length > 0 && content[content.length - 1] !== NEWLINE) return failure(NOT_APPEND_ONLY);
+        if (content.length > 0 && content[content.length - 1] !== NEWLINE) {return failure(NOT_APPEND_ONLY);}
         expected = { hash: createHash('sha256').update(content), bytes: content.length };
         sequence = content.filter((byte) => byte === NEWLINE).length;
       } else if (content.length !== expected.bytes || sha256(content) !== expected.hash.copy().digest('hex')) {

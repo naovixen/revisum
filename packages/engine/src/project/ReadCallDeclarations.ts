@@ -60,13 +60,13 @@ const REQUIRED_DECLARATION_FIELDS = ['service', 'method', 'path', 'parameters', 
 // defaults to false, so a service may reach a private address only when the person says so. The
 // port, the one a database command may reach, is left out when absent.
 export function readServices(input: unknown, issues: Issues): Parsed<readonly DeclaredService[]> {
-  if (input === undefined) return [];
+  if (input === undefined) {return [];}
   const raw = readList(input, '$.services', issues, MAXIMUM_SERVICES, 0);
-  if (raw === INVALID) return INVALID;
+  if (raw === INVALID) {return INVALID;}
   const services = raw.map((entry, index): Parsed<DeclaredService> => {
     const path = `$.services[${index}]`;
     const fields = readRecord(entry, path, issues, ['name', 'origin', 'private', 'port'], ['name', 'origin']);
-    if (fields === INVALID) return INVALID;
+    if (fields === INVALID) {return INVALID;}
     const name = fields['name'];
     const readName = (): Parsed<ServiceName> => {
       if (typeof name !== 'string') { issues.push({ code: PlanErrorCode.WrongType, path: `${path}.name` }); return INVALID; }
@@ -74,13 +74,13 @@ export function readServices(input: unknown, issues: Issues): Parsed<readonly De
       return brand<string, 'ServiceName'>(name);
     };
     const isPrivate = fields['private'] ?? false;
-    if (typeof isPrivate !== 'boolean') issues.push({ code: PlanErrorCode.WrongType, path: `${path}.private` });
+    if (typeof isPrivate !== 'boolean') {issues.push({ code: PlanErrorCode.WrongType, path: `${path}.private` });}
     const port = Object.hasOwn(fields, 'port') ? readInteger(fields['port'], `${path}.port`, issues, 1, LARGEST_PORT) : undefined;
     const parts = [readName(), readOrigin(fields['origin'], `${path}.origin`, issues), typeof isPrivate === 'boolean' ? isPrivate : INVALID] as const;
-    if (!allValid(parts) || port === INVALID) return INVALID;
+    if (!allValid(parts) || port === INVALID) {return INVALID;}
     return { name: parts[0], origin: parts[1], private: parts[2], ...(port === undefined ? {} : { port }) };
   });
-  if (!allValid(services)) return INVALID;
+  if (!allValid(services)) {return INVALID;}
   if (new Set(services.map((service) => service.name)).size !== services.length) {
     issues.push({ code: PlanErrorCode.Duplicate, path: '$.services' });
     return INVALID;
@@ -109,19 +109,19 @@ export function readDeclarationSection<Name extends string, Declaration>(
   input: unknown, path: string, issues: Issues, maximumCount: number, read: (input: unknown, path: string) => Parsed<Declaration>,
   rule: DeclaredNameRule = DECLARED_NAME_RULE,
 ): Parsed<Readonly<Record<Brand<string, Name>, Declaration>>> {
-  if (input === undefined) return {};
+  if (input === undefined) {return {};}
   const fields = peekRecord(input, path, issues);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const names = Object.keys(fields);
   if (names.length > maximumCount) { issues.push({ code: PlanErrorCode.TooLarge, path }); return INVALID; }
   const entries = names.map((name): Parsed<readonly [Brand<string, Name>, Declaration]> => {
     const at = `${path}.${name}`;
     const declaredName = readName<Name>(name, at, issues, rule);
-    if (declaredName === INVALID) return INVALID;
+    if (declaredName === INVALID) {return INVALID;}
     const declaration = read(fields[name], at);
     return declaration === INVALID ? INVALID : [declaredName, declaration];
   });
-  if (!allValid(entries)) return INVALID;
+  if (!allValid(entries)) {return INVALID;}
   return Object.fromEntries(entries);
 }
 
@@ -135,7 +135,7 @@ export function readCallDeclarations(input: unknown, context: DeclarationContext
 function readDeclaration(input: unknown, path: string, context: DeclarationContext): Parsed<CallDeclaration> {
   const { issues } = context;
   const fields = readRecord(input, path, issues, DECLARATION_FIELDS, REQUIRED_DECLARATION_FIELDS);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const service = readServiceName(fields['service'], `${path}.service`, context);
   const method = readOneOf(fields['method'], `${path}.method`, issues, HTTP_METHODS);
   const effect = readOneOf(fields['effect'], `${path}.effect`, issues, CALL_EFFECTS);
@@ -144,7 +144,7 @@ function readDeclaration(input: unknown, path: string, context: DeclarationConte
     ? readPendingStatuses(fields['pendingStatuses'], `${path}.pendingStatuses`, issues, effect, successStatuses) : undefined;
   const responseFields = Object.hasOwn(fields, 'fields') ? readFieldPointers(fields['fields'], `${path}.fields`, issues) : undefined;
   const allowInProposals = fields['allowInProposals'] ?? false;
-  if (typeof allowInProposals !== 'boolean') issues.push({ code: PlanErrorCode.WrongType, path: `${path}.allowInProposals` });
+  if (typeof allowInProposals !== 'boolean') {issues.push({ code: PlanErrorCode.WrongType, path: `${path}.allowInProposals` });}
   const timeoutMilliseconds = Object.hasOwn(fields, 'timeoutMilliseconds')
     ? readInteger(fields['timeoutMilliseconds'], `${path}.timeoutMilliseconds`, issues, 1, MAXIMUM_CALL_TIMEOUT_MILLISECONDS) : undefined;
   const maximumResponseBytes = Object.hasOwn(fields, 'maximumResponseBytes')
@@ -152,14 +152,14 @@ function readDeclaration(input: unknown, path: string, context: DeclarationConte
   const headers = Object.hasOwn(fields, 'headers') ? readHeaders(fields['headers'], `${path}.headers`, context) : undefined;
   // The templates name parameters, so they are read only once the parameters are known.
   const parameters = readParameters(fields['parameters'], `${path}.parameters`, issues);
-  if (parameters === INVALID) return INVALID;
+  if (parameters === INVALID) {return INVALID;}
   const templates: TemplateContext = { issues, parameters };
   const requestPath = readRequestPath(fields['path'], `${path}.path`, templates);
   const query = Object.hasOwn(fields, 'query') ? readQuery(fields['query'], `${path}.query`, templates) : undefined;
   const body = Object.hasOwn(fields, 'body') ? readTemplate(fields['body'], `${path}.body`, templates, 'body', 0) : undefined;
   const parts = [service, method, effect, successStatuses, requestPath] as const;
   if (!allValid(parts) || pendingStatuses === INVALID || typeof allowInProposals !== 'boolean' || responseFields === INVALID || timeoutMilliseconds === INVALID
-    || maximumResponseBytes === INVALID || headers === INVALID || query === INVALID || body === INVALID) return INVALID;
+    || maximumResponseBytes === INVALID || headers === INVALID || query === INVALID || body === INVALID) {return INVALID;}
   // Optional parts are left out when absent.
   return {
     service: parts[0], method: parts[1], path: parts[4],
@@ -192,9 +192,9 @@ function readName<Name extends string>(
 
 function readStatuses(input: unknown, path: string, issues: Issues): Parsed<readonly number[]> {
   const raw = readList(input, path, issues, MAXIMUM_STATUSES);
-  if (raw === INVALID) return INVALID;
+  if (raw === INVALID) {return INVALID;}
   const statuses = raw.map((status, index) => readInteger(status, `${path}[${index}]`, issues, 100, 599));
-  if (!allValid(statuses)) return INVALID;
+  if (!allValid(statuses)) {return INVALID;}
   if (new Set(statuses).size !== statuses.length) { issues.push({ code: PlanErrorCode.Duplicate, path }); return INVALID; }
   return statuses;
 }
@@ -221,11 +221,11 @@ function readPendingStatuses(
 
 export function readFieldPointers(input: unknown, path: string, issues: Issues): Parsed<Readonly<Record<FieldName, JsonPointer>>> {
   const fields = peekRecord(input, path, issues);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const entries = Object.entries(fields).map(([key, pointer]): Parsed<readonly [FieldName, JsonPointer]> => {
     const at = `${path}.${key}`;
     const name = readName<'FieldName'>(key, at, issues);
-    if (name === INVALID) return INVALID;
+    if (name === INVALID) {return INVALID;}
     if (typeof pointer !== 'string') { issues.push({ code: PlanErrorCode.WrongType, path: at }); return INVALID; }
     if (!JSON_POINTER.test(pointer)) { issues.push({ code: PlanErrorCode.UnknownValue, path: at }); return INVALID; }
     return [name, brand<string, 'JsonPointer'>(pointer)];
@@ -236,7 +236,7 @@ export function readFieldPointers(input: unknown, path: string, issues: Issues):
 function readHeaders(input: unknown, path: string, context: DeclarationContext): Parsed<Readonly<Record<string, HeaderValue>>> {
   const { issues } = context;
   const fields = peekRecord(input, path, issues);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const seen = new Set<string>();
   const entries = Object.entries(fields).map(([name, value]): Parsed<readonly [string, HeaderValue]> => {
     const at = `${path}.${name}`;
@@ -261,12 +261,12 @@ function readHeaderValue(input: unknown, path: string, context: DeclarationConte
   const { issues } = context;
   if (isNonArrayObject(input) && Object.hasOwn(input, 'literal')) {
     const fields = readRecord(input, path, issues, ['literal']);
-    if (fields === INVALID) return INVALID;
+    if (fields === INVALID) {return INVALID;}
     const literal = readUnscannedText(fields['literal'], `${path}.literal`, issues, MAXIMUM_HEADER_LITERAL_LENGTH);
     return literal === INVALID ? INVALID : { literal };
   }
   const fields = readRecord(input, path, issues, ['secretName', 'scheme']);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const secretName = fields['secretName'];
   const readSecret = (): Parsed<SecretName> => {
     const at = `${path}.secretName`;
@@ -283,7 +283,7 @@ function readHeaderValue(input: unknown, path: string, context: DeclarationConte
 
 export function readParameters(input: unknown, path: string, issues: Issues): Parsed<Readonly<Record<ParameterName, ParameterType>>> {
   const fields = peekRecord(input, path, issues);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   if (Object.keys(fields).length > MAXIMUM_PARAMETERS) { issues.push({ code: PlanErrorCode.TooLarge, path }); return INVALID; }
   const entries = Object.entries(fields).map(([key, type]): Parsed<readonly [ParameterName, ParameterType]> => {
     const at = `${path}.${key}`;
@@ -296,29 +296,29 @@ export function readParameters(input: unknown, path: string, issues: Issues): Pa
 
 function readParameterType(input: unknown, path: string, issues: Issues): Parsed<ParameterType> {
   const head = peekRecord(input, path, issues);
-  if (head === INVALID) return INVALID;
+  if (head === INVALID) {return INVALID;}
   const kind = readOneOf(head['kind'], `${path}.kind`, issues, PARAMETER_KINDS);
-  if (kind === INVALID) return INVALID;
+  if (kind === INVALID) {return INVALID;}
   switch (kind) {
     case ParameterKind.Text: {
-      if (readRecord(input, path, issues, ['kind', 'maximumLength']) === INVALID) return INVALID;
+      if (readRecord(input, path, issues, ['kind', 'maximumLength']) === INVALID) {return INVALID;}
       const maximumLength = readInteger(head['maximumLength'], `${path}.maximumLength`, issues, 1, MAXIMUM_TEXT_PARAMETER_LENGTH);
       return maximumLength === INVALID ? INVALID : { kind, maximumLength };
     }
     case ParameterKind.Integer: {
-      if (readRecord(input, path, issues, ['kind', 'minimum', 'maximum']) === INVALID) return INVALID;
+      if (readRecord(input, path, issues, ['kind', 'minimum', 'maximum']) === INVALID) {return INVALID;}
       const minimum = readInteger(head['minimum'], `${path}.minimum`, issues, Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER);
       const maximum = readInteger(head['maximum'], `${path}.maximum`, issues, Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER);
-      if (minimum === INVALID || maximum === INVALID) return INVALID;
+      if (minimum === INVALID || maximum === INVALID) {return INVALID;}
       if (maximum < minimum) { issues.push({ code: PlanErrorCode.UnknownValue, path: `${path}.maximum` }); return INVALID; }
       return { kind, minimum, maximum };
     }
     case ParameterKind.OneOf: {
-      if (readRecord(input, path, issues, ['kind', 'values']) === INVALID) return INVALID;
+      if (readRecord(input, path, issues, ['kind', 'values']) === INVALID) {return INVALID;}
       const raw = readList(head['values'], `${path}.values`, issues, MAXIMUM_ONE_OF_VALUES);
-      if (raw === INVALID) return INVALID;
+      if (raw === INVALID) {return INVALID;}
       const values = raw.map((value, index): Parsed<SafeText> => readUnscannedText(value, `${path}.values[${index}]`, issues, MAXIMUM_TEXT_PARAMETER_LENGTH));
-      if (!allValid(values)) return INVALID;
+      if (!allValid(values)) {return INVALID;}
       if (new Set(values).size !== values.length) { issues.push({ code: PlanErrorCode.Duplicate, path: `${path}.values` }); return INVALID; }
       return { kind, values };
     }
@@ -365,7 +365,7 @@ function readRequestPath(input: unknown, path: string, context: TemplateContext)
 // Query values, each a template whose result is a scalar.
 function readQuery(input: unknown, path: string, context: TemplateContext): Parsed<Readonly<Record<string, JsonTemplate>>> {
   const fields = peekRecord(input, path, context.issues);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const entries = Object.entries(fields).map(([key, value]): Parsed<readonly [string, JsonTemplate]> => {
     const at = `${path}.${key}`;
     if (!QUERY_KEY.test(key)) { context.issues.push({ code: PlanErrorCode.UnknownValue, path: at }); return INVALID; }
@@ -387,20 +387,20 @@ export const readJsonTemplate = (
 function readTemplate(input: unknown, path: string, context: TemplateContext, where: 'body' | 'query', depth: number): Parsed<JsonTemplate> {
   const { issues } = context;
   if (depth > MAXIMUM_TEMPLATE_DEPTH) { issues.push({ code: PlanErrorCode.TooLarge, path }); return INVALID; }
-  if (typeof input === 'string' || typeof input === 'boolean') return input;
+  if (typeof input === 'string' || typeof input === 'boolean') {return input;}
   if (typeof input === 'number') {
     if (!Number.isFinite(input)) { issues.push({ code: PlanErrorCode.WrongType, path }); return INVALID; }
     return input;
   }
   if (input === null || Array.isArray(input)) {
     if (where === 'query') { issues.push({ code: PlanErrorCode.WrongType, path }); return INVALID; }
-    if (input === null) return null;
+    if (input === null) {return null;}
     const items = input.map((item, index) => readTemplate(item, `${path}[${index}]`, context, where, depth + 1));
     return allValid(items) ? items : INVALID;
   }
   if (!isPlainObject(input)) { issues.push({ code: PlanErrorCode.WrongType, path }); return INVALID; }
-  if (Object.hasOwn(input, '$parameter')) return readParameterPlaceholder(input, path, context, where);
-  if (Object.hasOwn(input, '$interpolate')) return readInterpolatedString(input, path, context);
+  if (Object.hasOwn(input, '$parameter')) {return readParameterPlaceholder(input, path, context, where);}
+  if (Object.hasOwn(input, '$interpolate')) {return readInterpolatedString(input, path, context);}
   if (where === 'query') { issues.push({ code: PlanErrorCode.WrongType, path }); return INVALID; }
   const entries = Object.entries(input).map(([key, value]): Parsed<readonly [string, JsonTemplate]> => {
     const at = `${path}.${key}`;
@@ -416,7 +416,7 @@ function readTemplate(input: unknown, path: string, context: TemplateContext, wh
 function readParameterPlaceholder(
   input: Readonly<Record<string, unknown>>, path: string, context: TemplateContext, where: 'body' | 'query',
 ): Parsed<JsonTemplate> {
-  if (readRecord(input, path, context.issues, ['$parameter']) === INVALID) return INVALID;
+  if (readRecord(input, path, context.issues, ['$parameter']) === INVALID) {return INVALID;}
   const parameter = declaredParameter(input['$parameter'], context);
   if (parameter === undefined) { context.issues.push({ code: PlanErrorCode.UnknownValue, path }); return INVALID; }
   if (where === 'query' && parameter[1].kind === ParameterKind.Secret) { context.issues.push({ code: PlanErrorCode.UnsafeInterpolation, path }); return INVALID; }
@@ -429,18 +429,18 @@ function readParameterPlaceholder(
 function readInterpolatedString(input: Readonly<Record<string, unknown>>, path: string, context: TemplateContext): Parsed<JsonTemplate> {
   const { issues } = context;
   const fields = readRecord(input, path, issues, ['$interpolate', 'parameters']);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const template = fields['$interpolate'];
   if (typeof template !== 'string') { issues.push({ code: PlanErrorCode.WrongType, path: `${path}.$interpolate` }); return INVALID; }
   const raw = readList(fields['parameters'], `${path}.parameters`, issues, MAXIMUM_PARAMETERS);
-  if (raw === INVALID) return INVALID;
+  if (raw === INVALID) {return INVALID;}
   const parameters = raw.map((name, index): Parsed<ParameterName> => {
     const parameter = declaredParameter(name, context);
     if (parameter === undefined) { issues.push({ code: PlanErrorCode.UnknownValue, path: `${path}.parameters[${index}]` }); return INVALID; }
     if (!isInterpolationSafe(parameter[1])) { issues.push({ code: PlanErrorCode.UnsafeInterpolation, path }); return INVALID; }
     return parameter[0];
   });
-  if (!allValid(parameters)) return INVALID;
+  if (!allValid(parameters)) {return INVALID;}
   if (new Set(parameters).size !== parameters.length) { issues.push({ code: PlanErrorCode.Duplicate, path: `${path}.parameters` }); return INVALID; }
   const placeholders = [...template.matchAll(STRING_PLACEHOLDER)].map((match) => match[1] ?? '');
   if (placeholders.some((name) => !parameters.some((parameter) => parameter === name))) {

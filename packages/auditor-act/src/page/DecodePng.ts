@@ -5,7 +5,7 @@ import { inflateSync } from 'node:zlib';
 export interface DecodedImage { width: number; height: number; channels: number; data: Uint8Array }
 
 export function decodePng(buffer: Buffer): DecodedImage {
-  if (buffer.readUInt32BE(0) !== 0x89504e47) throw new Error('not a PNG');
+  if (buffer.readUInt32BE(0) !== 0x89504e47) {throw new Error('not a PNG');}
   let offset = 8;
   let width = 0;
   let height = 0;

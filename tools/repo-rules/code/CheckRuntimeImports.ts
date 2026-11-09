@@ -42,7 +42,7 @@ function declaredRuntimeDependencies(manifestPath: string): string[] {
   } catch {
     return [];
   }
-  if (typeof manifest !== 'object' || manifest === null) return [];
+  if (typeof manifest !== 'object' || manifest === null) {return [];}
   const fields = manifest as Record<string, unknown>;
   return DECLARED_DEPENDENCY_FIELDS.flatMap((field) => {
     const declared = fields[field];
@@ -62,7 +62,7 @@ export function checkRuntimeImports(root: string): string[] {
     for (const file of listSourceFiles(root, [`packages/${folder}`])) {
       for (const loaded of runtimeImports(readFileSync(join(root, file), 'utf8'))) {
         const library = specifierPackage(loaded.specifier);
-        if (!forbidden(library)) continue;
+        if (!forbidden(library)) {continue;}
         problems.push(`${file}:${loaded.line} imports ${library} ("${loaded.specifier}"); ${folder} is in the runtime set, which may not load it`);
       }
     }
@@ -70,4 +70,4 @@ export function checkRuntimeImports(root: string): string[] {
   return problems;
 }
 
-if (import.meta.main) process.exitCode = reportProblems('runtime import check', checkRuntimeImports(process.cwd()));
+if (import.meta.main) {process.exitCode = reportProblems('runtime import check', checkRuntimeImports(process.cwd()));}

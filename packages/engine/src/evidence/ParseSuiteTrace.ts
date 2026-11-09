@@ -35,7 +35,7 @@ function readEvent(line: string): Event | null {
   } catch {
     return null;
   }
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {return null;}
   return Object.fromEntries(['type', 'version', 'browserName', 'playwrightVersion', 'title', 'class', 'method', 'startTime']
     .map((key) => [key, fieldOf(parsed, key)]));
 }
@@ -43,7 +43,7 @@ function readEvent(line: string): Event | null {
 // What a step reads as: its own title, or its class and method when it has none.
 function actionTitle(event: Event): string | null {
   const title = event['title'];
-  if (typeof title === 'string' && title !== '') return title.slice(0, MAXIMUM_ACTION_TITLE_LENGTH);
+  if (typeof title === 'string' && title !== '') {return title.slice(0, MAXIMUM_ACTION_TITLE_LENGTH);}
   const className = event['class'];
   const method = event['method'];
   return typeof className === 'string' && typeof method === 'string' ? `${className}.${method}`.slice(0, MAXIMUM_ACTION_TITLE_LENGTH) : null;
@@ -52,20 +52,20 @@ function actionTitle(event: Event): string | null {
 function readTraceFile(text: string, path: string): Result<ReadEvents, SuiteDecodeError> {
   const lines = text.split('\n').filter((line) => line.trim() !== '');
   const first = lines[0] === undefined ? null : readEvent(lines[0]);
-  if (first === null || first['type'] !== CONTEXT_OPTIONS || typeof first['version'] !== 'number') return failure({ code: SuiteDecodeErrorCode.TraceInvalid, path });
+  if (first === null || first['type'] !== CONTEXT_OPTIONS || typeof first['version'] !== 'number') {return failure({ code: SuiteDecodeErrorCode.TraceInvalid, path });}
   const version = first['version'];
-  if (!SUPPORTED_TRACE_VERSIONS.includes(version)) return failure({ code: SuiteDecodeErrorCode.TraceUnsupported, path });
+  if (!SUPPORTED_TRACE_VERSIONS.includes(version)) {return failure({ code: SuiteDecodeErrorCode.TraceUnsupported, path });}
   const actions: { start: number; title: string }[] = [];
   for (const [index, line] of lines.entries()) {
     const event = readEvent(line);
-    if (event === null) return failure({ code: SuiteDecodeErrorCode.TraceInvalid, path: `${path}.lines[${index}]` });
-    if (event['type'] !== ACTION_START) continue;
+    if (event === null) {return failure({ code: SuiteDecodeErrorCode.TraceInvalid, path: `${path}.lines[${index}]` });}
+    if (event['type'] !== ACTION_START) {continue;}
     const title = actionTitle(event);
     const start = event['startTime'];
     if (title !== null && actions.length === MAXIMUM_TRACE_ACTIONS) {
       return failure({ code: SuiteDecodeErrorCode.TooLarge, path });
     }
-    if (title !== null) actions.push({ start: typeof start === 'number' && Number.isFinite(start) ? start : actions.length, title });
+    if (title !== null) {actions.push({ start: typeof start === 'number' && Number.isFinite(start) ? start : actions.length, title });}
   }
   const browserName = first['browserName'];
   const playwrightVersion = first['playwrightVersion'];
@@ -80,9 +80,9 @@ function readTraceFile(text: string, path: string): Result<ReadEvents, SuiteDeco
 // folder, so the result builder can find the test it belongs to.
 export function parseSuiteTrace(archive: Uint8Array, limits: EvidenceLimits, attachmentPath = ''): Result<SuiteTrace, SuiteDecodeError> {
   const read = readZip(archive, { maximumEntries: limits.maximumTraceEntries, maximumTotalBytes: limits.maximumTraceBytes });
-  if (!read.ok) return failure({ code: read.error.code === 'too-large' ? SuiteDecodeErrorCode.TooLarge : SuiteDecodeErrorCode.TraceInvalid, path: read.error.path });
+  if (!read.ok) {return failure({ code: read.error.code === 'too-large' ? SuiteDecodeErrorCode.TooLarge : SuiteDecodeErrorCode.TraceInvalid, path: read.error.path });}
   const traceFiles = read.value.flatMap((entry, index) => (TRACE_ENTRY.test(entry.name) ? [{ entry, index }] : []));
-  if (traceFiles.length === 0) return failure({ code: SuiteDecodeErrorCode.TraceInvalid, path: '$' });
+  if (traceFiles.length === 0) {return failure({ code: SuiteDecodeErrorCode.TraceInvalid, path: '$' });}
   const actions: { start: number; title: string }[] = [];
   let browserName: string | undefined;
   let playwrightVersion: string | undefined;
@@ -94,7 +94,7 @@ export function parseSuiteTrace(archive: Uint8Array, limits: EvidenceLimits, att
       return failure({ code: SuiteDecodeErrorCode.TraceInvalid, path: `$.entries[${index}]` });
     }
     const events = readTraceFile(text, `$.entries[${index}]`);
-    if (!events.ok) return events;
+    if (!events.ok) {return events;}
     for (const action of events.value.actions) {
       if (actions.length === MAXIMUM_TRACE_ACTIONS) {
         return failure({ code: SuiteDecodeErrorCode.TooLarge, path: `$.entries[${index}]` });

@@ -83,7 +83,7 @@ class ChromiumPage implements PageDriver {
     this.#allowedUrl = url;
     await this.#session.ask(BRING_TO_FRONT, {});
     const navigated = await this.#session.ask(NAVIGATE, { url }, timeoutMilliseconds);
-    if (navigated.errorText !== undefined && navigated.errorText !== '') throw new Error(`navigate ${url}: ${navigated.errorText}`);
+    if (navigated.errorText !== undefined && navigated.errorText !== '') {throw new Error(`navigate ${url}: ${navigated.errorText}`);}
     await loaded;
     await this.evaluate(`(${settleFontsAndFrames.toString()})()`);
   }
@@ -101,14 +101,14 @@ class ChromiumPage implements PageDriver {
   async activeElement(): Promise<{ backendId: number; box: Box | null } | null> {
     const found = await this.#session.ask(EVALUATE, { expression: `(${activeElementHolder.toString()})()`, returnByValue: false });
     const holder = found.result;
-    if (holder.subtype === 'null' || holder.objectId === undefined) return null;
+    if (holder.subtype === 'null' || holder.objectId === undefined) {return null;}
     const boxes = await this.#session.ask(CALL_FUNCTION_ON, {
       objectId: holder.objectId, functionDeclaration: boxesOfHolder.toString(), returnByValue: true,
     });
     const element = await this.#session.ask(CALL_FUNCTION_ON, {
       objectId: holder.objectId, functionDeclaration: elementOfHolder.toString(), returnByValue: false,
     });
-    if (element.result.objectId === undefined) return null;
+    if (element.result.objectId === undefined) {return null;}
     const described = await this.#session.ask(DESCRIBE_NODE, { objectId: element.result.objectId });
     await this.#session.ask(RELEASE_OBJECT, { objectId: holder.objectId });
     await this.#session.ask(RELEASE_OBJECT, { objectId: element.result.objectId });
@@ -140,13 +140,13 @@ class ChromiumPage implements PageDriver {
     }
     const { nodeIds } = await this.#session.ask(PUSH_NODES_BY_BACKEND_IDS, { backendNodeIds: [backendId] });
     const nodeId = nodeIds[0];
-    if (nodeId === undefined || nodeId === 0) return [];
+    if (nodeId === undefined || nodeId === 0) {return [];}
     const matched = await this.#session.ask(GET_MATCHED_STYLES, { nodeId });
     const declared = new Set<string>();
-    for (const declaration of matched.inlineStyle ?? []) if (declaration.value !== '') declared.add(declaration.name);
+    for (const declaration of matched.inlineStyle ?? []) {if (declaration.value !== '') {declared.add(declaration.name);}}
     for (const matchedRule of matched.matchedCSSRules ?? []) {
-      if (matchedRule.origin !== 'regular' && matchedRule.origin !== 'inspector') continue;
-      for (const declaration of matchedRule.declarations) if (declaration.value !== '') declared.add(declaration.name);
+      if (matchedRule.origin !== 'regular' && matchedRule.origin !== 'inspector') {continue;}
+      for (const declaration of matchedRule.declarations) {if (declaration.value !== '') {declared.add(declaration.name);}}
     }
     return [...declared].sort();
   }
@@ -173,7 +173,7 @@ class ChromiumPage implements PageDriver {
       const hidden = await this.#session.ask(CALL_FUNCTION_ON, { objectId, returnByValue: true, functionDeclaration: hideSampledText.toString() });
       await this.evaluate(`(${settleFrames.toString()})()`);
       const [x, y, width, height] = numbersIn(hidden.result.value) ?? [];
-      if (x === undefined || y === undefined || width === undefined || width === 0 || height === undefined || height === 0) return null;
+      if (x === undefined || y === undefined || width === undefined || width === 0 || height === undefined || height === 0) {return null;}
       const shot = await this.screenshotClip({ x: Math.floor(x), y: Math.floor(y), width: Math.max(1, Math.ceil(width)), height: Math.max(1, Math.ceil(height)) });
       return extremes(decodePng(Buffer.from(shot, 'base64')));
     } catch {
@@ -188,7 +188,7 @@ class ChromiumPage implements PageDriver {
 
   async evaluate(expression: string): Promise<unknown> {
     const evaluated = await this.#session.ask(EVALUATE, { expression, returnByValue: true, awaitPromise: true });
-    if (evaluated.exceptionDetails !== undefined) throw new Error('evaluate: ' + (evaluated.exceptionDetails.exception?.description ?? evaluated.exceptionDetails.text));
+    if (evaluated.exceptionDetails !== undefined) {throw new Error('evaluate: ' + (evaluated.exceptionDetails.exception?.description ?? evaluated.exceptionDetails.text));}
     return evaluated.result.value;
   }
 

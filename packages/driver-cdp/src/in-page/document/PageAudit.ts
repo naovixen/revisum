@@ -37,7 +37,7 @@ export function pageAudit(ruleTable: string): string {
     return { selector: selectorOf(element), box, offscreen, snippet: element.outerHTML.slice(0, 120) };
   };
   const hidden = (element: Element): boolean => {
-    if (element.closest('[aria-hidden="true"]') !== null) return true;
+    if (element.closest('[aria-hidden="true"]') !== null) {return true;}
     const style = getComputedStyle(element);
     return style.display === 'none' || style.visibility === 'hidden';
   };
@@ -54,19 +54,19 @@ export function pageAudit(ruleTable: string): string {
   const rules: FailingRule[] = [];
   const add = (ruleId: string, elements: Element[]): void => {
     const rule = details[ruleId];
-    if (rule !== undefined && elements.length > 0) rules.push({ ruleId, actRule: rule.actRule, wcag: rule.wcag, impact: rule.impact, nodes: elements.map(describe) });
+    if (rule !== undefined && elements.length > 0) {rules.push({ ruleId, actRule: rule.actRule, wcag: rule.wcag, impact: rule.impact, nodes: elements.map(describe) });}
   };
 
   // 1.1.1 Image has an accessible name.
   add('image-alt', shown('img').filter((element) => {
     const role = element.getAttribute('role');
-    if (role === 'presentation' || role === 'none') return false;
+    if (role === 'presentation' || role === 'none') {return false;}
     return !element.hasAttribute('alt') && explicitName(element) === '';
   }));
 
   // 4.1.2 Button has an accessible name.
   add('button-name', shown('button, input[type="button"], [role="button"]').filter((element) => {
-    if (element instanceof HTMLInputElement) return normalise(element.value) === '' && explicitName(element) === '';
+    if (element instanceof HTMLInputElement) {return normalise(element.value) === '' && explicitName(element) === '';}
     return textName(element) === '' && explicitName(element) === '';
   }));
 
@@ -76,17 +76,17 @@ export function pageAudit(ruleTable: string): string {
   // 4.1.2 Form field has an accessible name.
   const unlabelledTypes = ['hidden', 'submit', 'reset', 'button', 'image'];
   add('label', shown('input, select, textarea').filter((element) => {
-    if (element instanceof HTMLInputElement && unlabelledTypes.includes(element.type)) return false;
+    if (element instanceof HTMLInputElement && unlabelledTypes.includes(element.type)) {return false;}
     const labels = normalise(Array.from((element as HTMLInputElement).labels ?? []).map((label) => label.textContent).join(' '));
     return labels === '' && explicitName(element) === '' && normalise(element.getAttribute('placeholder')) === '';
   }));
 
   // 2.4.2 Document has a title.
-  if (normalise(document.title) === '') add('document-title', [document.documentElement]);
+  if (normalise(document.title) === '') {add('document-title', [document.documentElement]);}
 
   // 3.1.1 Page has a lang attribute; 3.1.1 and 3.1.2 lang values are valid.
   const root = document.documentElement;
-  if (normalise(root.getAttribute('lang')) === '' && normalise(root.getAttribute('xml:lang')) === '') add('html-has-lang', [root]);
+  if (normalise(root.getAttribute('lang')) === '' && normalise(root.getAttribute('xml:lang')) === '') {add('html-has-lang', [root]);}
   const languageNames = new Intl.DisplayNames(['en'], { type: 'language', fallback: 'none' });
   const validLanguage = (tag: string): boolean => {
     try {
@@ -95,7 +95,7 @@ export function pageAudit(ruleTable: string): string {
       return primary.length >= 2 && primary.length <= 3 && languageNames.of(primary) !== undefined;
     } catch { return false; }
   };
-  if (normalise(root.getAttribute('lang')) !== '' && !validLanguage(normalise(root.getAttribute('lang')))) add('html-lang-valid', [root]);
+  if (normalise(root.getAttribute('lang')) !== '' && !validLanguage(normalise(root.getAttribute('lang')))) {add('html-lang-valid', [root]);}
   add('valid-lang', shown('body [lang]').filter((element) => normalise(element.getAttribute('lang')) !== '' && !validLanguage(normalise(element.getAttribute('lang')))));
 
   // 1.3.1 Lists contain only list items.
@@ -113,16 +113,16 @@ export function pageAudit(ruleTable: string): string {
   const contactFields = ['tel', 'tel-country-code', 'tel-national', 'tel-area-code', 'tel-local', 'tel-local-prefix', 'tel-local-suffix', 'tel-extension', 'email', 'impp'];
   const validAutocomplete = (value: string): boolean => {
     const tokens = value.toLowerCase().split(/\s+/).filter((token) => token !== '');
-    if (tokens.length === 0 || (tokens.length === 1 && (tokens[0] === 'on' || tokens[0] === 'off'))) return true;
-    if (tokens[tokens.length - 1] === 'webauthn') tokens.pop();
+    if (tokens.length === 0 || (tokens.length === 1 && (tokens[0] === 'on' || tokens[0] === 'off'))) {return true;}
+    if (tokens[tokens.length - 1] === 'webauthn') {tokens.pop();}
     const field = tokens.pop() ?? '';
-    if (!autofillFields.includes(field)) return false;
+    if (!autofillFields.includes(field)) {return false;}
     if (tokens.length > 0 && ['home', 'work', 'mobile', 'fax', 'pager'].includes(tokens[tokens.length - 1] ?? '')) {
-      if (!contactFields.includes(field)) return false;
+      if (!contactFields.includes(field)) {return false;}
       tokens.pop();
     }
-    if (tokens.length > 0 && ['shipping', 'billing'].includes(tokens[tokens.length - 1] ?? '')) tokens.pop();
-    if (tokens.length > 0 && (tokens[tokens.length - 1] ?? '').startsWith('section-')) tokens.pop();
+    if (tokens.length > 0 && ['shipping', 'billing'].includes(tokens[tokens.length - 1] ?? '')) {tokens.pop();}
+    if (tokens.length > 0 && (tokens[tokens.length - 1] ?? '').startsWith('section-')) {tokens.pop();}
     return tokens.length === 0;
   };
   add('autocomplete-valid', shown('input[autocomplete], select[autocomplete], textarea[autocomplete]')
@@ -132,13 +132,13 @@ export function pageAudit(ruleTable: string): string {
   type Colour = [number, number, number, number];
   const parseColour = (text: string): Colour | null => {
     const match = /rgba?\(([^)]+)\)/.exec(text);
-    if (match === null || match[1] === undefined) return null;
+    if (match === null || match[1] === undefined) {return null;}
     const channels = match[1].split(/[\s,/]+/).filter((part) => part !== '').map(Number);
     return [channels[0] ?? 0, channels[1] ?? 0, channels[2] ?? 0, channels[3] ?? 1];
   };
   const over = (top: Colour, under: Colour): Colour => {
     const alpha = top[3] + under[3] * (1 - top[3]);
-    if (alpha === 0) return [0, 0, 0, 0];
+    if (alpha === 0) {return [0, 0, 0, 0];}
     const mix = (channel: 0 | 1 | 2): number => (top[channel] * top[3] + under[channel] * under[3] * (1 - top[3])) / alpha;
     return [mix(0), mix(1), mix(2), alpha];
   };
@@ -146,12 +146,12 @@ export function pageAudit(ruleTable: string): string {
     const layers: Colour[] = [];
     for (let current: Element | null = element; current !== null; current = current.parentElement) {
       const style = getComputedStyle(current);
-      if (style.backgroundImage !== 'none') return null;
+      if (style.backgroundImage !== 'none') {return null;}
       const colour = parseColour(style.backgroundColor);
-      if (colour !== null && colour[3] > 0) { layers.push(colour); if (colour[3] >= 1) break; }
+      if (colour !== null && colour[3] > 0) { layers.push(colour); if (colour[3] >= 1) {break;} }
     }
     let combined: Colour = [255, 255, 255, 1];
-    for (const layer of layers.reverse()) combined = over(layer, combined);
+    for (const layer of layers.reverse()) {combined = over(layer, combined);}
     return combined;
   };
   const luminance = (colour: Colour): number => {
@@ -159,14 +159,14 @@ export function pageAudit(ruleTable: string): string {
     return 0.2126 * linear(colour[0]) + 0.7152 * linear(colour[1]) + 0.0722 * linear(colour[2]);
   };
   add('color-contrast', shown('body *').filter((element) => {
-    if (['SCRIPT', 'STYLE', 'TEMPLATE', 'NOSCRIPT', 'OPTION'].includes(element.tagName)) return false;
-    if ((element as HTMLButtonElement).disabled === true) return false;
+    if (['SCRIPT', 'STYLE', 'TEMPLATE', 'NOSCRIPT', 'OPTION'].includes(element.tagName)) {return false;}
+    if ((element as HTMLButtonElement).disabled === true) {return false;}
     const ownText = Array.from(element.childNodes).some((child) => child.nodeType === Node.TEXT_NODE && normalise(child.textContent) !== '');
-    if (!ownText) return false;
+    if (!ownText) {return false;}
     const style = getComputedStyle(element);
     const backgroundColour = background(element);
     const rawForeground = parseColour(style.color);
-    if (backgroundColour === null || rawForeground === null) return false;
+    if (backgroundColour === null || rawForeground === null) {return false;}
     const foreground = over(rawForeground, backgroundColour);
     const [lighter, darker] = [luminance(foreground), luminance(backgroundColour)].sort((left, right) => right - left) as [number, number];
     const ratio = (lighter + 0.05) / (darker + 0.05);

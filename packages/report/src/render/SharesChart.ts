@@ -37,7 +37,7 @@ export function escapedDefectsChart(history: History, id: string): string {
     let stacked = 0;
     for (const severity of SEVERITIES) {
       const value = period.escaped[severity];
-      if (value === 0) continue;
+      if (value === 0) {continue;}
       const top = yOf(stacked + value);
       const bottom = yOf(stacked);
       bars.push(`<rect x="${oneDecimal(xAt(index, count) - barWidth / 2)}" y="${oneDecimal(top)}" width="${oneDecimal(barWidth)}" height="${oneDecimal(bottom - top)}" fill="url(#${id}-${severity.toLowerCase()})" stroke="${SEVERITY_FILL[severity]}" stroke-width="1.5"/>`);

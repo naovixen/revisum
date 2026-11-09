@@ -100,35 +100,35 @@ class Refusal extends Error {
 export function decodePageMap(input: unknown, origin: Origin): Result<PageMap, PageMapDecodeError> {
   let nodes = 0;
   const decodeNodes = (value: unknown, path: string, nesting: number): PageMapNode[] => {
-    if (!Array.isArray(value) || nesting > MAXIMUM_TREE_NESTING) throw new Refusal(path);
+    if (!Array.isArray(value) || nesting > MAXIMUM_TREE_NESTING) {throw new Refusal(path);}
     return value.map((node: unknown, index: number): PageMapNode => {
       const at = `${path}[${index}]`;
       nodes += 1;
-      if (nodes > MAXIMUM_DECODED_NODES || !isPlainObject(node) || !hasExactly(node, ['role', 'name', 'children'])) throw new Refusal(at);
+      if (nodes > MAXIMUM_DECODED_NODES || !isPlainObject(node) || !hasExactly(node, ['role', 'name', 'children'])) {throw new Refusal(at);}
       const { role, name } = node;
-      if (typeof role !== 'string' || !KEPT_ROLES.has(role) || !isBoundedText(name)) throw new Refusal(at);
+      if (typeof role !== 'string' || !KEPT_ROLES.has(role) || !isBoundedText(name)) {throw new Refusal(at);}
       return { role, name, children: decodeNodes(node['children'], `${at}.children`, nesting + 1) };
     });
   };
   const decodePage = (value: unknown, path: string): PageMapEntry => {
-    if (!isPlainObject(value) || !hasExactly(value, ['path', 'title', 'depth', 'tree'])) throw new Refusal(path);
+    if (!isPlainObject(value) || !hasExactly(value, ['path', 'title', 'depth', 'tree'])) {throw new Refusal(path);}
     const { path: pagePath, title, depth } = value;
-    if (typeof pagePath !== 'string' || !pagePath.startsWith('/') || pagePath.length > MAXIMUM_PATH_LENGTH) throw new Refusal(`${path}.path`);
-    if (!isBoundedText(title)) throw new Refusal(`${path}.title`);
-    if (typeof depth !== 'number' || !Number.isInteger(depth) || depth < 0 || depth > MAXIMUM_EXPLORE_DEPTH) throw new Refusal(`${path}.depth`);
+    if (typeof pagePath !== 'string' || !pagePath.startsWith('/') || pagePath.length > MAXIMUM_PATH_LENGTH) {throw new Refusal(`${path}.path`);}
+    if (!isBoundedText(title)) {throw new Refusal(`${path}.title`);}
+    if (typeof depth !== 'number' || !Number.isInteger(depth) || depth < 0 || depth > MAXIMUM_EXPLORE_DEPTH) {throw new Refusal(`${path}.depth`);}
     return { path: pagePath, title, depth, tree: decodeNodes(value['tree'], `${path}.tree`, 0) };
   };
   try {
-    if (!isPlainObject(input) || !hasExactly(input, ['origin', 'pages', 'truncated', 'guaranteeLevel'])) throw new Refusal('$');
-    if (input['origin'] !== origin) throw new Refusal('$.origin');
+    if (!isPlainObject(input) || !hasExactly(input, ['origin', 'pages', 'truncated', 'guaranteeLevel'])) {throw new Refusal('$');}
+    if (input['origin'] !== origin) {throw new Refusal('$.origin');}
     const { truncated, guaranteeLevel } = input;
-    if (typeof truncated !== 'boolean') throw new Refusal('$.truncated');
-    if (guaranteeLevel !== 'isolated' && guaranteeLevel !== 'host') throw new Refusal('$.guaranteeLevel');
+    if (typeof truncated !== 'boolean') {throw new Refusal('$.truncated');}
+    if (guaranteeLevel !== 'isolated' && guaranteeLevel !== 'host') {throw new Refusal('$.guaranteeLevel');}
     const pages = input['pages'];
-    if (!Array.isArray(pages) || pages.length > MAXIMUM_EXPLORE_PAGES) throw new Refusal('$.pages');
+    if (!Array.isArray(pages) || pages.length > MAXIMUM_EXPLORE_PAGES) {throw new Refusal('$.pages');}
     return success({ origin, pages: pages.map((page: unknown, index: number) => decodePage(page, `$.pages[${index}]`)), truncated, guaranteeLevel });
   } catch (error) {
-    if (error instanceof Refusal) return failure({ code: 'page-map-invalid', path: error.path });
+    if (error instanceof Refusal) {return failure({ code: 'page-map-invalid', path: error.path });}
     throw error;
   }
 }

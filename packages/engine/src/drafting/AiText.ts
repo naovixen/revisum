@@ -9,10 +9,10 @@ export type AiText = Brand<string, 'AiText'>;
 
 // Errors name the problem, never the text, so a hostile suggestion is not echoed back.
 export function parseAiText(input: unknown, maximumCharacters: number): Result<AiText, PlanError> {
-  if (typeof input !== 'string') return failure({ code: PlanErrorCode.WrongType, path: '$' });
-  if (input.length === 0) return failure({ code: PlanErrorCode.Empty, path: '$' });
+  if (typeof input !== 'string') {return failure({ code: PlanErrorCode.WrongType, path: '$' });}
+  if (input.length === 0) {return failure({ code: PlanErrorCode.Empty, path: '$' });}
   // Length first, so an enormous text is refused before any pattern runs over it.
-  if (input.length > maximumCharacters) return failure({ code: PlanErrorCode.TooLong, path: '$' });
-  if (isUnsafeProse(input)) return failure({ code: PlanErrorCode.UnsafeText, path: '$' });
+  if (input.length > maximumCharacters) {return failure({ code: PlanErrorCode.TooLong, path: '$' });}
+  if (isUnsafeProse(input)) {return failure({ code: PlanErrorCode.UnsafeText, path: '$' });}
   return success(brand<string, 'AiText'>(input));
 }

@@ -37,13 +37,13 @@ function decodeLine(text: string): TestResultLine | RerunLine | undefined {
   const kind = fieldOf(value, 'kind');
   const file = fieldOf(value, 'file');
   const passed = fieldOf(value, 'passed');
-  if (typeof file !== 'string' || typeof passed !== 'boolean') return undefined;
-  if (kind === 'rerun') return { kind, file, passed };
+  if (typeof file !== 'string' || typeof passed !== 'boolean') {return undefined;}
+  if (kind === 'rerun') {return { kind, file, passed };}
   const name = fieldOf(value, 'name');
   const line = fieldOf(value, 'line');
   const skipped = fieldOf(value, 'skipped');
   const duration = fieldOf(value, 'durationMilliseconds');
-  if (kind !== 'test' || typeof name !== 'string' || typeof line !== 'number' || typeof skipped !== 'boolean' || typeof duration !== 'number') return undefined;
+  if (kind !== 'test' || typeof name !== 'string' || typeof line !== 'number' || typeof skipped !== 'boolean' || typeof duration !== 'number') {return undefined;}
   return { kind, file, name, line, passed, skipped, durationMilliseconds: duration };
 }
 
@@ -58,10 +58,10 @@ export function readTestResults(root: string): TestResults {
   const reruns: RerunLine[] = [];
   for (const { name } of ordered) {
     for (const text of readFileSync(join(folder, name), 'utf8').split('\n')) {
-      if (text.trim() === '') continue;
+      if (text.trim() === '') {continue;}
       const line = decodeLine(text);
-      if (line === undefined) continue;
-      if (line.kind === 'rerun') reruns.push(line);
+      if (line === undefined) {continue;}
+      if (line.kind === 'rerun') {reruns.push(line);}
       else {
         const testId = testIdOf(line.file, line.name);
         tests.set(testId, { ...line, testId });

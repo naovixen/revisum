@@ -19,7 +19,7 @@ export function probeMeta(id: string, title: string, successCriteria: string[], 
 
 // The HTML "rules for parsing integers"; null when parsing fails.
 export function parseInteger(value: string | undefined): number | null {
-  if (value === undefined) return null;
+  if (value === undefined) {return null;}
   const match = value.trim().match(/^[+-]?\d+/);
   return match ? Number(match[0]) : null;
 }
@@ -29,12 +29,12 @@ export function tabIndexOf(node: SnapshotNode): number | null { return parseInte
 const DISABLEABLE_ELEMENTS = new Set(['button', 'input', 'select', 'textarea', 'optgroup', 'option', 'fieldset']);
 // HTML "actually disabled": a disabled attribute, or a disabled fieldset ancestor outside its first legend.
 export function actuallyDisabled(snapshot: PageSnapshot, node: SnapshotNode): boolean {
-  if (DISABLEABLE_ELEMENTS.has(node.name) && node.attributes['disabled'] !== undefined) return true;
-  if (!['button', 'input', 'select', 'textarea'].includes(node.name)) return false;
+  if (DISABLEABLE_ELEMENTS.has(node.name) && node.attributes['disabled'] !== undefined) {return true;}
+  if (!['button', 'input', 'select', 'textarea'].includes(node.name)) {return false;}
   for (const ancestor of ancestors(snapshot, node)) {
     if (ancestor.name === 'fieldset' && ancestor.attributes['disabled'] !== undefined) {
       const firstLegend = ancestor.children.map((childIndex) => snapshot.nodes[childIndex]).find((child) => child?.name === 'legend');
-      if (firstLegend && (firstLegend === node || ancestors(snapshot, node).includes(firstLegend))) continue;
+      if (firstLegend && (firstLegend === node || ancestors(snapshot, node).includes(firstLegend))) {continue;}
       return true;
     }
   }
@@ -70,15 +70,15 @@ export function nativelyFocusable(snapshot: PageSnapshot, node: SnapshotNode): b
 
 // Part of sequential focus navigation (HTML Standard), leaving out browser-only behaviours such as focusable scrollers.
 export function inSequentialFocus(snapshot: PageSnapshot, node: SnapshotNode): boolean {
-  if (node.nodeType !== 1 || !renderedForFocus(node) || inert(snapshot, node) || actuallyDisabled(snapshot, node)) return false;
+  if (node.nodeType !== 1 || !renderedForFocus(node) || inert(snapshot, node) || actuallyDisabled(snapshot, node)) {return false;}
   const tabIndex = tabIndexOf(node);
-  if (tabIndex !== null) return tabIndex >= 0;
+  if (tabIndex !== null) {return tabIndex >= 0;}
   return nativelyFocusable(snapshot, node);
 }
 
 // ACT "focusable": in sequential focus navigation, or with a tabindex value.
 export function focusable(snapshot: PageSnapshot, node: SnapshotNode): boolean {
-  if (node.nodeType !== 1 || !renderedForFocus(node) || inert(snapshot, node) || actuallyDisabled(snapshot, node)) return false;
+  if (node.nodeType !== 1 || !renderedForFocus(node) || inert(snapshot, node) || actuallyDisabled(snapshot, node)) {return false;}
   return tabIndexOf(node) !== null || nativelyFocusable(snapshot, node);
 }
 
@@ -116,7 +116,7 @@ const CHROMIUM_ROLE_NAMES: Record<string, string> = {
 };
 // Chromium's accessibility role names, mapped to ARIA role names.
 export function accessibilityRole(node: SnapshotNode): string {
-  if (!node.accessibility) return '';
+  if (!node.accessibility) {return '';}
   const role = node.accessibility.role.toLowerCase();
   return CHROMIUM_ROLE_NAMES[role] ?? role;
 }
@@ -124,14 +124,14 @@ export function accessibilityRole(node: SnapshotNode): string {
 // The primary language subtags of Type "language" in the IANA language subtag registry.
 let knownLanguagesCache: Set<string> | null = null;
 export function knownLanguages(): Set<string> {
-  if (knownLanguagesCache) return knownLanguagesCache;
+  if (knownLanguagesCache) {return knownLanguagesCache;}
   const here = dirname(fileURLToPath(import.meta.url));
   const registry = readFileSync(join(here, '..', '..', 'data', 'iana-language-subtag-registry.txt'), 'utf8');
   const languages = new Set<string>();
   for (const entry of registry.split(/\r?\n%%\r?\n/)) {
     const type = entry.match(/^Type: (\S+)/m)?.[1];
     const subtag = entry.match(/^Subtag: (\S+)/m)?.[1];
-    if (type === 'language' && subtag && !subtag.includes('..')) languages.add(subtag.toLowerCase());
+    if (type === 'language' && subtag && !subtag.includes('..')) {languages.add(subtag.toLowerCase());}
   }
   knownLanguagesCache = languages;
   return languages;
@@ -140,21 +140,21 @@ export function knownLanguages(): Set<string> {
 // primary subtag is registered as a language.
 export function hasKnownPrimaryLanguage(tag: string): boolean {
   const trimmed = tag.trim();
-  if (!/^[a-z0-9]+(-[a-z0-9]+)*$/i.test(trimmed)) return false;
+  if (!/^[a-z0-9]+(-[a-z0-9]+)*$/i.test(trimmed)) {return false;}
   const primary = trimmed.split('-')[0] ?? '';
   return knownLanguages().has(primary.toLowerCase());
 }
 
 export function parseStyleAttribute(value: string | undefined): { property: string; value: string; important: boolean }[] {
-  if (!value) return [];
+  if (!value) {return [];}
   const declarations: { property: string; value: string; important: boolean }[] = [];
   for (const declaration of value.split(';')) {
     const colon = declaration.indexOf(':');
-    if (colon < 0) continue;
+    if (colon < 0) {continue;}
     const property = declaration.slice(0, colon).trim().toLowerCase();
     let declared = declaration.slice(colon + 1).trim();
     const important = /!\s*important\s*$/i.test(declared);
-    if (important) declared = declared.replace(/!\s*important\s*$/i, '').trim();
+    if (important) {declared = declared.replace(/!\s*important\s*$/i, '').trim();}
     declarations.push({ property, value: declared, important });
   }
   return declarations;
@@ -162,7 +162,7 @@ export function parseStyleAttribute(value: string | undefined): { property: stri
 
 // A css pixel length such as "12px" as a number; NaN for anything else.
 export const pixels = (value: string | undefined): number => {
-  if (!value) return NaN;
+  if (!value) {return NaN;}
   const match = value.match(/^(-?[\d.]+)px$/);
   return match ? Number(match[1]) : NaN;
 };
@@ -172,8 +172,8 @@ const GLOBAL_ARIA_ATTRIBUTES = ['aria-atomic', 'aria-busy', 'aria-controls', 'ar
 // An explicit none or presentation role that survives WAI-ARIA presentational-role conflict resolution.
 export function presentational(snapshot: PageSnapshot, node: SnapshotNode): boolean {
   const role = (node.attributes['role'] ?? '').trim().toLowerCase().split(/\s+/)[0];
-  if (role !== 'none' && role !== 'presentation') return false;
-  if (focusable(snapshot, node)) return false;
+  if (role !== 'none' && role !== 'presentation') {return false;}
+  if (focusable(snapshot, node)) {return false;}
   return !GLOBAL_ARIA_ATTRIBUTES.some((attribute) => node.attributes[attribute] !== undefined);
 }
 

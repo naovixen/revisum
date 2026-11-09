@@ -6,7 +6,7 @@ import { snapshotExtras } from './BuildSnapshot.ts';
 export function parentElement(snapshot: PageSnapshot, node: SnapshotNode): SnapshotNode | undefined {
   let parent = snapshot.nodes[node.parent];
   while (parent !== undefined && parent.nodeType !== 1) {
-    if (parent.nodeType === 9 && parent.parent < 0) return undefined;
+    if (parent.nodeType === 9 && parent.parent < 0) {return undefined;}
     parent = snapshot.nodes[parent.parent];
   }
   return parent;
@@ -25,7 +25,7 @@ export function ancestors(snapshot: PageSnapshot, node: SnapshotNode): SnapshotN
 export function descendants(snapshot: PageSnapshot, node: SnapshotNode, found: SnapshotNode[] = []): SnapshotNode[] {
   for (const childIndex of node.children) {
     const child = snapshot.nodes[childIndex];
-    if (child === undefined) continue;
+    if (child === undefined) {continue;}
     found.push(child);
     descendants(snapshot, child, found);
   }
@@ -39,10 +39,10 @@ export function inSvg(snapshot: PageSnapshot, node: SnapshotNode): boolean {
 
 // ACT "programmatically hidden": hidden through css display or visibility, or aria-hidden, on itself or an ancestor.
 export function programmaticallyHidden(snapshot: PageSnapshot, node: SnapshotNode): boolean {
-  if (node.attributes['aria-hidden'] === 'true') return true;
-  for (const ancestor of ancestors(snapshot, node)) if (ancestor.attributes['aria-hidden'] === 'true') return true;
-  if (node.style === null) return true; // not rendered: display:none, or inside it
-  if (node.style['visibility'] === 'hidden' || node.style['visibility'] === 'collapse') return true;
+  if (node.attributes['aria-hidden'] === 'true') {return true;}
+  for (const ancestor of ancestors(snapshot, node)) {if (ancestor.attributes['aria-hidden'] === 'true') {return true;}}
+  if (node.style === null) {return true;} // not rendered: display:none, or inside it
+  if (node.style['visibility'] === 'hidden' || node.style['visibility'] === 'collapse') {return true;}
   return false;
 }
 
@@ -52,30 +52,30 @@ export function inAccessibilityTree(node: SnapshotNode): boolean {
 }
 
 export function parseColour(text: string | undefined): [number, number, number, number] | null {
-  if (text === undefined) return null;
+  if (text === undefined) {return null;}
   const match = text.match(/rgba?\(\s*([\d.]+)[ ,]+([\d.]+)[ ,]+([\d.]+)(?:\s*[,/]\s*([\d.]+%?))?\s*\)/);
-  if (match === null) return null;
+  if (match === null) {return null;}
   let alpha = 1;
-  if (match[4] !== undefined) alpha = match[4].endsWith('%') ? Number(match[4].slice(0, -1)) / 100 : Number(match[4]);
+  if (match[4] !== undefined) {alpha = match[4].endsWith('%') ? Number(match[4].slice(0, -1)) / 100 : Number(match[4]);}
   return [Number(match[1]), Number(match[2]), Number(match[3]), alpha];
 }
 
 // ACT "visible": renders at least one pixel on screen, approximated from layout and style.
 export function isVisible(snapshot: PageSnapshot, node: SnapshotNode): boolean {
   const style = node.style;
-  if (style === null || node.bounds === null) return false;
-  if (style['visibility'] !== 'visible') return false;
-  if (node.bounds.width < 1 || node.bounds.height < 1) return false;
+  if (style === null || node.bounds === null) {return false;}
+  if (style['visibility'] !== 'visible') {return false;}
+  if (node.bounds.width < 1 || node.bounds.height < 1) {return false;}
   for (const ancestor of [node, ...ancestors(snapshot, node)]) {
     const ancestorStyle = ancestor.style;
-    if (ancestorStyle === null) return false;
-    if (Number(ancestorStyle['opacity'] ?? '1') === 0) return false;
+    if (ancestorStyle === null) {return false;}
+    if (Number(ancestorStyle['opacity'] ?? '1') === 0) {return false;}
     const clip = ancestorStyle['clip'] ?? 'auto';
-    if (ancestorStyle['position'] === 'absolute' && /rect\(\s*0(px)?[ ,]+0(px)?[ ,]+0(px)?[ ,]+0(px)?\s*\)/.test(clip)) return false;
-    if ((ancestorStyle['clip-path'] ?? 'none').startsWith('inset(50%')) return false;
+    if (ancestorStyle['position'] === 'absolute' && /rect\(\s*0(px)?[ ,]+0(px)?[ ,]+0(px)?[ ,]+0(px)?\s*\)/.test(clip)) {return false;}
+    if ((ancestorStyle['clip-path'] ?? 'none').startsWith('inset(50%')) {return false;}
   }
   const bounds = node.bounds;
-  if (bounds.x + bounds.width <= 0 || bounds.y + bounds.height <= 0) return false; // moved off screen to the left or top
+  if (bounds.x + bounds.width <= 0 || bounds.y + bounds.height <= 0) {return false;} // moved off screen to the left or top
   return true;
 }
 
@@ -85,12 +85,12 @@ function isVisibleIgnoringSize(snapshot: PageSnapshot, node: SnapshotNode): bool
 }
 
 export function textVisible(snapshot: PageSnapshot, text: SnapshotNode): boolean {
-  if (text.nodeType !== 3 || text.value.trim() === '') return false;
+  if (text.nodeType !== 3 || text.value.trim() === '') {return false;}
   const parent = parentElement(snapshot, text);
-  if (parent === undefined || parent.style === null || text.bounds === null || text.bounds.width < 1) return false;
-  if (!isVisible(snapshot, parent) && !(parent.bounds !== null && parent.bounds.width < 1 && isVisibleIgnoringSize(snapshot, parent))) return false;
+  if (parent === undefined || parent.style === null || text.bounds === null || text.bounds.width < 1) {return false;}
+  if (!isVisible(snapshot, parent) && !(parent.bounds !== null && parent.bounds.width < 1 && isVisibleIgnoringSize(snapshot, parent))) {return false;}
   const colour = parseColour(parent.style['color']);
-  if (colour !== null && colour[3] === 0) return false;
+  if (colour !== null && colour[3] === 0) {return false;}
   return true;
 }
 
@@ -104,8 +104,8 @@ function shadowHostOf(snapshot: PageSnapshot, node: SnapshotNode): SnapshotNode 
   let current = node;
   while (inShadow.has(current.index)) {
     const parent: SnapshotNode | undefined = snapshot.nodes[current.parent];
-    if (parent === undefined) return undefined;
-    if (!inShadow.has(parent.index)) return parent;
+    if (parent === undefined) {return undefined;}
+    if (!inShadow.has(parent.index)) {return parent;}
     current = parent;
   }
   return undefined;
@@ -115,11 +115,11 @@ function shadowHostOf(snapshot: PageSnapshot, node: SnapshotNode): SnapshotNode 
 function domParent(snapshot: PageSnapshot, node: SnapshotNode): SnapshotNode | undefined {
   const inShadow = snapshotExtras(snapshot).inShadow;
   const parent = snapshot.nodes[node.parent];
-  if (parent === undefined) return undefined;
+  if (parent === undefined) {return undefined;}
   if (!inShadow.has(node.index) && inShadow.has(parent.index)) {
     // A slotted light-tree node: its DOM parent is the nearest light-tree ancestor.
     let current: SnapshotNode | undefined = parent;
-    while (current !== undefined && inShadow.has(current.index)) current = snapshot.nodes[current.parent];
+    while (current !== undefined && inShadow.has(current.index)) {current = snapshot.nodes[current.parent];}
     return current;
   }
   return parent;
@@ -142,10 +142,10 @@ export function selectorFor(snapshot: PageSnapshot, node: SnapshotNode): string[
         && inShadow.has(other.index) === elementInShadow && other.attributes['id'] === id).length === 1;
       if (hasUniqueId) {
         parts.unshift('#' + cssEscapeIdentifier(id));
-        if (elementInShadow) nextScope = shadowHostOf(snapshot, element);
+        if (elementInShadow) {nextScope = shadowHostOf(snapshot, element);}
         else {
           let documentNode: SnapshotNode | undefined = element;
-          while (documentNode !== undefined && documentNode.nodeType !== 9) documentNode = snapshot.nodes[documentNode.parent];
+          while (documentNode !== undefined && documentNode.nodeType !== 9) {documentNode = snapshot.nodes[documentNode.parent];}
           nextScope = documentNode !== undefined && documentNode.parent >= 0 ? snapshot.nodes[documentNode.parent] : undefined;
         }
         break;
@@ -173,7 +173,7 @@ export function selectorFor(snapshot: PageSnapshot, node: SnapshotNode): string[
 export function boxOf(snapshot: PageSnapshot, node: SnapshotNode): Box {
   let current: SnapshotNode | undefined = node;
   while (current !== undefined) {
-    if (current.bounds !== null && (current.bounds.width > 0 || current.bounds.height > 0)) return current.bounds;
+    if (current.bounds !== null && (current.bounds.width > 0 || current.bounds.height > 0)) {return current.bounds;}
     current = snapshot.nodes[current.parent];
   }
   return { x: 0, y: 0, width: 0, height: 0 };
@@ -182,7 +182,7 @@ export function boxOf(snapshot: PageSnapshot, node: SnapshotNode): Box {
 // The explicit role: the first token of the role attribute.
 export function explicitRole(node: SnapshotNode): string | null {
   const role = node.attributes['role'];
-  if (role === undefined) return null;
+  if (role === undefined) {return null;}
   const first = role.trim().toLowerCase().split(/\s+/)[0] ?? '';
   return first === '' ? null : first;
 }

@@ -34,13 +34,13 @@ export interface SnapshotExtras {
 const extrasBySnapshot = new WeakMap<PageSnapshot, SnapshotExtras>();
 export function snapshotExtras(snapshot: PageSnapshot): SnapshotExtras {
   const extras = extrasBySnapshot.get(snapshot);
-  if (extras === undefined) throw new Error('snapshot without extras');
+  if (extras === undefined) {throw new Error('snapshot without extras');}
   return extras;
 }
 
 function collectFrameIds(tree: FrameTree, found: string[] = []): string[] {
   found.push(tree.frame.id);
-  for (const child of tree.childFrames ?? []) collectFrameIds(child, found);
+  for (const child of tree.childFrames ?? []) {collectFrameIds(child, found);}
   return found;
 }
 
@@ -62,9 +62,9 @@ export async function buildSnapshot(session: CdpSessionClient): Promise<PageSnap
     const ownedOf = (node: AccessibilityTreeNode, owned: number[]): number[] => {
       for (const childId of node.childIds ?? []) {
         const child = byId.get(childId);
-        if (child === undefined) continue;
-        if (child.ignored || child.backendDOMNodeId === undefined) ownedOf(child, owned);
-        else owned.push(child.backendDOMNodeId);
+        if (child === undefined) {continue;}
+        if (child.ignored || child.backendDOMNodeId === undefined) {ownedOf(child, owned);}
+        else {owned.push(child.backendDOMNodeId);}
       }
       return owned;
     };
@@ -74,13 +74,13 @@ export async function buildSnapshot(session: CdpSessionClient): Promise<PageSnap
       }
     }
     for (const node of accessibilityNodes) {
-      if (node.backendDOMNodeId === undefined) continue;
+      if (node.backendDOMNodeId === undefined) {continue;}
       const earlier = accessibility.get(node.backendDOMNodeId);
-      if (earlier !== undefined && !earlier.ignored) continue;
+      if (earlier !== undefined && !earlier.ignored) {continue;}
       const properties: Record<string, string | boolean | number> = {};
       for (const property of node.properties ?? []) {
         const { value } = property;
-        if (typeof value === 'string' || typeof value === 'boolean' || typeof value === 'number') properties[property.name] = value;
+        if (typeof value === 'string' || typeof value === 'boolean' || typeof value === 'number') {properties[property.name] = value;}
       }
       accessibility.set(node.backendDOMNodeId, {
         role: node.role ?? '', name: node.name ?? '', ignored: node.ignored,
@@ -104,7 +104,7 @@ export async function buildSnapshot(session: CdpSessionClient): Promise<PageSnap
     for (let i = 0; i < count; i++) {
       const attributes: Record<string, string> = {};
       const attributePairs = documentNodes.attributes[i] ?? [];
-      for (let k = 0; k + 1 < attributePairs.length; k += 2) attributes[stringAt(attributePairs[k]).toLowerCase()] = stringAt(attributePairs[k + 1]);
+      for (let k = 0; k + 1 < attributePairs.length; k += 2) {attributes[stringAt(attributePairs[k]).toLowerCase()] = stringAt(attributePairs[k + 1]);}
       const nodeType = documentNodes.nodeType[i] ?? 0;
       const parentIndex = documentNodes.parentIndex[i] ?? -1;
       nodes.push({
@@ -113,27 +113,27 @@ export async function buildSnapshot(session: CdpSessionClient): Promise<PageSnap
         document: documentIndex, shadowHost: -1, contentDocument: -1, style: null, bounds: null, accessibility: null,
       });
     }
-    for (const i of documentNodes.shadowRootType?.index ?? []) extras.inShadow.add(offset + i);
+    for (const i of documentNodes.shadowRootType?.index ?? []) {extras.inShadow.add(offset + i);}
     for (const i of documentNodes.shadowRootType?.index ?? []) {
       const node = nodes[offset + i];
       // The top node of a shadow tree: its flat-tree parent is the shadow host.
-      if (node !== undefined && node.parent >= 0 && !extras.inShadow.has(node.parent)) node.shadowHost = node.parent;
+      if (node !== undefined && node.parent >= 0 && !extras.inShadow.has(node.parent)) {node.shadowHost = node.parent;}
     }
-    for (const i of documentNodes.isClickable?.index ?? []) extras.clickable.add(offset + i);
+    for (const i of documentNodes.isClickable?.index ?? []) {extras.clickable.add(offset + i);}
     (documentNodes.pseudoType?.index ?? []).forEach((i, k) => extras.pseudoElement.set(offset + i, stringAt(documentNodes.pseudoType?.value[k])));
     const layout = documentSnapshot.layout;
     layout.nodeIndex.forEach((nodeIndex, k) => {
       const node = nodes[offset + nodeIndex];
-      if (node === undefined) return;
+      if (node === undefined) {return;}
       const style: Record<string, string> = {};
-      (layout.styles[k] ?? []).forEach((stringIndex, j) => { const name = SNAPSHOT_STYLES[j]; if (name !== undefined) style[name] = stringAt(stringIndex); });
+      (layout.styles[k] ?? []).forEach((stringIndex, j) => { const name = SNAPSHOT_STYLES[j]; if (name !== undefined) {style[name] = stringAt(stringIndex);} });
       node.style ??= style;
       const bounds = layout.bounds[k];
-      if (bounds !== undefined) node.bounds ??= { x: bounds[0] ?? 0, y: bounds[1] ?? 0, width: bounds[2] ?? 0, height: bounds[3] ?? 0 };
+      if (bounds !== undefined) {node.bounds ??= { x: bounds[0] ?? 0, y: bounds[1] ?? 0, width: bounds[2] ?? 0, height: bounds[3] ?? 0 };}
       const blended = layout.blendedBackgroundColors?.[k];
-      if (blended !== undefined && blended >= 0) extras.blendedBackground.set(offset + nodeIndex, stringAt(blended));
+      if (blended !== undefined && blended >= 0) {extras.blendedBackground.set(offset + nodeIndex, stringAt(blended));}
       const opacity = layout.textColorOpacities?.[k];
-      if (opacity !== undefined) extras.textOpacity.set(offset + nodeIndex, opacity);
+      if (opacity !== undefined) {extras.textOpacity.set(offset + nodeIndex, opacity);}
       const scrollRectangle = layout.scrollRects?.[k];
       const clientRectangle = layout.clientRects?.[k];
       if (scrollRectangle !== undefined && clientRectangle !== undefined && !extras.scroll.has(offset + nodeIndex)) {
@@ -143,10 +143,10 @@ export async function buildSnapshot(session: CdpSessionClient): Promise<PageSnap
   });
   // Children, accessibility information and the backend id index.
   for (const node of nodes) {
-    if (node.parent >= 0) nodes[node.parent]?.children.push(node.index);
+    if (node.parent >= 0) {nodes[node.parent]?.children.push(node.index);}
     const info = accessibility.get(node.backendId);
-    if (info !== undefined && node.nodeType === 1) node.accessibility = info;
-    if (node.nodeType === 1 && !indexByBackend.has(node.backendId)) indexByBackend.set(node.backendId, node.index);
+    if (info !== undefined && node.nodeType === 1) {node.accessibility = info;}
+    if (node.nodeType === 1 && !indexByBackend.has(node.backendId)) {indexByBackend.set(node.backendId, node.index);}
   }
   for (const [backendId, ownedBackendIds] of ownedByBackend) {
     const index = indexByBackend.get(backendId);
@@ -157,14 +157,14 @@ export async function buildSnapshot(session: CdpSessionClient): Promise<PageSnap
   // Frame documents hang under their frame element, with boxes moved into top-document coordinates.
   captured.documents.forEach((documentSnapshot, documentIndex) => {
     const contentDocuments = documentSnapshot.nodes.contentDocumentIndex;
-    if (contentDocuments === undefined) return;
+    if (contentDocuments === undefined) {return;}
     contentDocuments.index.forEach((nodeIndex, k) => {
       const owner = nodes[(offsets[documentIndex] ?? 0) + nodeIndex];
       const childDocument = contentDocuments.value[k];
-      if (owner === undefined || childDocument === undefined) return;
+      if (owner === undefined || childDocument === undefined) {return;}
       const rootIndex = offsets[childDocument] ?? -1;
       const root = nodes[rootIndex];
-      if (root === undefined) return;
+      if (root === undefined) {return;}
       owner.contentDocument = rootIndex;
       root.parent = owner.index;
       owner.children.push(rootIndex);
@@ -175,7 +175,7 @@ export async function buildSnapshot(session: CdpSessionClient): Promise<PageSnap
         const end = childDocument + 1 < offsets.length ? (offsets[childDocument + 1] ?? nodes.length) : nodes.length;
         for (let i = rootIndex; i < end; i++) {
           const shifted = nodes[i];
-          if (shifted !== undefined) shifted.bounds = shift(shifted.bounds);
+          if (shifted !== undefined) {shifted.bounds = shift(shifted.bounds);}
         }
       }
     });

@@ -160,16 +160,16 @@ function textsToRemember(
   step: CallStep, declaration: CallDeclaration, response: ServiceResponse, maximumResponseBytes: number,
 ): Result<readonly (readonly [ValueName, string])[], CallStepCode> {
   const remembered = rememberedFieldEntries(step.remember);
-  if (remembered.length === 0) return success([]);
+  if (remembered.length === 0) {return success([]);}
   const document = responseJson(response, maximumResponseBytes);
-  if (!document.ok) return document;
+  if (!document.ok) {return document;}
   const entries: (readonly [ValueName, string])[] = [];
   for (const [name, field] of remembered) {
     const pointer = pointerOf(declaration, field);
     const found = pointer === undefined ? failure('field-missing' as const) : fieldAt(document.value, pointer);
-    if (!found.ok) return found;
+    if (!found.ok) {return found;}
     const text = fieldText(found.value);
-    if (text === undefined) return failure('field-missing');
+    if (text === undefined) {return failure('field-missing');}
     entries.push([name, text]);
   }
   return success(entries);
@@ -182,16 +182,16 @@ const pointerOf = (declaration: CallDeclaration, field: string): JsonPointer | u
 // A call step: one request, never repeated.
 export async function runCallStep(step: CallStep, stepIndex: number, context: CallStepContext): Promise<CallStepOutcome> {
   const found = declared(step.call, context.project);
-  if (found === undefined) return failedWith('egress-blocked');
+  if (found === undefined) {return failedWith('egress-blocked');}
   const request = buildServiceRequest(found.declaration, found.service, step.arguments, context.values, context.secrets);
-  if (!request.ok) return failedWith(request.error, record(step, found, NO_ANSWER, 0));
+  if (!request.ok) {return failedWith(request.error, record(step, found, NO_ANSWER, 0));}
   const sent = await send(request.value, found, judgeForCall, stepIndex, step.type, context);
   const serviceCall = record(step, found, sent.kept, 1);
   if (sent.outcome !== 'passed') {
     return failedWith(sent.code, serviceCall);
   }
   const texts = textsToRemember(step, found.declaration, sent.received, request.value.maximumResponseBytes);
-  if (!texts.ok) return failedWith(texts.error, serviceCall);
+  if (!texts.ok) {return failedWith(texts.error, serviceCall);}
   const kept = context.remembered.keepUnrecorded(texts.value);
   return kept.ok ? { outcome: StepOutcome.Passed, serviceCall } : failedWith(kept.error, serviceCall);
 }
@@ -219,7 +219,7 @@ function checkAnswer(
 // cannot be built would fail the same way every time, so it fails at once.
 export async function runBackendCheck(step: Extract<Step, { type: 'expectBackend' }>, stepIndex: number, context: CallStepContext): Promise<CallStepOutcome> {
   const found = declared(step.call, context.project);
-  if (found === undefined) return failedWith('egress-blocked');
+  if (found === undefined) {return failedWith('egress-blocked');}
   // The parser refuses this, but a plan parsed under another project gets here. A check polls, and a
   // write is never sent twice, so it is not sent at all.
   if (found.declaration.effect === CallEffect.Write) {
@@ -227,11 +227,11 @@ export async function runBackendCheck(step: Extract<Step, { type: 'expectBackend
   }
   const expected = 'value' in step.assert && typeof step.assert.value !== 'number'
     ? resolveText(step.assert.value, context.values, context.project.limits.maximumTextLength) : success(null);
-  if (!expected.ok) return failedWith(expected.error);
+  if (!expected.ok) {return failedWith(expected.error);}
   const request = buildServiceRequest(found.declaration, found.service, step.arguments, context.values, context.secrets);
-  if (!request.ok) return failedWith(request.error, record(step, found, NO_ANSWER, 0));
+  if (!request.ok) {return failedWith(request.error, record(step, found, NO_ANSWER, 0));}
   const pointer = pointerOf(found.declaration, step.field);
-  if (pointer === undefined) return failedWith('field-missing', record(step, found, NO_ANSWER, 0));
+  if (pointer === undefined) {return failedWith('field-missing', record(step, found, NO_ANSWER, 0));}
   const rule = {
     timeoutMilliseconds: context.project.limits.backendCheckTimeoutMilliseconds,
     intervalMilliseconds: BACKEND_POLL_INTERVAL_MILLISECONDS,

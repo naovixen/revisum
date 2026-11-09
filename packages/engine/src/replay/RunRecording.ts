@@ -69,8 +69,8 @@ function byName(value: unknown, secrets: Secret[]): unknown {
     secrets.push(value);
     return { secretName: value.name };
   }
-  if (value instanceof Uint8Array) return { sha256: sha256(value) };
-  if (Array.isArray(value)) return value.map((item: unknown) => byName(item, secrets));
+  if (value instanceof Uint8Array) {return { sha256: sha256(value) };}
+  if (Array.isArray(value)) {return value.map((item: unknown) => byName(item, secrets));}
   if (typeof value === 'object' && value !== null) {
     return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, byName(item, secrets)]));
   }
@@ -108,7 +108,7 @@ function recordedBytes(bytes: Uint8Array, secrets: readonly Secret[]): RecordedB
 function replayedBytes(recorded: RecordedBytes, secrets: SecretStore | undefined): Uint8Array {
   const resolve = (name: Secret['name']): Secret | null => secrets?.resolve(name) ?? null;
   const echoes = recorded.secretEchoes ?? [];
-  if ('text' in recorded) return new TextEncoder().encode(restoreSecretEchoes(recorded.text, echoes, resolve));
+  if ('text' in recorded) {return new TextEncoder().encode(restoreSecretEchoes(recorded.text, echoes, resolve));}
   const latin1 = Buffer.from(recorded.base64, 'base64').toString('latin1');
   return new Uint8Array(Buffer.from(restoreSecretEchoes(latin1, echoes, resolve), 'latin1'));
 }
@@ -194,11 +194,11 @@ function replayedReplies<Reply, Answer>(
   let last: (Reply & { readonly requestSha256: string }) | undefined;
   return {
     answerFor(request) {
-      if (mismatch !== null) return refused;
+      if (mismatch !== null) {return refused;}
       const requestSha256 = requestRecord(request).sha256;
       const reply = replies[position];
       if (reply === undefined || reply.requestSha256 !== requestSha256) {
-        if (last !== undefined && last.requestSha256 === requestSha256) return answer(last);
+        if (last !== undefined && last.requestSha256 === requestSha256) {return answer(last);}
         mismatch = position;
         return refused;
       }
@@ -273,20 +273,20 @@ const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
 function readEcho(input: unknown, path: string, issues: Issues): Parsed<SecretEcho> {
   const keys = ['offset', 'secretName', 'form', 'scheme', 'characters', 'spelling', 'alignment', 'approximate'];
   const fields = readRecord(input, path, issues, keys, ['offset', 'secretName', 'form']);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const offset = readInteger(fields['offset'], `${path}.offset`, issues, 0, MAXIMUM_BYTES_TEXT);
   const secretName = readSecretName(fields['secretName'], `${path}.secretName`, issues);
   const form = readOneOf(fields['form'], `${path}.form`, issues, LEAK_FORMS);
   const scheme = fields['scheme'] === undefined ? undefined : readOneOf(fields['scheme'], `${path}.scheme`, issues, ['bearer', 'basic'] as const);
   const characters = fields['characters'] === undefined ? undefined : readInteger(fields['characters'], `${path}.characters`, issues, 1, MAXIMUM_BYTES_TEXT);
   const spelling = fields['spelling'] === undefined ? undefined : readString(fields['spelling'], `${path}.spelling`, issues, MAXIMUM_BYTES_TEXT);
-  if (spelling !== undefined && spelling !== INVALID && !SPELLING.test(spelling)) issues.push({ code: PlanErrorCode.UnknownValue, path: `${path}.spelling` });
+  if (spelling !== undefined && spelling !== INVALID && !SPELLING.test(spelling)) {issues.push({ code: PlanErrorCode.UnknownValue, path: `${path}.spelling` });}
   const alignment = fields['alignment'] === undefined ? undefined : readInteger(fields['alignment'], `${path}.alignment`, issues, 0, 2);
   const approximate = fields['approximate'];
-  if (approximate !== undefined && approximate !== true) issues.push({ code: PlanErrorCode.WrongType, path: `${path}.approximate` });
+  if (approximate !== undefined && approximate !== true) {issues.push({ code: PlanErrorCode.WrongType, path: `${path}.approximate` });}
   if (offset === INVALID || secretName === INVALID || form === INVALID || scheme === INVALID || characters === INVALID
     || spelling === INVALID || alignment === INVALID || (spelling !== undefined && !SPELLING.test(spelling))
-    || (approximate !== undefined && approximate !== true)) return INVALID;
+    || (approximate !== undefined && approximate !== true)) {return INVALID;}
   return {
     offset, secretName, form,
     ...(scheme === undefined ? {} : { scheme }), ...(characters === undefined ? {} : { characters }),
@@ -297,19 +297,19 @@ function readEcho(input: unknown, path: string, issues: Issues): Parsed<SecretEc
 
 function readBytes(input: unknown, path: string, issues: Issues): Parsed<RecordedBytes> {
   const fields = readRecord(input, path, issues, ['text', 'base64', 'secretEchoes'], []);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const hasText = Object.hasOwn(fields, 'text');
   if (hasText === Object.hasOwn(fields, 'base64')) { issues.push({ code: PlanErrorCode.MissingField, path: `${path}.${hasText ? 'base64' : 'text'}` }); return INVALID; }
   const raw = hasText ? readString(fields['text'], `${path}.text`, issues, MAXIMUM_BYTES_TEXT) : readString(fields['base64'], `${path}.base64`, issues, MAXIMUM_BYTES_TEXT);
-  if (raw === INVALID) return INVALID;
+  if (raw === INVALID) {return INVALID;}
   if (!hasText && !BASE64.test(raw)) { issues.push({ code: PlanErrorCode.WrongType, path: `${path}.base64` }); return INVALID; }
   const length = hasText ? raw.length : Buffer.from(raw, 'base64').length;
   let echoes: readonly SecretEcho[] | undefined;
   if (fields['secretEchoes'] !== undefined) {
     const list = readList(fields['secretEchoes'], `${path}.secretEchoes`, issues, MAXIMUM_ECHOES, 0);
-    if (list === INVALID) return INVALID;
+    if (list === INVALID) {return INVALID;}
     const read = list.map((entry, index) => readEcho(entry, `${path}.secretEchoes[${index}]`, issues));
-    if (!allValid(read)) return INVALID;
+    if (!allValid(read)) {return INVALID;}
     // Each echo goes back at or after the one before it, inside the kept text.
     const misplaced = read.findIndex((echo, index) => echo.offset > length || echo.offset < (read[index - 1]?.offset ?? 0));
     if (misplaced !== -1) { issues.push({ code: PlanErrorCode.UnknownValue, path: `${path}.secretEchoes[${misplaced}].offset` }); return INVALID; }
@@ -321,40 +321,40 @@ function readBytes(input: unknown, path: string, issues: Issues): Parsed<Recorde
 
 function readServiceReply(input: unknown, path: string, issues: Issues): Parsed<RecordedServiceReply> {
   const fields = readRecord(input, path, issues, ['requestSha256', 'response', 'failure'], ['requestSha256']);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const requestSha256 = readSha256(fields['requestSha256'], `${path}.requestSha256`, issues);
-  if (requestSha256 === INVALID) return INVALID;
+  if (requestSha256 === INVALID) {return INVALID;}
   if (Object.hasOwn(fields, 'failure')) {
     const code = readOneOf(fields['failure'], `${path}.failure`, issues, codesOf(SERVICE_CALL_ERROR_CODES));
     return code === INVALID ? INVALID : { requestSha256, failure: code };
   }
   const response = readRecord(fields['response'], `${path}.response`, issues, ['status', 'mediaType', 'body']);
-  if (response === INVALID) return INVALID;
+  if (response === INVALID) {return INVALID;}
   const status = readInteger(response['status'], `${path}.response.status`, issues, 100, 599);
   const mediaType = response['mediaType'] === null ? null : readString(response['mediaType'], `${path}.response.mediaType`, issues);
   const body = readBytes(response['body'], `${path}.response.body`, issues);
-  if (status === INVALID || mediaType === INVALID || body === INVALID) return INVALID;
+  if (status === INVALID || mediaType === INVALID || body === INVALID) {return INVALID;}
   return { requestSha256, response: { status, mediaType, body } };
 }
 
 function readCommandReply(input: unknown, path: string, issues: Issues): Parsed<RecordedCommandReply> {
   const fields = readRecord(input, path, issues, ['requestSha256', 'outcome', 'failure'], ['requestSha256']);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const requestSha256 = readSha256(fields['requestSha256'], `${path}.requestSha256`, issues);
-  if (requestSha256 === INVALID) return INVALID;
+  if (requestSha256 === INVALID) {return INVALID;}
   if (Object.hasOwn(fields, 'failure')) {
     const code = readOneOf(fields['failure'], `${path}.failure`, issues, codesOf(WORKLOAD_ERROR_CODES));
     return code === INVALID ? INVALID : { requestSha256, failure: code };
   }
   const outcome = readRecord(fields['outcome'], `${path}.outcome`, issues, ['exitCode', 'timedOut', 'stdout', 'truncated']);
-  if (outcome === INVALID) return INVALID;
+  if (outcome === INVALID) {return INVALID;}
   const exitCode = readInteger(outcome['exitCode'], `${path}.outcome.exitCode`, issues, -(2 ** 31), 2 ** 32);
   const timedOut = outcome['timedOut'];
   const truncated = outcome['truncated'];
-  if (typeof timedOut !== 'boolean') issues.push({ code: PlanErrorCode.WrongType, path: `${path}.outcome.timedOut` });
-  if (typeof truncated !== 'boolean') issues.push({ code: PlanErrorCode.WrongType, path: `${path}.outcome.truncated` });
+  if (typeof timedOut !== 'boolean') {issues.push({ code: PlanErrorCode.WrongType, path: `${path}.outcome.timedOut` });}
+  if (typeof truncated !== 'boolean') {issues.push({ code: PlanErrorCode.WrongType, path: `${path}.outcome.truncated` });}
   const stdout = readBytes(outcome['stdout'], `${path}.outcome.stdout`, issues);
-  if (exitCode === INVALID || stdout === INVALID || typeof timedOut !== 'boolean' || typeof truncated !== 'boolean') return INVALID;
+  if (exitCode === INVALID || stdout === INVALID || typeof timedOut !== 'boolean' || typeof truncated !== 'boolean') {return INVALID;}
   return { requestSha256, outcome: { exitCode, timedOut, stdout, truncated } };
 }
 
@@ -362,7 +362,7 @@ function readReplies<Reply>(
   input: unknown, path: string, issues: Issues, read: (entry: unknown, path: string, issues: Issues) => Parsed<Reply>,
 ): Parsed<readonly Reply[]> {
   const list = readList(input, path, issues, MAXIMUM_REPLIES, 0);
-  if (list === INVALID) return INVALID;
+  if (list === INVALID) {return INVALID;}
   const replies = list.map((entry, index) => read(entry, `${path}[${index}]`, issues));
   return allValid(replies) ? replies : INVALID;
 }
@@ -371,16 +371,16 @@ function readReplies<Reply>(
 // version does not know, is version-unsupported; a known field of the wrong shape, a mismatch at
 // its JSON path.
 export function decodeRecording(input: unknown): Result<RunRecording, DecodeError> {
-  if (!isPlainObject(input)) return failure({ code: ReplayErrorCode.VersionUnsupported, path: '$' });
-  if (input['schema'] !== RECORDING_SCHEMA) return failure({ code: ReplayErrorCode.VersionUnsupported, path: '$.schema' });
+  if (!isPlainObject(input)) {return failure({ code: ReplayErrorCode.VersionUnsupported, path: '$' });}
+  if (input['schema'] !== RECORDING_SCHEMA) {return failure({ code: ReplayErrorCode.VersionUnsupported, path: '$.schema' });}
   const issues: Issues = [];
   const fields = readRecord(input, '$', issues, ['schema', 'manifestHash', 'serviceCalls', 'databaseCommands'], ['schema', 'manifestHash']);
-  if (fields === INVALID) return failure(decodeErrorOf(issues));
+  if (fields === INVALID) {return failure(decodeErrorOf(issues));}
   const manifestHash = readSha256(fields['manifestHash'], '$.manifestHash', issues);
   const serviceCalls = fields['serviceCalls'] === undefined ? undefined : readReplies(fields['serviceCalls'], '$.serviceCalls', issues, readServiceReply);
   const databaseCommands = fields['databaseCommands'] === undefined
     ? undefined : readReplies(fields['databaseCommands'], '$.databaseCommands', issues, readCommandReply);
-  if (manifestHash === INVALID || serviceCalls === INVALID || databaseCommands === INVALID || issues.length > 0) return failure(decodeErrorOf(issues));
+  if (manifestHash === INVALID || serviceCalls === INVALID || databaseCommands === INVALID || issues.length > 0) {return failure(decodeErrorOf(issues));}
   return success({
     schema: RECORDING_SCHEMA, manifestHash,
     ...(serviceCalls === undefined ? {} : { serviceCalls }),

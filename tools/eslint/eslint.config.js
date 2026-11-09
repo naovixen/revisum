@@ -106,7 +106,6 @@ export default defineConfig([
         rules: {
             "revisum/file-name-matches-export": "error",
 
-            curly: ["error", "all"],
             "no-else-return": "error",
             "no-case-declarations": "error",
             "no-nested-ternary": "error",
@@ -218,6 +217,11 @@ export default defineConfig([
                 },
             ],
         },
+    },
+    {
+        // Tests join when their sweep lands.
+        files: ["packages/**/*.ts", "tools/**/*.ts"],
+        rules: { curly: ["error", "all"] },
     },
     {
         files: ["packages/**/*.ts"],

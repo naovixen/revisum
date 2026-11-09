@@ -37,7 +37,7 @@ const ISO_DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{
 // Decodes the records file's JSON. Every fault is named by its record and field; nothing is
 // guessed or dropped.
 export function decodeUpkeepRecords(input: unknown): Decoded<readonly UpkeepRecord[]> {
-  if (!Array.isArray(input)) return { ok: false, faults: ['the records file must hold a JSON list (an array) of upkeep records'] };
+  if (!Array.isArray(input)) {return { ok: false, faults: ['the records file must hold a JSON list (an array) of upkeep records'] };}
   const faults: string[] = [];
   const records: UpkeepRecord[] = [];
   const seen = new Set<string>();
@@ -49,8 +49,8 @@ export function decodeUpkeepRecords(input: unknown): Decoded<readonly UpkeepReco
     }
     const fields = entry as Record<string, unknown>;
     const before = faults.length;
-    for (const field of Object.keys(fields)) if (!RECORD_FIELDS.includes(field)) faults.push(`${where}: unknown field ${field}`);
-    for (const field of RECORD_FIELDS) if (!(field in fields)) faults.push(`${where}: ${field} is missing`);
+    for (const field of Object.keys(fields)) {if (!RECORD_FIELDS.includes(field)) {faults.push(`${where}: unknown field ${field}`);}}
+    for (const field of RECORD_FIELDS) {if (!(field in fields)) {faults.push(`${where}: ${field} is missing`);}}
     const { browser, major, fixHours, revalidatedAt } = fields;
     if ('browser' in fields && !BROWSERS.some((known) => known === browser)) {
       faults.push(`${where}: browser ${JSON.stringify(browser)} is not ${BROWSERS.join(' or ')}`);
@@ -64,7 +64,7 @@ export function decodeUpkeepRecords(input: unknown): Decoded<readonly UpkeepReco
     if ('revalidatedAt' in fields && !(typeof revalidatedAt === 'string' && ISO_DATE_TIME.test(revalidatedAt) && !Number.isNaN(Date.parse(revalidatedAt)))) {
       faults.push(`${where}: revalidatedAt must be an ISO 8601 date and time, such as 2026-07-21T09:00:00Z`);
     }
-    if (faults.length > before) continue;
+    if (faults.length > before) {continue;}
     const record = { browser, major, fixHours, revalidatedAt } as UpkeepRecord;
     const key = `${record.browser} ${record.major}`;
     if (seen.has(key)) {
@@ -90,7 +90,7 @@ export function summariseUpkeep(records: readonly UpkeepRecord[]): UpkeepSummary
   const first = records.filter((record) => record.browser === 'chrome')
     .toSorted((left, right) => left.major - right.major)
     .slice(0, MAJORS_COUNTED);
-  if (first.length === 0) return { majorsCovered: 0, averageFixHours: null, killCriterionFlagged: false };
+  if (first.length === 0) {return { majorsCovered: 0, averageFixHours: null, killCriterionFlagged: false };}
   const average = first.reduce((total, record) => total + record.fixHours, 0) / first.length;
   return { majorsCovered: first.length, averageFixHours: average, killCriterionFlagged: first.length === MAJORS_COUNTED && average > MAXIMUM_AVERAGE_FIX_HOURS };
 }
@@ -106,12 +106,12 @@ export type StableMajor = { readonly version: string; readonly major: number; re
 // newer than the pinned build's.
 export function newerStableMajor(versionList: unknown, pinnedBuild: string): Decoded<StableMajor> {
   const pinnedMajor = majorOf(pinnedBuild);
-  if (pinnedMajor === null) return { ok: false, faults: [`the pinned build ${pinnedBuild} is not a four-part Chrome version`] };
+  if (pinnedMajor === null) {return { ok: false, faults: [`the pinned build ${pinnedBuild} is not a four-part Chrome version`] };}
   const channels = typeof versionList === 'object' && versionList !== null ? (versionList as Record<string, unknown>)['channels'] : undefined;
   const stable = typeof channels === 'object' && channels !== null ? (channels as Record<string, unknown>)['Stable'] : undefined;
   const version = typeof stable === 'object' && stable !== null ? (stable as Record<string, unknown>)['version'] : undefined;
   const major = typeof version === 'string' ? majorOf(version) : null;
-  if (typeof version !== 'string' || major === null) return { ok: false, faults: ['the version list has no Stable version'] };
+  if (typeof version !== 'string' || major === null) {return { ok: false, faults: ['the version list has no Stable version'] };}
   return { ok: true, value: { version, major, newer: major > pinnedMajor } };
 }
 
@@ -151,7 +151,7 @@ function main(words: readonly string[], root: string): number {
   const raw = readJson(options.records);
   const decoded = raw.ok ? decodeUpkeepRecords(raw.value) : raw;
   if (!decoded.ok) {
-    for (const fault of decoded.faults) console.error(`browser upkeep: ${fault}`);
+    for (const fault of decoded.faults) {console.error(`browser upkeep: ${fault}`);}
     return 1;
   }
   let status = 0;
@@ -175,7 +175,7 @@ function main(words: readonly string[], root: string): number {
     const list = readJson(options.versions);
     const stable = list.ok ? newerStableMajor(list.value, options.pinned) : list;
     if (!stable.ok) {
-      for (const fault of stable.faults) console.error(`browser upkeep: ${fault}`);
+      for (const fault of stable.faults) {console.error(`browser upkeep: ${fault}`);}
       return 1;
     }
     const { version, major, newer } = stable.value;
@@ -192,4 +192,4 @@ function main(words: readonly string[], root: string): number {
   return status;
 }
 
-if (import.meta.main) process.exitCode = main(process.argv.slice(2), process.cwd());
+if (import.meta.main) {process.exitCode = main(process.argv.slice(2), process.cwd());}

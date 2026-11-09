@@ -67,10 +67,10 @@ export async function loadTrustedProject(
   const projectPath = repositoryPath(path);
   const protectedFile = await versionControl.protectedFile(projectPath);
   // Unavailable is refused too: without the protected version there is nothing core may trust.
-  if (!protectedFile.ok) return failure({ code: TrustErrorCode.UntrustedSource, path: projectPath });
+  if (!protectedFile.ok) {return failure({ code: TrustErrorCode.UntrustedSource, path: projectPath });}
   const asWritten = parseJson(protectedFile.value.bytes);
   const parsed = parseProject(asWritten);
-  if (!parsed.ok) return failure({ code: CliErrorCode.ConfigInvalid, path: projectPath, errors: parsed.error });
+  if (!parsed.ok) {return failure({ code: CliErrorCode.ConfigInvalid, path: projectPath, errors: parsed.error });}
 
   // The one place a TrustedProject is made, from the project the parser gave.
   const project = {
@@ -83,7 +83,7 @@ export async function loadTrustedProject(
     .filter((file) => file === projectPath || isTrustedFile(file) || isAnySuiteFile(project.evidenceMode, file)).sort();
   const reviewItems = edited.map((file): TrustedFileReviewItem => ({ code: TrustErrorCode.ChangedWithCode, path: file }));
   // The review items carry the finding whether or not the sink accepts the event.
-  for (const item of reviewItems) change.events.append({ kind: AuditEventKind.TrustedChangedWithCode, path: item.path }, CHANGE_AUTHOR);
+  for (const item of reviewItems) {change.events.append({ kind: AuditEventKind.TrustedChangedWithCode, path: item.path }, CHANGE_AUTHOR);}
   return success({ project, asWritten, reviewItems });
 }
 

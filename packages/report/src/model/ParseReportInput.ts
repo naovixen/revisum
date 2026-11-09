@@ -24,12 +24,12 @@ class ErrorList {
 }
 
 function rejectUnknownKeys(errors: ErrorList, path: string, fields: Fields, keys: readonly string[]): void {
-  for (const key of Object.keys(fields)) if (!keys.includes(key)) errors.add(`${path}.${key}`, 'unknown_field');
+  for (const key of Object.keys(fields)) {if (!keys.includes(key)) {errors.add(`${path}.${key}`, 'unknown_field');}}
 }
 function readText(errors: ErrorList, path: string, value: unknown, longest: number = LIMITS.text, shortest = 1): string {
   if (typeof value !== 'string') { errors.add(path, 'not_text'); return ''; }
-  if (value.length < shortest) errors.add(path, 'empty');
-  if (value.length > longest) errors.add(path, 'too_long');
+  if (value.length < shortest) {errors.add(path, 'empty');}
+  if (value.length > longest) {errors.add(path, 'too_long');}
   return value;
 }
 function readOptionalText(errors: ErrorList, path: string, value: unknown): string | null {
@@ -37,28 +37,28 @@ function readOptionalText(errors: ErrorList, path: string, value: unknown): stri
 }
 function readId(errors: ErrorList, path: string, value: unknown): string {
   const text = readText(errors, path, value, 64);
-  if (text !== '' && !isId(text)) errors.add(path, 'bad_id');
+  if (text !== '' && !isId(text)) {errors.add(path, 'bad_id');}
   return text;
 }
 function readList(errors: ErrorList, path: string, value: unknown, longest: number = LIMITS.items): readonly unknown[] {
   if (!Array.isArray(value)) { errors.add(path, 'not_list'); return []; }
-  if (value.length > longest) errors.add(path, 'too_many');
+  if (value.length > longest) {errors.add(path, 'too_many');}
   return value;
 }
 function readNumber(errors: ErrorList, path: string, value: unknown, lowest = 0): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) { errors.add(path, 'not_number'); return 0; }
-  if (value < lowest) errors.add(path, 'out_of_range');
+  if (value < lowest) {errors.add(path, 'out_of_range');}
   return value;
 }
 function readOneOf<Value extends string>(errors: ErrorList, path: string, value: unknown, allowed: readonly Value[], code: string): Value {
   const found = allowed.find((candidate) => candidate === value);
-  if (found !== undefined) return found;
+  if (found !== undefined) {return found;}
   errors.add(path, code);
   return allowed[0] as Value;
 }
 function readTextWithNoSecret(errors: ErrorList, path: string, value: unknown, shortest: number): string {
   const text = readText(errors, path, value, LIMITS.line, shortest);
-  if (SECRET_SHAPES.some((pattern) => pattern.test(text))) errors.add(path, 'secret_shape');
+  if (SECRET_SHAPES.some((pattern) => pattern.test(text))) {errors.add(path, 'secret_shape');}
   return text;
 }
 function readLines(errors: ErrorList, path: string, value: unknown, longest: number = LIMITS.lines): readonly string[] {
@@ -66,7 +66,7 @@ function readLines(errors: ErrorList, path: string, value: unknown, longest: num
 }
 
 function readBox(errors: ErrorList, path: string, value: unknown): PixelBox | null {
-  if (value === null) return null;
+  if (value === null) {return null;}
   if (!isPlainObject(value)) { errors.add(path, 'not_object'); return null; }
   rejectUnknownKeys(errors, path, value, ['x', 'y', 'width', 'height']);
   return {
@@ -80,7 +80,7 @@ function readCriterion(errors: ErrorList, path: string, value: unknown): Criteri
   if (value['kind'] === 'wcag') {
     rejectUnknownKeys(errors, path, value, ['kind', 'successCriterion', 'title', 'level']);
     const successCriterion = readText(errors, `${path}.successCriterion`, value['successCriterion'], 12);
-    if (successCriterion !== '' && !/^\d\.\d{1,2}\.\d{1,2}$/.test(successCriterion)) errors.add(`${path}.successCriterion`, 'bad_success_criterion');
+    if (successCriterion !== '' && !/^\d\.\d{1,2}\.\d{1,2}$/.test(successCriterion)) {errors.add(`${path}.successCriterion`, 'bad_success_criterion');}
     return {
       kind: 'wcag', successCriterion, title: readText(errors, `${path}.title`, value['title']),
       level: readOneOf(errors, `${path}.level`, value['level'], ['A', 'AA', 'AAA'] as const, 'bad_level'),
@@ -99,9 +99,9 @@ function readExchange(errors: ErrorList, path: string, value: unknown): Exchange
   if (!isPlainObject(value)) { errors.add(path, 'not_object'); return empty; }
   rejectUnknownKeys(errors, path, value, ['id', 'method', 'path', 'status', 'requestLines', 'responseLines']);
   const status = value['status'] === null ? null : readNumber(errors, `${path}.status`, value['status'], 100);
-  if (status !== null && status > 599) errors.add(`${path}.status`, 'out_of_range');
+  if (status !== null && status > 599) {errors.add(`${path}.status`, 'out_of_range');}
   const method = readText(errors, `${path}.method`, value['method'], 10);
-  if (method !== '' && !/^[A-Z]{3,7}$/.test(method)) errors.add(`${path}.method`, 'bad_method');
+  if (method !== '' && !/^[A-Z]{3,7}$/.test(method)) {errors.add(`${path}.method`, 'bad_method');}
   return {
     id: readId(errors, `${path}.id`, value['id']), method, path: readText(errors, `${path}.path`, value['path'], 300), status,
     requestLines: readLines(errors, `${path}.requestLines`, value['requestLines'], 8),
@@ -120,15 +120,15 @@ function readFinding(errors: ErrorList, path: string, value: unknown): Finding {
   rejectUnknownKeys(errors, path, value, FINDING_KEYS);
   const status = readOneOf(errors, `${path}.status`, value['status'], ['failed', 'needs-review'] as const, 'unknown_status');
   const severity = value['severity'] === null ? null : readOneOf<Severity>(errors, `${path}.severity`, value['severity'], SEVERITIES, 'unknown_severity');
-  if (severity === null && status === Verdict.Failed) errors.add(`${path}.severity`, 'failed_needs_severity');
+  if (severity === null && status === Verdict.Failed) {errors.add(`${path}.severity`, 'failed_needs_severity');}
   const caption = readText(errors, `${path}.caption`, value['caption'], 200);
-  if (wordCount(caption) > MAXIMUM_CAPTION_WORDS) errors.add(`${path}.caption`, 'caption_too_long');
+  if (wordCount(caption) > MAXIMUM_CAPTION_WORDS) {errors.add(`${path}.caption`, 'caption_too_long');}
   const steps = readLines(errors, `${path}.steps`, value['steps'], 12);
-  if (steps.length < 2) errors.add(`${path}.steps`, 'needs_two_steps');
+  if (steps.length < 2) {errors.add(`${path}.steps`, 'needs_two_steps');}
   let image: Finding['image'] = null;
   if (value['image'] !== null) {
     const rawImage = value['image'];
-    if (!isPlainObject(rawImage)) errors.add(`${path}.image`, 'not_object');
+    if (!isPlainObject(rawImage)) {errors.add(`${path}.image`, 'not_object');}
     else {
       rejectUnknownKeys(errors, `${path}.image`, rawImage, ['imageId', 'box']);
       image = { imageId: readId(errors, `${path}.image.imageId`, rawImage['imageId']), box: readBox(errors, `${path}.image.box`, rawImage['box']) };
@@ -138,7 +138,7 @@ function readFinding(errors: ErrorList, path: string, value: unknown): Finding {
     .map((exchange, index) => readExchange(errors, `${path}.exchanges[${index}]`, exchange));
   const reason = readOptionalText(errors, `${path}.reason`, value['reason']);
   const action = readOptionalText(errors, `${path}.action`, value['action']);
-  if (status === Verdict.NeedsReview && (reason === null || action === null)) errors.add(path, 'review_needs_reason_and_action');
+  if (status === Verdict.NeedsReview && (reason === null || action === null)) {errors.add(path, 'review_needs_reason_and_action');}
   return {
     id: readId(errors, `${path}.id`, value['id']), status, severity, title: readText(errors, `${path}.title`, value['title']), caption,
     rule: readText(errors, `${path}.rule`, value['rule'], 80), criterion: readCriterion(errors, `${path}.criterion`, value['criterion']),
@@ -153,7 +153,7 @@ function readAcceptanceCriterion(errors: ErrorList, path: string, value: unknown
   if (!isPlainObject(value)) { errors.add(path, 'not_object'); return empty; }
   rejectUnknownKeys(errors, path, value, ['id', 'text', 'status', 'stepIds', 'evidence']);
   const stepIds = readList(errors, `${path}.stepIds`, value['stepIds'], 500).map((id, index) => readId(errors, `${path}.stepIds[${index}]`, id));
-  if (stepIds.length === 0) errors.add(`${path}.stepIds`, 'criterion_without_steps');
+  if (stepIds.length === 0) {errors.add(`${path}.stepIds`, 'criterion_without_steps');}
   const evidence: EvidenceReference[] = readList(errors, `${path}.evidence`, value['evidence'], 500).map((entry, index): EvidenceReference => {
     const entryPath = `${path}.evidence[${index}]`;
     if (!isPlainObject(entry)) { errors.add(entryPath, 'not_object'); return { kind: 'step', id: '', label: '' }; }
@@ -163,7 +163,7 @@ function readAcceptanceCriterion(errors: ErrorList, path: string, value: unknown
       id: readId(errors, `${entryPath}.id`, entry['id']), label: readText(errors, `${entryPath}.label`, entry['label']),
     };
   });
-  if (evidence.length === 0) errors.add(`${path}.evidence`, 'criterion_without_evidence');
+  if (evidence.length === 0) {errors.add(`${path}.evidence`, 'criterion_without_evidence');}
   return {
     id: readId(errors, `${path}.id`, value['id']), text: readText(errors, `${path}.text`, value['text']),
     status: readOneOf(errors, `${path}.status`, value['status'], VERDICTS, 'unknown_verdict'), stepIds, evidence,
@@ -179,15 +179,15 @@ function readRun(errors: ErrorList, path: string, value: unknown): RunInfo {
   if (!isPlainObject(value)) { errors.add(path, 'not_object'); return empty; }
   rejectUnknownKeys(errors, path, value, ['runId', 'recordedAt', 'target', 'tool', 'manifestHash', 'inputs', 'blockedOrigins']);
   const recordedAt = readText(errors, `${path}.recordedAt`, value['recordedAt'], 40);
-  if (recordedAt !== '' && !/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?Z)?$/.test(recordedAt)) errors.add(`${path}.recordedAt`, 'bad_time');
+  if (recordedAt !== '' && !/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?Z)?$/.test(recordedAt)) {errors.add(`${path}.recordedAt`, 'bad_time');}
   const manifestHash = value['manifestHash'] === null ? null : readText(errors, `${path}.manifestHash`, value['manifestHash'], 64);
-  if (manifestHash !== null && !isHex64(manifestHash)) errors.add(`${path}.manifestHash`, 'bad_hash');
+  if (manifestHash !== null && !isHex64(manifestHash)) {errors.add(`${path}.manifestHash`, 'bad_hash');}
   const inputs = readList(errors, `${path}.inputs`, value['inputs'], 200).map((input, index) => {
     const inputPath = `${path}.inputs[${index}]`;
     if (!isPlainObject(input)) { errors.add(inputPath, 'not_object'); return { name: '', sha256: '' }; }
     rejectUnknownKeys(errors, inputPath, input, ['name', 'sha256']);
     const hash = readText(errors, `${inputPath}.sha256`, input['sha256'], 64);
-    if (!isHex64(hash)) errors.add(`${inputPath}.sha256`, 'bad_hash');
+    if (!isHex64(hash)) {errors.add(`${inputPath}.sha256`, 'bad_hash');}
     return { name: readText(errors, `${inputPath}.name`, input['name'], 200), sha256: hash };
   });
   return {
@@ -202,18 +202,18 @@ const REPORT_KEYS = ['schema', 'reportId', 'kind', 'title', 'subject', 'note', '
 export function parseReportInput(input: unknown): Parsed<ValidReport> {
   const errors = new ErrorList();
   try {
-    if (!isPlainObject(input)) return { ok: false, error: [{ path: '$', code: 'not_object' }] };
+    if (!isPlainObject(input)) {return { ok: false, error: [{ path: '$', code: 'not_object' }] };}
     rejectUnknownKeys(errors, '$', input, REPORT_KEYS);
-    if (input['schema'] !== REPORT_INPUT_SCHEMA) errors.add('$.schema', 'unknown_schema');
+    if (input['schema'] !== REPORT_INPUT_SCHEMA) {errors.add('$.schema', 'unknown_schema');}
     const images: ImageMeta[] = readList(errors, '$.images', input['images'], 500).map((entry, index): ImageMeta => {
       const path = `$.images[${index}]`;
       if (!isPlainObject(entry)) { errors.add(path, 'not_object'); return { id: '', sha256: '', width: 0, height: 0, alt: '' }; }
       rejectUnknownKeys(errors, path, entry, ['id', 'sha256', 'width', 'height', 'alt']);
       const hash = readText(errors, `${path}.sha256`, entry['sha256'], 64);
-      if (!isHex64(hash)) errors.add(`${path}.sha256`, 'bad_hash');
+      if (!isHex64(hash)) {errors.add(`${path}.sha256`, 'bad_hash');}
       const width = readNumber(errors, `${path}.width`, entry['width'], 1);
       const height = readNumber(errors, `${path}.height`, entry['height'], 1);
-      if (!Number.isInteger(width) || !Number.isInteger(height)) errors.add(path, 'not_integer_size');
+      if (!Number.isInteger(width) || !Number.isInteger(height)) {errors.add(path, 'not_integer_size');}
       return { id: readId(errors, `${path}.id`, entry['id']), sha256: hash, width, height, alt: readText(errors, `${path}.alt`, entry['alt']) };
     });
     const steps: PlanStep[] = readList(errors, '$.steps', input['steps'], 2000).map((entry, index): PlanStep => {
@@ -239,7 +239,7 @@ export function parseReportInput(input: unknown): Parsed<ValidReport> {
     const requireUnique = (path: string, ids: readonly string[]): void => {
       const seen = new Set<string>();
       ids.forEach((id, index) => {
-        if (seen.has(id)) errors.add(`${path}[${index}]`, 'duplicate_id');
+        if (seen.has(id)) {errors.add(`${path}[${index}]`, 'duplicate_id');}
         seen.add(id);
       });
     };
@@ -257,14 +257,14 @@ export function parseReportInput(input: unknown): Parsed<ValidReport> {
       finding: findingIds, image: imageIds, exchange: exchangeIds, step: stepIds,
     } satisfies Record<EvidenceReference['kind'], ReadonlySet<string>>;
     findings.forEach((finding, index) => {
-      if (finding.image !== null && !imageIds.has(finding.image.imageId)) errors.add(`$.findings[${index}].image.imageId`, 'unknown_image');
-      finding.stepIds.forEach((id, j) => { if (!stepIds.has(id)) errors.add(`$.findings[${index}].stepIds[${j}]`, 'unknown_step'); });
-      finding.criterionIds.forEach((id, j) => { if (!criterionIds.has(id)) errors.add(`$.findings[${index}].criterionIds[${j}]`, 'unknown_criterion'); });
+      if (finding.image !== null && !imageIds.has(finding.image.imageId)) {errors.add(`$.findings[${index}].image.imageId`, 'unknown_image');}
+      finding.stepIds.forEach((id, j) => { if (!stepIds.has(id)) {errors.add(`$.findings[${index}].stepIds[${j}]`, 'unknown_step');} });
+      finding.criterionIds.forEach((id, j) => { if (!criterionIds.has(id)) {errors.add(`$.findings[${index}].criterionIds[${j}]`, 'unknown_criterion');} });
     });
     acceptance.forEach((criterion, index) => {
-      criterion.stepIds.forEach((id, j) => { if (!stepIds.has(id)) errors.add(`$.acceptance[${index}].stepIds[${j}]`, 'unknown_step'); });
+      criterion.stepIds.forEach((id, j) => { if (!stepIds.has(id)) {errors.add(`$.acceptance[${index}].stepIds[${j}]`, 'unknown_step');} });
       criterion.evidence.forEach((entry, j) => {
-        if (!idsOfEvidenceKind[entry.kind].has(entry.id)) errors.add(`$.acceptance[${index}].evidence[${j}].id`, 'unknown_evidence');
+        if (!idsOfEvidenceKind[entry.kind].has(entry.id)) {errors.add(`$.acceptance[${index}].evidence[${j}].id`, 'unknown_evidence');}
       });
     });
     // The one place a ValidReport is made: after every check above passed.
@@ -279,10 +279,10 @@ const PERIOD_KEYS = ['id', 'changes', 'changesVerifiedWithoutReview', 'criteriaI
 export function parseHistory(input: unknown): Parsed<History> {
   const errors = new ErrorList();
   try {
-    if (!isPlainObject(input)) return { ok: false, error: [{ path: '$', code: 'not_object' }] };
+    if (!isPlainObject(input)) {return { ok: false, error: [{ path: '$', code: 'not_object' }] };}
     rejectUnknownKeys(errors, '$', input, ['schema', 'synthetic', 'label', 'periods']);
-    if (input['schema'] !== HISTORY_SCHEMA) errors.add('$.schema', 'unknown_schema');
-    if (typeof input['synthetic'] !== 'boolean') errors.add('$.synthetic', 'not_boolean');
+    if (input['schema'] !== HISTORY_SCHEMA) {errors.add('$.schema', 'unknown_schema');}
+    if (typeof input['synthetic'] !== 'boolean') {errors.add('$.synthetic', 'not_boolean');}
     const periods: HistoryPeriod[] = readList(errors, '$.periods', input['periods'], 200).map((entry, index): HistoryPeriod => {
       const path = `$.periods[${index}]`;
       const zero: HistoryPeriod = {
@@ -293,8 +293,8 @@ export function parseHistory(input: unknown): Parsed<History> {
       rejectUnknownKeys(errors, path, entry, PERIOD_KEYS);
       const rawEscaped = entry['escaped'];
       let escaped: Fields = {};
-      if (isPlainObject(rawEscaped)) escaped = rawEscaped;
-      else errors.add(`${path}.escaped`, 'not_object');
+      if (isPlainObject(rawEscaped)) {escaped = rawEscaped;}
+      else {errors.add(`${path}.escaped`, 'not_object');}
       rejectUnknownKeys(errors, `${path}.escaped`, escaped, SEVERITIES);
       const period: HistoryPeriod = {
         id: readId(errors, `${path}.id`, entry['id']),
@@ -309,12 +309,12 @@ export function parseHistory(input: unknown): Parsed<History> {
           P3: readNumber(errors, `${path}.escaped.P3`, escaped['P3']), P4: readNumber(errors, `${path}.escaped.P4`, escaped['P4']),
         },
       };
-      if (period.changesVerifiedWithoutReview > period.changes) errors.add(path, 'verified_exceeds_changes');
-      if (period.criteriaTraced > period.criteriaInScope) errors.add(path, 'traced_exceeds_total');
-      if (period.flakyRuns > period.runs) errors.add(path, 'flaky_exceeds_runs');
+      if (period.changesVerifiedWithoutReview > period.changes) {errors.add(path, 'verified_exceeds_changes');}
+      if (period.criteriaTraced > period.criteriaInScope) {errors.add(path, 'traced_exceeds_total');}
+      if (period.flakyRuns > period.runs) {errors.add(path, 'flaky_exceeds_runs');}
       return period;
     });
-    if (periods.length === 0) errors.add('$.periods', 'empty');
+    if (periods.length === 0) {errors.add('$.periods', 'empty');}
     const value: History = { schema: HISTORY_SCHEMA, synthetic: input['synthetic'] === true, label: readText(errors, '$.label', input['label']), periods };
     return errors.errors.length === 0 ? { ok: true, value } : { ok: false, error: errors.errors };
   } catch {

@@ -26,24 +26,24 @@ export function nestingDepth(text: string, limit: number): number {
     const character = text[index];
     if (inString) {
       // A backslash escapes the next character, a quote among them.
-      if (character === '\\') index++;
-      else if (character === '"') inString = false;
+      if (character === '\\') {index++;}
+      else if (character === '"') {inString = false;}
       continue;
     }
-    if (character === '"') inString = true;
+    if (character === '"') {inString = true;}
     else if (character === '[' || character === '{') {
       depth++;
-      if (depth > deepest) deepest = depth;
-      if (deepest > limit) return deepest;
-    } else if (character === ']' || character === '}') depth--;
+      if (depth > deepest) {deepest = depth;}
+      if (deepest > limit) {return deepest;}
+    } else if (character === ']' || character === '}') {depth--;}
   }
   return deepest;
 }
 
 // The script's result as a JSON value, or why it is refused.
 export function decodeScriptResult(text: string, maximumResultBytes: number): Result<unknown, ScriptResultErrorCode> {
-  if (Buffer.byteLength(text, 'utf8') > maximumResultBytes) return failure('script-result-too-large');
-  if (nestingDepth(text, MAXIMUM_SCRIPT_RESULT_DEPTH) > MAXIMUM_SCRIPT_RESULT_DEPTH) return failure('script-result-invalid');
+  if (Buffer.byteLength(text, 'utf8') > maximumResultBytes) {return failure('script-result-too-large');}
+  if (nestingDepth(text, MAXIMUM_SCRIPT_RESULT_DEPTH) > MAXIMUM_SCRIPT_RESULT_DEPTH) {return failure('script-result-invalid');}
   try {
     return success(JSON.parse(text));
   } catch {

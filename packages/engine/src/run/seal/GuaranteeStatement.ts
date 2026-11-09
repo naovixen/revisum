@@ -70,7 +70,7 @@ function isolationReason(guarantee: GuaranteeId, conditions: GuaranteeConditions
     // Suite code, the suite's browser and the app server it starts cannot be pinned; and without
     // egress control, nor can what a plan run's page reaches.
     case GuaranteeId.ReplayIdentical:
-      if (conditions.mode === RunMode.Evidence) return 'evidence-mode';
+      if (conditions.mode === RunMode.Evidence) {return 'evidence-mode';}
       return conditions.egressEnforced ? undefined : 'egress-unenforceable';
     // Only the isolated runner routes every process through the proxy and keeps credentials out.
     case GuaranteeId.EgressEnforced: case GuaranteeId.NoAmbientCredentials:
@@ -96,8 +96,8 @@ export function guaranteeStatement(conditions: GuaranteeConditions): GuaranteeSt
   const lost: { readonly guarantee: GuaranteeId; readonly because: GuaranteeLossReason }[] = [];
   for (const guarantee of GUARANTEE_IDS) {
     const reasons = lossReasons(guarantee, conditions);
-    if (reasons.length === 0) holds.push(guarantee);
-    else lost.push(...reasons.map((because) => ({ guarantee, because })));
+    if (reasons.length === 0) {holds.push(guarantee);}
+    else {lost.push(...reasons.map((because) => ({ guarantee, because })));}
   }
   return { level: lost.length === 0 ? GuaranteeLevel.Isolated : GuaranteeLevel.Host, holds, lost };
 }

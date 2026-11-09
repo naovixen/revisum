@@ -36,7 +36,7 @@ function writeJson(value: JsonWithSecrets, parts: (string | Secret)[]): void {
   if (isSecret(value)) { parts.push(value); return; }
   if (Array.isArray(value)) {
     parts.push('[');
-    value.forEach((item, index) => { if (index > 0) parts.push(','); writeJson(item, parts); });
+    value.forEach((item, index) => { if (index > 0) {parts.push(',');} writeJson(item, parts); });
     parts.push(']');
     return;
   }
@@ -56,8 +56,8 @@ export function bodyOf(value: JsonWithSecrets): JsonBodyWithSecrets {
   const jsonParts: (string | Secret)[] = [];
   for (const part of written) {
     const last = jsonParts.at(-1);
-    if (typeof part === 'string' && typeof last === 'string') jsonParts[jsonParts.length - 1] = last + part;
-    else jsonParts.push(part);
+    if (typeof part === 'string' && typeof last === 'string') {jsonParts[jsonParts.length - 1] = last + part;}
+    else {jsonParts.push(part);}
   }
   return { jsonParts };
 }
@@ -65,13 +65,13 @@ export function bodyOf(value: JsonWithSecrets): JsonBodyWithSecrets {
 // One argument, checked against its parameter's type. A literal was checked by the plan parser
 // already and is checked again here; a run value is checked now that its text is known.
 function fill(type: ParameterType, argument: CallArgument | undefined, values: RunValues, secrets: SecretStore): Built<Filled> {
-  if (argument === undefined) return failure('parameter-invalid');
+  if (argument === undefined) {return failure('parameter-invalid');}
   if (typeof argument === 'object' && 'secretName' in argument) {
-    if (type.kind !== ParameterKind.Secret) return failure('parameter-invalid');
+    if (type.kind !== ParameterKind.Secret) {return failure('parameter-invalid');}
     const secret = secrets.resolve(argument.secretName);
     return secret === null ? failure('secret-missing') : success({ kind: ParameterKind.Secret, secret });
   }
-  if (type.kind === ParameterKind.Secret) return failure('parameter-invalid');
+  if (type.kind === ParameterKind.Secret) {return failure('parameter-invalid');}
   if (typeof argument === 'object') {
     // The parameter's type holds the value to its own length, so no other limit applies here.
     const text = resolveText(argument, values, Number.POSITIVE_INFINITY);
@@ -102,10 +102,10 @@ function buildPath(path: string, filled: ReadonlyMap<string, Filled>): Built<str
     const placeholder = WHOLE_SEGMENT_PLACEHOLDER.exec(segment);
     if (placeholder === null) { segments.push(segment); continue; }
     const text = textOf(filled, placeholder[1] ?? '');
-    if (!text.ok) return text;
-    if (text.value === '' || text.value === '.' || text.value === '..') return failure('parameter-invalid');
+    if (!text.ok) {return text;}
+    if (text.value === '' || text.value === '.' || text.value === '..') {return failure('parameter-invalid');}
     const encoded = encodeComponent(text.value);
-    if (!encoded.ok) return encoded;
+    if (!encoded.ok) {return encoded;}
     segments.push(encoded.value);
   }
   return success(`/${segments.join('/')}`);
@@ -114,12 +114,12 @@ function buildPath(path: string, filled: ReadonlyMap<string, Filled>): Built<str
 // A template with its parameters in place. An interpolated string takes the parameters' text;
 // everything else is built as a JSON structure, never as text.
 function fillTemplate(template: JsonTemplate, filled: ReadonlyMap<string, Filled>): Built<JsonWithSecrets> {
-  if (template === null || typeof template !== 'object') return success(template);
+  if (template === null || typeof template !== 'object') {return success(template);}
   if (Array.isArray(template)) {
     const items: JsonWithSecrets[] = [];
     for (const item of template) {
       const built = fillTemplate(item, filled);
-      if (!built.ok) return built;
+      if (!built.ok) {return built;}
       items.push(built.value);
     }
     return success(items);
@@ -127,14 +127,14 @@ function fillTemplate(template: JsonTemplate, filled: ReadonlyMap<string, Filled
   // The project parser refused every other key starting with "$", so these two are placeholders.
   if ('$parameter' in template && typeof template.$parameter === 'string') {
     const parameter = filled.get(template.$parameter);
-    if (parameter === undefined) return failure('parameter-invalid');
+    if (parameter === undefined) {return failure('parameter-invalid');}
     return success(parameter.kind === 'secret' ? parameter.secret : parameter.value);
   }
   if ('$interpolate' in template && typeof template.$interpolate === 'string') {
     let problem: RequestBuildError | undefined;
     const text = template.$interpolate.replace(PLACEHOLDER, (_placeholder, name: string) => {
       const value = textOf(filled, name);
-      if (!value.ok) problem = value.error;
+      if (!value.ok) {problem = value.error;}
       return value.ok ? value.value : '';
     });
     return problem === undefined ? success(text) : failure(problem);
@@ -142,7 +142,7 @@ function fillTemplate(template: JsonTemplate, filled: ReadonlyMap<string, Filled
   const entries: [string, JsonWithSecrets][] = [];
   for (const [key, value] of Object.entries(template)) {
     const built = fillTemplate(value, filled);
-    if (!built.ok) return built;
+    if (!built.ok) {return built;}
     entries.push([key, built.value]);
   }
   return success(Object.fromEntries(entries));
@@ -153,11 +153,11 @@ function buildQuery(query: Readonly<Record<string, JsonTemplate>>, filled: Reado
   const pairs: string[] = [];
   for (const [key, template] of Object.entries(query)) {
     const built = fillTemplate(template, filled);
-    if (!built.ok) return built;
+    if (!built.ok) {return built;}
     const value = built.value;
-    if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') return failure('parameter-invalid');
+    if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') {return failure('parameter-invalid');}
     const encoded = encodeComponent(String(value));
-    if (!encoded.ok) return encoded;
+    if (!encoded.ok) {return encoded;}
     pairs.push(`${encodeURIComponent(key)}=${encoded.value}`);
   }
   return success(pairs.length === 0 ? '' : `?${pairs.join('&')}`);
@@ -170,7 +170,7 @@ function buildHeaders(declaration: CallDeclaration, secrets: SecretStore): Built
   for (const [name, header] of Object.entries(declaration.headers ?? {})) {
     if ('literal' in header) { headers.push({ name, value: header.literal }); continue; }
     const secret = secrets.resolve(header.secretName);
-    if (secret === null) return failure('secret-missing');
+    if (secret === null) {return failure('secret-missing');}
     headers.push({ name, value: headerSecret(secret, header.scheme) });
   }
   if (declaration.body !== undefined && !headers.some((header) => header.name.toLowerCase() === 'content-type')) {
@@ -187,7 +187,7 @@ function fillParameters(
   const filled = new Map<string, Filled>();
   for (const [name, type] of Object.entries(parameters)) {
     const parameter = fill(type, given.get(name), values, secrets);
-    if (!parameter.ok) return parameter;
+    if (!parameter.ok) {return parameter;}
     filled.set(name, parameter.value);
   }
   return success(filled);
@@ -209,16 +209,16 @@ export function buildServiceRequest(
   declaration: CallDeclaration, service: { readonly origin: Origin }, callArguments: CallArguments, values: RunValues, secrets: SecretStore,
 ): Result<ServiceRequest, RequestBuildError> {
   const parameters = fillParameters(declaration.parameters, callArguments, values, secrets);
-  if (!parameters.ok) return parameters;
+  if (!parameters.ok) {return parameters;}
   const filled = parameters.value;
   const headers = buildHeaders(declaration, secrets);
-  if (!headers.ok) return headers;
+  if (!headers.ok) {return headers;}
   const path = buildPath(declaration.path, filled);
-  if (!path.ok) return path;
+  if (!path.ok) {return path;}
   const query = buildQuery(declaration.query ?? {}, filled);
-  if (!query.ok) return query;
+  if (!query.ok) {return query;}
   const body = declaration.body === undefined ? success(null) : fillTemplate(declaration.body, filled);
-  if (!body.ok) return body;
+  if (!body.ok) {return body;}
   return success({
     origin: service.origin, method: declaration.method, pathAndQuery: `${path.value}${query.value}`, headers: headers.value,
     body: declaration.body === undefined ? null : bodyOf(body.value),

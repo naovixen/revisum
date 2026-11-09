@@ -28,7 +28,7 @@ export function readSpecCriteria(root: string): SpecCriteria {
       const id = match[1] ?? '';
       const owner = match[2] ?? specNumber;
       const list = bySpec.get(owner) ?? [];
-      if (!list.includes(id)) list.push(id);
+      if (!list.includes(id)) {list.push(id);}
       bySpec.set(owner, list);
     }
   }

@@ -71,7 +71,7 @@ export function readDeclaredCodes(tokens: readonly Token[], name: string): Decla
   const start = tokens.findIndex((token, index) =>
     isIdentifier(token, name) && (isIdentifier(tokens[index - 1], 'type') || isIdentifier(tokens[index - 1], 'const'))
     && isPunctuator(tokens[index + 1], '='));
-  if (start === -1) return undefined;
+  if (start === -1) {return undefined;}
   const codes: string[] = [];
   const borrowedSets = new Set<string>();
   let depth = 0;
@@ -80,10 +80,10 @@ export function readDeclaredCodes(tokens: readonly Token[], name: string): Decla
     if (token === undefined) {
       break;
     }
-    if (isPunctuator(token, '{') || isPunctuator(token, '[') || isPunctuator(token, '(')) depth += 1;
-    else if (isPunctuator(token, '}') || isPunctuator(token, ']') || isPunctuator(token, ')')) depth -= 1;
-    else if (isPunctuator(token, ';') && depth === 0) break;
-    else if (token.kind === TokenKind.String) codes.push(token.text);
+    if (isPunctuator(token, '{') || isPunctuator(token, '[') || isPunctuator(token, '(')) {depth += 1;}
+    else if (isPunctuator(token, '}') || isPunctuator(token, ']') || isPunctuator(token, ')')) {depth -= 1;}
+    else if (isPunctuator(token, ';') && depth === 0) {break;}
+    else if (token.kind === TokenKind.String) {codes.push(token.text);}
     // `typeof Set.Member` names the set, not `typeof`.
     else if (token.kind === TokenKind.Identifier && token.text !== 'typeof' && namesBorrowedSet(tokens, index)) {
       borrowedSets.add(token.text);
@@ -107,7 +107,7 @@ export function checkErrorAnchors(root: string): string[] {
   const codes = new Set<string>();
   const pagePath = join(root, ERRORS_PAGE);
   const headings = existsSync(pagePath) ? headingsIn(readFileSync(pagePath, 'utf8')) : new Set<string>();
-  if (!existsSync(pagePath)) problems.push(`${ERRORS_PAGE} is missing`);
+  if (!existsSync(pagePath)) {problems.push(`${ERRORS_PAGE} is missing`);}
 
   for (const union of ERROR_CODE_UNIONS) {
     const filePath = join(root, union.file);
@@ -121,13 +121,13 @@ export function checkErrorAnchors(root: string): string[] {
     }
     for (const code of declared.codes) {
       codes.add(code);
-      if (!headings.has(code)) problems.push(`${ERRORS_PAGE} has no "## ${code}" heading, so errors#${code} does not resolve (${union.name} in ${union.file})`);
+      if (!headings.has(code)) {problems.push(`${ERRORS_PAGE} has no "## ${code}" heading, so errors#${code} does not resolve (${union.name} in ${union.file})`);}
     }
   }
   for (const heading of headings) {
-    if (!codes.has(heading)) problems.push(`${ERRORS_PAGE} has a "## ${heading}" heading, but no error-code union holds ${heading}`);
+    if (!codes.has(heading)) {problems.push(`${ERRORS_PAGE} has a "## ${heading}" heading, but no error-code union holds ${heading}`);}
   }
   return problems;
 }
 
-if (import.meta.main) process.exitCode = reportProblems('error anchor check', checkErrorAnchors(process.cwd()));
+if (import.meta.main) {process.exitCode = reportProblems('error anchor check', checkErrorAnchors(process.cwd()));}

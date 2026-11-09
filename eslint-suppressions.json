@@ -1,8 +1,5 @@
 {
   "packages/auditor-act/src/page/BuildSnapshot.ts": {
-    "curly": {
-      "count": 24
-    },
     "max-lines-per-function": {
       "count": 1
     },
@@ -11,9 +8,6 @@
     }
   },
   "packages/auditor-act/src/page/DecodePng.ts": {
-    "curly": {
-      "count": 1
-    },
     "no-nested-ternary": {
       "count": 1
     }
@@ -22,9 +16,6 @@
     "@typescript-eslint/naming-convention": {
       "count": 2
     },
-    "curly": {
-      "count": 30
-    },
     "prefer-template": {
       "count": 1
     }
@@ -32,9 +23,6 @@
   "packages/auditor-act/src/page/LaunchBrowser.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 2
-    },
-    "curly": {
-      "count": 11
     },
     "prefer-template": {
       "count": 2
@@ -46,9 +34,6 @@
     },
     "@typescript-eslint/strict-boolean-expressions": {
       "count": 9
-    },
-    "curly": {
-      "count": 17
     }
   },
   "packages/auditor-act/src/rules/InteractiveRules.ts": {
@@ -58,16 +43,8 @@
     "@typescript-eslint/require-await": {
       "count": 4
     },
-    "curly": {
-      "count": 32
-    },
     "prefer-template": {
       "count": 6
-    }
-  },
-  "packages/auditor-act/src/rules/Rule.ts": {
-    "curly": {
-      "count": 4
     }
   },
   "packages/auditor-act/src/rules/StaticRules.ts": {
@@ -76,9 +53,6 @@
     },
     "@typescript-eslint/strict-boolean-expressions": {
       "count": 51
-    },
-    "curly": {
-      "count": 116
     },
     "max-lines": {
       "count": 1
@@ -96,48 +70,21 @@
     },
     "@typescript-eslint/strict-boolean-expressions": {
       "count": 4
-    },
-    "curly": {
-      "count": 3
-    }
-  },
-  "packages/auditor-act/src/scan/TabWalk.ts": {
-    "curly": {
-      "count": 5
     }
   },
   "packages/cli/src/commands/BenchmarkRuns.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
-    },
-    "curly": {
-      "count": 12
     }
   },
   "packages/cli/src/commands/DraftCommand.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 3
-    },
-    "curly": {
-      "count": 44
     }
   },
   "packages/cli/src/commands/RunSuite.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 2
-    },
-    "curly": {
-      "count": 12
-    }
-  },
-  "packages/cli/src/explore/ExploreInContainer.ts": {
-    "curly": {
-      "count": 10
-    }
-  },
-  "packages/cli/src/planners/PlannerAdapter.ts": {
-    "curly": {
-      "count": 4
     }
   },
   "packages/contracts/src/ports/DeterminismScript.ts": {
@@ -145,17 +92,9 @@
       "count": 1
     }
   },
-  "packages/contracts/src/ports/Secret.ts": {
-    "curly": {
-      "count": 1
-    }
-  },
   "packages/driver-cdp/src/in-page/document/PageAudit.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 5
-    },
-    "curly": {
-      "count": 23
     },
     "max-lines-per-function": {
       "count": 1
@@ -165,73 +104,28 @@
     "@typescript-eslint/naming-convention": {
       "count": 1
     },
-    "curly": {
-      "count": 31
-    },
     "max-lines-per-function": {
       "count": 1
-    }
-  },
-  "packages/engine/src/approval/ApproversFile.ts": {
-    "curly": {
-      "count": 16
     }
   },
   "packages/engine/src/approval/ParseCodeOwners.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 2
-    },
-    "curly": {
-      "count": 5
-    }
-  },
-  "packages/engine/src/approval/PlanStanding.ts": {
-    "curly": {
-      "count": 1
-    }
-  },
-  "packages/engine/src/drafting/AiText.ts": {
-    "curly": {
-      "count": 4
     }
   },
   "packages/engine/src/drafting/CheckDraftLocators.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
-    },
-    "curly": {
-      "count": 13
     }
   },
   "packages/engine/src/drafting/CrawlSite.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
-    },
-    "curly": {
-      "count": 5
-    }
-  },
-  "packages/engine/src/drafting/ExtractCriteria.ts": {
-    "curly": {
-      "count": 4
-    }
-  },
-  "packages/engine/src/drafting/PageMapEntry.ts": {
-    "curly": {
-      "count": 13
-    }
-  },
-  "packages/engine/src/drafting/PlannerRequestBody.ts": {
-    "curly": {
-      "count": 8
     }
   },
   "packages/engine/src/evidence/EvidenceResult.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 2
-    },
-    "curly": {
-      "count": 7
     },
     "no-control-regex": {
       "count": 1
@@ -240,87 +134,36 @@
   "packages/engine/src/evidence/ParseSuiteTrace.ts": {
     "@typescript-eslint/strict-boolean-expressions": {
       "count": 1
-    },
-    "curly": {
-      "count": 10
-    }
-  },
-  "packages/engine/src/evidence/ReadZip.ts": {
-    "curly": {
-      "count": 18
-    }
-  },
-  "packages/engine/src/evidence/SuiteEnvironment.ts": {
-    "curly": {
-      "count": 1
     }
   },
   "packages/engine/src/evidence/SuitePasses.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
-    },
-    "curly": {
-      "count": 1
-    }
-  },
-  "packages/engine/src/evidence/SuiteReport.ts": {
-    "curly": {
-      "count": 35
-    }
-  },
-  "packages/engine/src/evidence/WriteReleaseNotes.ts": {
-    "curly": {
-      "count": 4
     }
   },
   "packages/engine/src/foundation/RepositoryPath.ts": {
-    "curly": {
-      "count": 3
-    },
     "no-control-regex": {
       "count": 1
     }
   },
   "packages/engine/src/foundation/Sha256.ts": {
-    "curly": {
-      "count": 3
-    },
     "no-nested-ternary": {
       "count": 1
-    }
-  },
-  "packages/engine/src/plan/UnsafeFeaturesOf.ts": {
-    "curly": {
-      "count": 2
     }
   },
   "packages/engine/src/plan/parse/AdmitDraft.ts": {
     "@typescript-eslint/no-unsafe-assignment": {
       "count": 1
-    },
-    "curly": {
-      "count": 7
     }
   },
   "packages/engine/src/plan/parse/ReadRecord.ts": {
-    "curly": {
-      "count": 2
-    },
     "no-control-regex": {
       "count": 2
-    }
-  },
-  "packages/engine/src/plan/parse/declarations/ReadPlanClock.ts": {
-    "curly": {
-      "count": 10
     }
   },
   "packages/engine/src/plan/readable/ReadPlanText.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 6
-    },
-    "curly": {
-      "count": 28
     },
     "max-lines-per-function": {
       "count": 1
@@ -332,17 +175,11 @@
   "packages/engine/src/plan/readable/StepStatements.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
-    },
-    "curly": {
-      "count": 20
     }
   },
   "packages/engine/src/plan/readable/Syntax.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 2
-    },
-    "curly": {
-      "count": 39
     },
     "max-lines": {
       "count": 1
@@ -352,9 +189,6 @@
     }
   },
   "packages/engine/src/plan/schema/PlanJsonSchema.ts": {
-    "curly": {
-      "count": 1
-    },
     "max-lines-per-function": {
       "count": 1
     }
@@ -362,17 +196,11 @@
   "packages/engine/src/policy/PolicyGate.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 3
-    },
-    "curly": {
-      "count": 6
     }
   },
   "packages/engine/src/project/ParseProject.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 3
-    },
-    "curly": {
-      "count": 52
     },
     "max-lines": {
       "count": 1
@@ -381,54 +209,31 @@
   "packages/engine/src/project/ReadCallDeclarations.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
-    },
-    "curly": {
-      "count": 39
     }
   },
   "packages/engine/src/project/ReadEvidenceMode.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 6
-    },
-    "curly": {
-      "count": 21
     }
   },
   "packages/engine/src/project/ReadStubDeclarations.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
-    },
-    "curly": {
-      "count": 21
     }
   },
   "packages/engine/src/project/ReadUnsafeFeatures.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 5
-    },
-    "curly": {
-      "count": 20
     }
   },
   "packages/engine/src/project/TrustedProject.ts": {
-    "curly": {
-      "count": 3
-    },
     "no-restricted-syntax": {
       "count": 1
-    }
-  },
-  "packages/engine/src/replay/DecodeManifest.ts": {
-    "curly": {
-      "count": 20
     }
   },
   "packages/engine/src/replay/Replay.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 2
-    },
-    "curly": {
-      "count": 15
     }
   },
   "packages/engine/src/replay/RunRecording.ts": {
@@ -437,22 +242,11 @@
     },
     "@typescript-eslint/unbound-method": {
       "count": 2
-    },
-    "curly": {
-      "count": 28
-    }
-  },
-  "packages/engine/src/run/executors/clock-and-clipboard/CheckClipboard.ts": {
-    "curly": {
-      "count": 7
     }
   },
   "packages/engine/src/run/executors/database-commands/RunDatabaseStep.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
-    },
-    "curly": {
-      "count": 26
     }
   },
   "packages/engine/src/run/executors/network-and-storage/CheckRequests.ts": {
@@ -461,28 +255,14 @@
     },
     "@typescript-eslint/require-await": {
       "count": 1
-    },
-    "curly": {
-      "count": 30
     }
   },
   "packages/engine/src/run/executors/page-scripts/DecodeScriptResult.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
-    },
-    "curly": {
-      "count": 8
-    }
-  },
-  "packages/engine/src/run/executors/page-scripts/RunEvaluate.ts": {
-    "curly": {
-      "count": 18
     }
   },
   "packages/engine/src/run/executors/service-calls/ArgumentValue.ts": {
-    "curly": {
-      "count": 7
-    },
     "no-nested-ternary": {
       "count": 1
     }
@@ -493,38 +273,21 @@
     },
     "@typescript-eslint/no-unsafe-argument": {
       "count": 2
-    },
-    "curly": {
-      "count": 24
     }
   },
   "packages/engine/src/run/executors/service-calls/CheckBackendField.ts": {
-    "curly": {
-      "count": 5
-    },
     "no-nested-ternary": {
       "count": 1
-    }
-  },
-  "packages/engine/src/run/executors/service-calls/RunCallStep.ts": {
-    "curly": {
-      "count": 11
     }
   },
   "packages/engine/src/run/logging/JsonLinesEventSink.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
-    },
-    "curly": {
-      "count": 2
     }
   },
   "packages/engine/src/run/logging/LoggingManifest.ts": {
     "@typescript-eslint/no-unnecessary-type-assertion": {
       "count": 1
-    },
-    "curly": {
-      "count": 4
     }
   },
   "packages/engine/src/run/outcome/Transition.ts": {
@@ -538,9 +301,6 @@
   "packages/engine/src/run/outcome/Verdict.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 3
-    },
-    "curly": {
-      "count": 6
     }
   },
   "packages/engine/src/run/seal/BuildManifest.ts": {
@@ -549,59 +309,24 @@
     },
     "@typescript-eslint/prefer-nullish-coalescing": {
       "count": 1
-    },
-    "curly": {
-      "count": 5
     }
   },
   "packages/engine/src/run/seal/GuaranteeStatement.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 3
-    },
-    "curly": {
-      "count": 3
-    }
-  },
-  "packages/engine/src/run/values/RunValues.ts": {
-    "curly": {
-      "count": 13
-    }
-  },
-  "packages/engine/src/secrets/LeakScanner.ts": {
-    "curly": {
-      "count": 5
-    }
-  },
-  "packages/engine/src/secrets/ResolvePlanSecrets.ts": {
-    "curly": {
-      "count": 11
     }
   },
   "packages/engine/src/secrets/SecretRedaction.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 4
-    },
-    "curly": {
-      "count": 28
     }
   },
   "packages/engine/src/target/ReadLockfile.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
-    },
-    "curly": {
-      "count": 23
-    }
-  },
-  "packages/engine/src/target/UnavailableTargetOutcome.ts": {
-    "curly": {
-      "count": 1
     }
   },
   "packages/report/src/model/CleanText.ts": {
-    "curly": {
-      "count": 1
-    },
     "no-control-regex": {
       "count": 1
     }
@@ -609,22 +334,11 @@
   "packages/report/src/model/LevelAt.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 2
-    },
-    "curly": {
-      "count": 5
-    }
-  },
-  "packages/report/src/model/ParseReportInput.ts": {
-    "curly": {
-      "count": 42
     }
   },
   "packages/report/src/model/ReportView.ts": {
     "@typescript-eslint/strict-boolean-expressions": {
       "count": 4
-    },
-    "curly": {
-      "count": 2
     },
     "no-nested-ternary": {
       "count": 2
@@ -632,14 +346,6 @@
   },
   "packages/report/src/render/FigureSvg.ts": {
     "@typescript-eslint/strict-boolean-expressions": {
-      "count": 1
-    },
-    "curly": {
-      "count": 3
-    }
-  },
-  "packages/report/src/render/Generate.ts": {
-    "curly": {
       "count": 1
     }
   },
@@ -656,9 +362,6 @@
     "@typescript-eslint/strict-boolean-expressions": {
       "count": 7
     },
-    "curly": {
-      "count": 5
-    },
     "prefer-template": {
       "count": 6
     }
@@ -670,9 +373,6 @@
     "@typescript-eslint/strict-boolean-expressions": {
       "count": 1
     },
-    "curly": {
-      "count": 1
-    },
     "no-nested-ternary": {
       "count": 1
     }
@@ -682,45 +382,12 @@
       "count": 1
     }
   },
-  "packages/runner/src/containers/RunImageContainer.ts": {
-    "curly": {
-      "count": 4
-    }
-  },
-  "packages/runner/src/egress/BuildEgressPolicy.ts": {
-    "curly": {
-      "count": 3
-    }
-  },
-  "packages/runner/src/egress/JoinEgressEvents.ts": {
-    "curly": {
-      "count": 4
-    }
-  },
-  "packages/runner/src/egress/StartLookupRecorder.ts": {
-    "curly": {
-      "count": 8
-    }
-  },
-  "packages/runner/src/egress/StartRecordKeeping.ts": {
-    "curly": {
-      "count": 2
-    }
-  },
-  "packages/runner/src/image/RunImage.ts": {
-    "curly": {
-      "count": 7
-    }
-  },
   "packages/runner/src/service-calls/ServiceCaller.ts": {
     "@typescript-eslint/dot-notation": {
       "count": 1
     },
     "@typescript-eslint/naming-convention": {
       "count": 1
-    },
-    "curly": {
-      "count": 3
     }
   },
   "packages/runner/src/workload/WorkloadEnvironment.ts": {
@@ -734,9 +401,6 @@
     }
   },
   "test/browser/accessibility/BrowserScan.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 5
     }
@@ -760,17 +424,11 @@
     }
   },
   "test/browser/clock-and-clipboard/CdpPlanClock.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 6
     }
   },
   "test/browser/clock-and-clipboard/ClockAndClipboardDriverSupport.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 12
     }
@@ -790,9 +448,6 @@
     "@typescript-eslint/require-await": {
       "count": 7
     },
-    "curly": {
-      "count": 19
-    },
     "no-nested-ternary": {
       "count": 1
     }
@@ -809,17 +464,11 @@
     }
   },
   "test/browser/downloads/CdpPagesAndDownloads.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 6
     }
   },
   "test/browser/egress/EgressChannels.test.ts": {
-    "curly": {
-      "count": 2
-    },
     "revisum/test-title-format": {
       "count": 6
     }
@@ -830,18 +479,12 @@
     }
   },
   "test/browser/egress/PageScriptEgress.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 2
     }
   },
   "test/browser/egress/StubEgress.test.ts": {
     "@typescript-eslint/naming-convention": {
-      "count": 1
-    },
-    "curly": {
       "count": 1
     },
     "revisum/test-title-format": {
@@ -877,9 +520,6 @@
     }
   },
   "test/browser/explore/ExploreCommand.test.ts": {
-    "curly": {
-      "count": 5
-    },
     "max-lines": {
       "count": 1
     },
@@ -899,9 +539,6 @@
     }
   },
   "test/browser/frames-and-tabs/CdpDownloadAndTabReplays.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 2
     }
@@ -912,9 +549,6 @@
     }
   },
   "test/browser/frames-and-tabs/PopupHeldBack.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 2
     }
@@ -928,18 +562,12 @@
     }
   },
   "test/browser/input/DriverActionGuard.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 21
     }
   },
   "test/browser/lifecycle/CdpBrowserProcesses.test.ts": {
     "@typescript-eslint/strict-boolean-expressions": {
-      "count": 1
-    },
-    "curly": {
       "count": 1
     },
     "no-useless-assignment": {
@@ -955,17 +583,11 @@
     }
   },
   "test/browser/lifecycle/ChromiumDisabledFeatures.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 7
     }
   },
   "test/browser/lifecycle/DriverContract.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 17
     }
@@ -1036,9 +658,6 @@
     "@typescript-eslint/naming-convention": {
       "count": 1
     },
-    "curly": {
-      "count": 2
-    },
     "revisum/test-title-format": {
       "count": 14
     }
@@ -1077,9 +696,6 @@
     }
   },
   "test/containers/egress/ProxyEvidence.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 2
     }
@@ -1110,16 +726,6 @@
   "test/containers/isolation/StoppedDockerDaemon.test.ts": {
     "revisum/test-title-format": {
       "count": 4
-    }
-  },
-  "test/containers/support/InsideSitePort.ts": {
-    "curly": {
-      "count": 1
-    }
-  },
-  "test/containers/support/PlanRunInside.ts": {
-    "curly": {
-      "count": 3
     }
   },
   "test/containers/support/RealCommandRun.ts": {
@@ -1179,9 +785,6 @@
     "@typescript-eslint/no-unsafe-return": {
       "count": 3
     },
-    "curly": {
-      "count": 2
-    },
     "revisum/test-title-format": {
       "count": 7
     }
@@ -1196,9 +799,6 @@
     "@typescript-eslint/strict-boolean-expressions": {
       "count": 2
     },
-    "curly": {
-      "count": 2
-    },
     "revisum/test-title-format": {
       "count": 6
     }
@@ -1207,9 +807,6 @@
     "@typescript-eslint/no-unsafe-return": {
       "count": 3
     },
-    "curly": {
-      "count": 2
-    },
     "revisum/test-title-format": {
       "count": 5
     }
@@ -1217,9 +814,6 @@
   "test/proofs/plan-schema/PlanSchemaStubsAndStorage.test.ts": {
     "@typescript-eslint/no-unsafe-return": {
       "count": 3
-    },
-    "curly": {
-      "count": 2
     },
     "revisum/test-title-format": {
       "count": 6
@@ -1260,9 +854,6 @@
     "@typescript-eslint/no-unnecessary-type-assertion": {
       "count": 1
     },
-    "curly": {
-      "count": 2
-    },
     "revisum/test-title-format": {
       "count": 6
     }
@@ -1302,9 +893,6 @@
     "@typescript-eslint/strict-boolean-expressions": {
       "count": 2
     },
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 7
     }
@@ -1318,17 +906,11 @@
     }
   },
   "test/proofs/repo-rules/licences-and-reviews/DatabaseCommandDependencies.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 5
     }
   },
   "test/proofs/repo-rules/licences-and-reviews/DependencyReviewLint.test.ts": {
-    "curly": {
-      "count": 4
-    },
     "prefer-template": {
       "count": 1
     },
@@ -1348,17 +930,11 @@
     "@typescript-eslint/no-unsafe-assignment": {
       "count": 1
     },
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 9
     }
   },
   "test/proofs/repo-rules/licences-and-reviews/PageScriptDriverDependencies.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 6
     }
@@ -1372,9 +948,6 @@
     }
   },
   "test/proofs/repo-rules/metrics/Benchmark.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 12
     }
@@ -1391,9 +964,6 @@
     "@typescript-eslint/no-unsafe-assignment": {
       "count": 1
     },
-    "curly": {
-      "count": 7
-    },
     "no-useless-assignment": {
       "count": 1
     },
@@ -1407,9 +977,6 @@
     }
   },
   "test/proofs/repo-rules/running/DenyRulesLint.test.ts": {
-    "curly": {
-      "count": 3
-    },
     "revisum/test-title-format": {
       "count": 3
     }
@@ -1420,9 +987,6 @@
     }
   },
   "test/proofs/repo-rules/running/GlossaryLint.test.ts": {
-    "curly": {
-      "count": 2
-    },
     "revisum/test-title-format": {
       "count": 9
     }
@@ -1433,9 +997,6 @@
     },
     "@typescript-eslint/no-unsafe-return": {
       "count": 1
-    },
-    "curly": {
-      "count": 2
     },
     "revisum/test-title-format": {
       "count": 9
@@ -1451,22 +1012,9 @@
       "count": 1
     }
   },
-  "test/proofs/repo-rules/support/CompileFiles.ts": {
-    "curly": {
-      "count": 1
-    }
-  },
-  "test/proofs/repo-rules/support/ScratchRepository.ts": {
-    "curly": {
-      "count": 4
-    }
-  },
   "test/proofs/repo-rules/support/WithEdits.ts": {
     "@typescript-eslint/no-unsafe-assignment": {
       "count": 1
-    },
-    "curly": {
-      "count": 3
     }
   },
   "test/proofs/runs/ActionGuardPassing.test.ts": {
@@ -1485,9 +1033,6 @@
     },
     "@typescript-eslint/require-await": {
       "count": 1
-    },
-    "curly": {
-      "count": 2
     },
     "revisum/test-title-format": {
       "count": 3
@@ -1532,25 +1077,16 @@
     "@typescript-eslint/require-await": {
       "count": 4
     },
-    "curly": {
-      "count": 3
-    },
     "revisum/test-title-format": {
       "count": 29
     }
   },
   "test/proofs/secrets/SecretEncodedEchoScan.test.ts": {
-    "curly": {
-      "count": 3
-    },
     "revisum/test-title-format": {
       "count": 3
     }
   },
   "test/proofs/secrets/SecretLeakScan.test.ts": {
-    "curly": {
-      "count": 2
-    },
     "revisum/test-title-format": {
       "count": 3
     }
@@ -1569,41 +1105,26 @@
     }
   },
   "test/proofs/secrets/leak-scans/ClipboardLeakScan.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 3
     }
   },
   "test/proofs/secrets/leak-scans/DownloadLeakScan.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 7
     }
   },
   "test/proofs/secrets/leak-scans/NetworkAndStorageLeakScan.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 3
     }
   },
   "test/proofs/secrets/leak-scans/RememberedValueLeakScan.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 2
     }
   },
   "test/proofs/secrets/leak-scans/UnsafePageLeakScan.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 14
     }
@@ -1632,40 +1153,14 @@
       "count": 1
     }
   },
-  "test/support/browser/harnesses/AccessibilityServer.ts": {
-    "curly": {
-      "count": 2
-    }
-  },
-  "test/support/browser/harnesses/CrashWhenRequested.ts": {
-    "curly": {
-      "count": 1
-    }
-  },
   "test/support/browser/harnesses/ProcessTree.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
-    },
-    "curly": {
-      "count": 7
-    }
-  },
-  "test/support/builders/ClearRun.ts": {
-    "curly": {
-      "count": 2
     }
   },
   "test/support/builders/DecodePng.ts": {
-    "curly": {
-      "count": 1
-    },
     "no-nested-ternary": {
       "count": 1
-    }
-  },
-  "test/support/builders/FixtureServer.ts": {
-    "curly": {
-      "count": 2
     }
   },
   "test/support/builders/HostilePlans.ts": {
@@ -1676,17 +1171,11 @@
   "test/support/builders/MemoryEventSink.ts": {
     "@typescript-eslint/require-await": {
       "count": 1
-    },
-    "curly": {
-      "count": 1
     }
   },
   "test/support/builders/ReportInputs.ts": {
     "@typescript-eslint/strict-boolean-expressions": {
       "count": 1
-    },
-    "curly": {
-      "count": 5
     }
   },
   "test/support/repository/ChangelogEntries.ts": {
@@ -1694,20 +1183,7 @@
       "count": 1
     }
   },
-  "test/support/repository/FilesNamed.ts": {
-    "curly": {
-      "count": 5
-    }
-  },
-  "test/support/repository/GitRepository.ts": {
-    "curly": {
-      "count": 2
-    }
-  },
   "test/unit/auditor-act/rules/RuleSet.test.ts": {
-    "curly": {
-      "count": 8
-    },
     "revisum/test-title-format": {
       "count": 7
     }
@@ -1720,17 +1196,11 @@
   "test/unit/cli/commands/examples/DraftCommand.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
-    },
-    "curly": {
-      "count": 13
     }
   },
   "test/unit/cli/commands/run-suite/SuiteRuns.test.ts": {
     "@typescript-eslint/await-thenable": {
       "count": 1
-    },
-    "curly": {
-      "count": 4
     },
     "revisum/test-title-format": {
       "count": 27
@@ -1769,9 +1239,6 @@
     "@typescript-eslint/naming-convention": {
       "count": 1
     },
-    "curly": {
-      "count": 5
-    },
     "revisum/test-title-format": {
       "count": 13
     }
@@ -1780,17 +1247,11 @@
     "@typescript-eslint/require-await": {
       "count": 1
     },
-    "curly": {
-      "count": 5
-    },
     "revisum/test-title-format": {
       "count": 4
     }
   },
   "test/unit/engine/approval/ApprovalSubjectHash.test.ts": {
-    "curly": {
-      "count": 3
-    },
     "revisum/test-title-format": {
       "count": 7
     }
@@ -1801,9 +1262,6 @@
     },
     "@typescript-eslint/no-unused-vars": {
       "count": 2
-    },
-    "curly": {
-      "count": 6
     },
     "revisum/test-title-format": {
       "count": 14
@@ -1821,9 +1279,6 @@
     "@typescript-eslint/no-unsafe-return": {
       "count": 1
     },
-    "curly": {
-      "count": 3
-    },
     "revisum/test-title-format": {
       "count": 2
     }
@@ -1834,17 +1289,11 @@
     }
   },
   "test/unit/engine/approval/code-owners/CodeOwnerApproval.test.ts": {
-    "curly": {
-      "count": 4
-    },
     "revisum/test-title-format": {
       "count": 15
     }
   },
   "test/unit/engine/approval/code-owners/CodeOwnerReviewedBytes.test.ts": {
-    "curly": {
-      "count": 2
-    },
     "revisum/test-title-format": {
       "count": 7
     }
@@ -1855,9 +1304,6 @@
     },
     "@typescript-eslint/require-await": {
       "count": 7
-    },
-    "curly": {
-      "count": 15
     },
     "max-lines-per-function": {
       "count": 1
@@ -1875,17 +1321,11 @@
     }
   },
   "test/unit/engine/drafting/DraftLocatorCheck.test.ts": {
-    "curly": {
-      "count": 2
-    },
     "revisum/test-title-format": {
       "count": 15
     }
   },
   "test/unit/engine/drafting/ExploreDraftAdmission.test.ts": {
-    "curly": {
-      "count": 4
-    },
     "revisum/test-title-format": {
       "count": 4
     }
@@ -1896,17 +1336,11 @@
     }
   },
   "test/unit/engine/drafting/PageMapEntry.test.ts": {
-    "curly": {
-      "count": 2
-    },
     "revisum/test-title-format": {
       "count": 15
     }
   },
   "test/unit/engine/drafting/SiteCrawl.test.ts": {
-    "curly": {
-      "count": 2
-    },
     "revisum/test-title-format": {
       "count": 18
     }
@@ -1914,9 +1348,6 @@
   "test/unit/engine/drafting/examples/CrawlOutcome.ts": {
     "@typescript-eslint/require-await": {
       "count": 4
-    },
-    "curly": {
-      "count": 7
     }
   },
   "test/unit/engine/evidence/EvidencePlanRunsUnchanged.test.ts": {
@@ -1928,25 +1359,16 @@
     "@typescript-eslint/naming-convention": {
       "count": 1
     },
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 25
     }
   },
   "test/unit/engine/evidence/EvidenceSuiteTrust.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 14
     }
   },
   "test/unit/engine/evidence/SuiteArguments.test.ts": {
-    "curly": {
-      "count": 5
-    },
     "revisum/test-title-format": {
       "count": 7
     }
@@ -1960,9 +1382,6 @@
     "@typescript-eslint/no-unsafe-return": {
       "count": 1
     },
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 13
     }
@@ -1971,17 +1390,11 @@
     "@typescript-eslint/naming-convention": {
       "count": 1
     },
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 13
     }
   },
   "test/unit/engine/evidence/examples/EvidenceRun.ts": {
-    "curly": {
-      "count": 3
-    },
     "no-restricted-syntax": {
       "count": 1
     }
@@ -2010,17 +1423,11 @@
     "@typescript-eslint/strict-boolean-expressions": {
       "count": 1
     },
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 6
     }
   },
   "test/unit/engine/plan/PlanDrafts.test.ts": {
-    "curly": {
-      "count": 11
-    },
     "revisum/test-title-format": {
       "count": 14
     }
@@ -2033,9 +1440,6 @@
   "test/unit/engine/plan/PositionsKeysAndText.test.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 3
-    },
-    "curly": {
-      "count": 1
     },
     "revisum/test-title-format": {
       "count": 26
@@ -2059,17 +1463,11 @@
     "@typescript-eslint/no-unused-vars": {
       "count": 1
     },
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 19
     }
   },
   "test/unit/engine/plan/ValueReferences.test.ts": {
-    "curly": {
-      "count": 2
-    },
     "revisum/test-title-format": {
       "count": 12
     }
@@ -2077,9 +1475,6 @@
   "test/unit/engine/plan/examples/GoldenPlan.ts": {
     "@typescript-eslint/no-unsafe-return": {
       "count": 1
-    },
-    "curly": {
-      "count": 5
     }
   },
   "test/unit/engine/plan/parse/PathTemplates.test.ts": {
@@ -2096,9 +1491,6 @@
     "@typescript-eslint/naming-convention": {
       "count": 1
     },
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 9
     }
@@ -2112,9 +1504,6 @@
     "@typescript-eslint/no-unsafe-assignment": {
       "count": 1
     },
-    "curly": {
-      "count": 8
-    },
     "no-irregular-whitespace": {
       "count": 1
     },
@@ -2123,25 +1512,16 @@
     }
   },
   "test/unit/engine/plan/readable/ReadablePlanErrors.test.ts": {
-    "curly": {
-      "count": 9
-    },
     "revisum/test-title-format": {
       "count": 31
     }
   },
   "test/unit/engine/plan/readable/ReadablePlanExample.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 5
     }
   },
   "test/unit/engine/plan/readable/ReadablePlanHash.test.ts": {
-    "curly": {
-      "count": 6
-    },
     "revisum/test-title-format": {
       "count": 5
     }
@@ -2152,9 +1532,6 @@
     }
   },
   "test/unit/engine/plan/readable/UnsafeReadableConversion.test.ts": {
-    "curly": {
-      "count": 11
-    },
     "no-irregular-whitespace": {
       "count": 1
     },
@@ -2163,9 +1540,6 @@
     }
   },
   "test/unit/engine/plan/readable/UnsafeReadableErrors.test.ts": {
-    "curly": {
-      "count": 3
-    },
     "revisum/test-title-format": {
       "count": 25
     }
@@ -2176,9 +1550,6 @@
     }
   },
   "test/unit/engine/plan/readable/UnsafeReadableTextForms.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 30
     }
@@ -2186,9 +1557,6 @@
   "test/unit/engine/plan/readable/examples/ParsePlan.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 6
-    },
-    "curly": {
-      "count": 34
     },
     "max-lines": {
       "count": 1
@@ -2207,9 +1575,6 @@
     "@typescript-eslint/no-unsafe-return": {
       "count": 1
     },
-    "curly": {
-      "count": 39
-    },
     "no-nested-ternary": {
       "count": 2
     },
@@ -2226,9 +1591,6 @@
     "@typescript-eslint/no-unsafe-return": {
       "count": 1
     },
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 7
     }
@@ -2239,9 +1601,6 @@
     },
     "@typescript-eslint/no-unsafe-assignment": {
       "count": 1
-    },
-    "curly": {
-      "count": 2
     },
     "revisum/test-title-format": {
       "count": 24
@@ -2276,25 +1635,16 @@
     }
   },
   "test/unit/engine/policy/PolicyDenialEvents.test.ts": {
-    "curly": {
-      "count": 2
-    },
     "revisum/test-title-format": {
       "count": 7
     }
   },
   "test/unit/engine/policy/PolicyDeterminism.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 5
     }
   },
   "test/unit/engine/policy/PolicyReviewFixes.test.ts": {
-    "curly": {
-      "count": 3
-    },
     "revisum/test-title-format": {
       "count": 13
     }
@@ -2309,17 +1659,9 @@
       "count": 28
     }
   },
-  "test/unit/engine/policy/examples/Policy.ts": {
-    "curly": {
-      "count": 7
-    }
-  },
   "test/unit/engine/policy/red-team/PolicyRedTeam.test.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
-    },
-    "curly": {
-      "count": 10
     },
     "revisum/test-title-format": {
       "count": 7
@@ -2382,25 +1724,16 @@
     }
   },
   "test/unit/engine/project/ServiceCallDeclarations.test.ts": {
-    "curly": {
-      "count": 3
-    },
     "revisum/test-title-format": {
       "count": 32
     }
   },
   "test/unit/engine/project/StubAndStorageDeclarations.test.ts": {
-    "curly": {
-      "count": 2
-    },
     "revisum/test-title-format": {
       "count": 35
     }
   },
   "test/unit/engine/project/TrustedProject.test.ts": {
-    "curly": {
-      "count": 3
-    },
     "revisum/test-title-format": {
       "count": 13
     }
@@ -2414,9 +1747,6 @@
     }
   },
   "test/unit/engine/project/WorkingCopyIsolation.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 7
     }
@@ -2447,9 +1777,6 @@
     "@typescript-eslint/naming-convention": {
       "count": 3
     },
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 11
     }
@@ -2460,9 +1787,6 @@
     }
   },
   "test/unit/engine/replay/ReplayedReplies.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 12
     }
@@ -2476,16 +1800,8 @@
     "@typescript-eslint/require-await": {
       "count": 1
     },
-    "curly": {
-      "count": 12
-    },
     "no-restricted-syntax": {
       "count": 1
-    }
-  },
-  "test/unit/engine/run/examples/GuardedDriver.ts": {
-    "curly": {
-      "count": 10
     }
   },
   "test/unit/engine/run/executors/clock-and-clipboard/ClockAdvanceLimits.test.ts": {
@@ -2504,9 +1820,6 @@
     }
   },
   "test/unit/engine/run/executors/database-commands/DatabaseCommandRuns.test.ts": {
-    "curly": {
-      "count": 2
-    },
     "revisum/test-title-format": {
       "count": 18
     }
@@ -2523,17 +1836,11 @@
     }
   },
   "test/unit/engine/run/executors/network-and-storage/StorageState.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 8
     }
   },
   "test/unit/engine/run/executors/network-and-storage/examples/Stubs.ts": {
-    "curly": {
-      "count": 1
-    },
     "no-restricted-syntax": {
       "count": 1
     }
@@ -2556,9 +1863,6 @@
     "@typescript-eslint/strict-boolean-expressions": {
       "count": 2
     },
-    "curly": {
-      "count": 7
-    },
     "revisum/test-title-format": {
       "count": 36
     }
@@ -2567,17 +1871,11 @@
     "@typescript-eslint/no-base-to-string": {
       "count": 1
     },
-    "curly": {
-      "count": 4
-    },
     "revisum/test-title-format": {
       "count": 21
     }
   },
   "test/unit/engine/run/executors/service-calls/examples/ShopService.ts": {
-    "curly": {
-      "count": 8
-    },
     "no-restricted-syntax": {
       "count": 1
     }
@@ -2588,9 +1886,6 @@
     }
   },
   "test/unit/engine/run/preflight/TargetRefusals.test.ts": {
-    "curly": {
-      "count": 3
-    },
     "revisum/test-title-format": {
       "count": 3
     }
@@ -2610,9 +1905,6 @@
     "@typescript-eslint/strict-boolean-expressions": {
       "count": 2
     },
-    "curly": {
-      "count": 10
-    },
     "revisum/test-title-format": {
       "count": 21
     }
@@ -2620,9 +1912,6 @@
   "test/unit/engine/run/values/examples/RunPlan.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
-    },
-    "curly": {
-      "count": 2
     },
     "no-restricted-syntax": {
       "count": 1
@@ -2640,17 +1929,11 @@
     "@typescript-eslint/restrict-template-expressions": {
       "count": 2
     },
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 5
     }
   },
   "test/unit/engine/secrets/SecretResolution.test.ts": {
-    "curly": {
-      "count": 2
-    },
     "revisum/test-title-format": {
       "count": 10
     }
@@ -2660,31 +1943,17 @@
       "count": 5
     }
   },
-  "test/unit/engine/secrets/examples/EchoPageDriver.ts": {
-    "curly": {
-      "count": 3
-    }
-  },
   "test/unit/engine/secrets/examples/SecretRun.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
-    },
-    "curly": {
-      "count": 9
     }
   },
   "test/unit/engine/secrets/leak-scanner/LeakScanner.test.ts": {
-    "curly": {
-      "count": 2
-    },
     "revisum/test-title-format": {
       "count": 6
     }
   },
   "test/unit/engine/secrets/literal-secrets/LiteralSecret.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 9
     }
@@ -2700,9 +1969,6 @@
     }
   },
   "test/unit/engine/target/TargetLock.test.ts": {
-    "curly": {
-      "count": 2
-    },
     "revisum/test-title-format": {
       "count": 23
     }
@@ -2713,9 +1979,6 @@
     }
   },
   "test/unit/engine/target/TestedOnWording.test.ts": {
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 20
     }
@@ -2723,11 +1986,6 @@
   "test/unit/engine/target/UnavailableTargetOutcome.test.ts": {
     "revisum/test-title-format": {
       "count": 5
-    }
-  },
-  "test/unit/engine/target/examples/TargetOf.ts": {
-    "curly": {
-      "count": 3
     }
   },
   "test/unit/report/model/ReportModel.test.ts": {
@@ -2743,17 +2001,11 @@
     "@typescript-eslint/no-unsafe-member-access": {
       "count": 16
     },
-    "curly": {
-      "count": 1
-    },
     "revisum/test-title-format": {
       "count": 8
     }
   },
   "test/unit/report/render/ReportGenerator.test.ts": {
-    "curly": {
-      "count": 24
-    },
     "max-lines": {
       "count": 1
     },
@@ -2813,9 +2065,6 @@
     }
   },
   "test/unit/runner/egress-proxy/rules/RefusedIpv6Forms.test.ts": {
-    "curly": {
-      "count": 2
-    },
     "revisum/test-title-format": {
       "count": 5
     }
@@ -2852,9 +2101,6 @@
     }
   },
   "test/unit/runner/egress/ResolvedAddressCheck.test.ts": {
-    "curly": {
-      "count": 4
-    },
     "revisum/test-title-format": {
       "count": 4
     }
@@ -2862,11 +2108,6 @@
   "test/unit/runner/examples/DeclaredService.ts": {
     "@typescript-eslint/require-await": {
       "count": 1
-    }
-  },
-  "test/unit/runner/examples/WorkloadRequest.ts": {
-    "curly": {
-      "count": 5
     }
   },
   "test/unit/runner/image/GitMountCheck.test.ts": {
@@ -2886,9 +2127,6 @@
     "@typescript-eslint/require-await": {
       "count": 1
     },
-    "curly": {
-      "count": 2
-    },
     "revisum/test-title-format": {
       "count": 23
     }
@@ -2897,16 +2135,8 @@
     "@typescript-eslint/require-await": {
       "count": 1
     },
-    "curly": {
-      "count": 11
-    },
     "revisum/test-title-format": {
       "count": 12
-    }
-  },
-  "test/unit/runner/support/EgressFixtureServer.ts": {
-    "curly": {
-      "count": 1
     }
   },
   "test/unit/runner/support/LocalService.ts": {
@@ -2918,70 +2148,32 @@
     },
     "@typescript-eslint/unbound-method": {
       "count": 1
-    },
-    "curly": {
-      "count": 1
     }
   },
   "test/unit/runner/workload/WorkloadRunner.test.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
     },
-    "curly": {
-      "count": 2
-    },
     "revisum/test-title-format": {
       "count": 13
-    }
-  },
-  "tools/browsers/ChromeForTestingBuild.ts": {
-    "curly": {
-      "count": 3
     }
   },
   "tools/metrics/GuaranteeMap.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
-    },
-    "curly": {
-      "count": 7
     }
   },
   "tools/metrics/ProjectMetrics.ts": {
     "@typescript-eslint/naming-convention": {
-      "count": 1
-    },
-    "curly": {
-      "count": 5
-    }
-  },
-  "tools/repo-rules/CheckLayout.ts": {
-    "curly": {
-      "count": 4
-    }
-  },
-  "tools/repo-rules/ListSourceFiles.ts": {
-    "curly": {
-      "count": 3
-    }
-  },
-  "tools/repo-rules/ReadSpecCriteria.ts": {
-    "curly": {
       "count": 1
     }
   },
   "tools/repo-rules/ReadWorkspacePackages.ts": {
     "@typescript-eslint/no-unsafe-assignment": {
       "count": 1
-    },
-    "curly": {
-      "count": 1
     }
   },
   "tools/repo-rules/ValidateAgainstSchema.ts": {
-    "curly": {
-      "count": 23
-    },
     "max-lines-per-function": {
       "count": 1
     },
@@ -2992,100 +2184,41 @@
   "tools/repo-rules/code/CheckApprovalStrength.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 4
-    },
-    "curly": {
-      "count": 27
-    }
-  },
-  "tools/repo-rules/code/CheckBrandedCasts.ts": {
-    "curly": {
-      "count": 8
-    }
-  },
-  "tools/repo-rules/code/CheckImports.ts": {
-    "curly": {
-      "count": 3
     }
   },
   "tools/repo-rules/code/CheckPersonGates.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 2
-    },
-    "curly": {
-      "count": 3
-    }
-  },
-  "tools/repo-rules/code/CheckRuntimeImports.ts": {
-    "curly": {
-      "count": 3
     }
   },
   "tools/repo-rules/code/CheckSecretReveal.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
-    },
-    "curly": {
-      "count": 16
     }
   },
   "tools/repo-rules/commits/CheckDenyRules.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
-    },
-    "curly": {
-      "count": 3
-    }
-  },
-  "tools/repo-rules/commits/CheckTestsApart.ts": {
-    "curly": {
-      "count": 2
     }
   },
   "tools/repo-rules/commits/CommitTrailers.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
-    },
-    "curly": {
-      "count": 14
-    }
-  },
-  "tools/repo-rules/docs/CheckDependencyReviews.ts": {
-    "curly": {
-      "count": 11
-    }
-  },
-  "tools/repo-rules/docs/CheckErrorAnchors.ts": {
-    "curly": {
-      "count": 9
     }
   },
   "tools/repo-rules/docs/CheckGlossary.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 2
-    },
-    "curly": {
-      "count": 40
     }
   },
   "tools/repo-rules/docs/CheckLicences.ts": {
     "@typescript-eslint/no-base-to-string": {
       "count": 1
-    },
-    "curly": {
-      "count": 15
-    }
-  },
-  "tools/repo-rules/docs/CheckPlanSchema.ts": {
-    "curly": {
-      "count": 7
     }
   },
   "tools/repo-rules/naming/LintRepository.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 8
-    },
-    "curly": {
-      "count": 53
     },
     "max-lines": {
       "count": 1
@@ -3097,44 +2230,24 @@
   "tools/scheduled/BenchmarkRuns.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
-    },
-    "curly": {
-      "count": 26
     }
   },
   "tools/scheduled/SummariseUpkeep.ts": {
     "@typescript-eslint/naming-convention": {
       "count": 1
-    },
-    "curly": {
-      "count": 12
     }
   },
   "tools/test-runner/LoadEngineFunction.ts": {
     "@typescript-eslint/no-unsafe-return": {
-      "count": 1
-    },
-    "curly": {
       "count": 1
     }
   },
   "tools/test-runner/ReadTestResults.ts": {
     "@typescript-eslint/strict-boolean-expressions": {
       "count": 1
-    },
-    "curly": {
-      "count": 6
-    }
-  },
-  "tools/test-runner/RunTestFolder.ts": {
-    "curly": {
-      "count": 11
     }
   },
   "tools/test-runner/TestResultLine.ts": {
-    "curly": {
-      "count": 2
-    },
     "no-restricted-syntax": {
       "count": 1
     }

@@ -112,11 +112,11 @@ const RECORDED_REPLIES_INPUT = 'recorded-replies';
 // The manifest a replay may run, or why none may: a replay of it could never be claimed identical.
 // The replay itself, which runs the manifest again and compares result hashes, is replay().
 export function replayManifest(manifest: RunManifest): Result<PlanRunManifest, { readonly code: typeof ReplayErrorCode.ReplayNotClaimed }> {
-  if (isEvidenceManifest(manifest)) return failure({ code: ReplayErrorCode.ReplayNotClaimed });
+  if (isEvidenceManifest(manifest)) {return failure({ code: ReplayErrorCode.ReplayNotClaimed });}
   const unpinned = manifest.nonHermeticInputs;
-  if (unpinned.some((input) => DETERMINISM_INPUTS.includes(input))) return failure({ code: ReplayErrorCode.ReplayNotClaimed });
+  if (unpinned.some((input) => DETERMINISM_INPUTS.includes(input))) {return failure({ code: ReplayErrorCode.ReplayNotClaimed });}
   const needsReplies = unpinned.includes(SERVICE_CALLS_INPUT) || unpinned.includes(DATABASE_COMMANDS_INPUT);
-  if (needsReplies && !unpinned.includes(RECORDED_REPLIES_INPUT)) return failure({ code: ReplayErrorCode.ReplayNotClaimed });
+  if (needsReplies && !unpinned.includes(RECORDED_REPLIES_INPUT)) {return failure({ code: ReplayErrorCode.ReplayNotClaimed });}
   return success(manifest);
 }
 
@@ -132,11 +132,11 @@ export const DATABASE_COMMANDS_INPUT = 'database-commands';
 // the plan names, with its sha256. Undefined for a closed plan.
 export function unsafeFeatureRecord(plan: Plan, project: Project, scripts: NamedScripts): UnsafeFeatureRecord | undefined {
   const unsafeFeatures = unsafeFeaturesOf(plan);
-  if (unsafeFeatures.length === 0) return undefined;
+  if (unsafeFeatures.length === 0) {return undefined;}
   const named = declarationsNamedBy(plan);
   const commands = Object.entries(declaredCommands(project.unsafeFeatures)).filter(([name]) => named.commands.some((used) => used === name));
   const records = [...scripts.values()].map(({ name, source }): UnsafeDeclarationRecord => ({ kind: 'script', name, sha256: sha256(source) }));
-  for (const [name, declaration] of commands) records.push({ kind: 'command', name, sha256: sha256(canonicalJson(declaration)) });
+  for (const [name, declaration] of commands) {records.push({ kind: 'command', name, sha256: sha256(canonicalJson(declaration)) });}
   const order = (record: UnsafeDeclarationRecord): string => `${record.kind}:${record.name}`;
   return { unsafeFeatures, unsafeDeclarations: records.sort((left, right) => (order(left) < order(right) ? -1 : 1)) };
 }

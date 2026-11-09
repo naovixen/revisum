@@ -47,7 +47,7 @@ function suitePolicy(project: Project): EgressPolicy {
   const allowOrigins = project.origins.filter((origin) => !project.productionOrigins.includes(origin));
   const built = buildEgressPolicy({ allowOrigins, allowServices: [] });
   // With no response rewrites the builder has nothing to refuse.
-  if (!built.ok) throw new Error('the suite egress policy was refused');
+  if (!built.ok) {throw new Error('the suite egress policy was refused');}
   return built.value;
 }
 
@@ -64,19 +64,19 @@ function suiteFiles(checkout: string, suite: EvidenceSuiteDeclaration): readonly
   const found = new Map<string, SuiteFile>();
   const visit = (relative: string): void => {
     const absolute = join(checkout, relative);
-    if (!existsSync(absolute)) return;
+    if (!existsSync(absolute)) {return;}
     const entry = lstatSync(absolute);
-    if (entry.isSymbolicLink()) return;
+    if (entry.isSymbolicLink()) {return;}
     if (entry.isFile()) {
-      if (isSuiteFile(suite, relative) && !found.has(relative)) found.set(relative, { path: relative, bytes: new Uint8Array(readFileSync(absolute)) });
+      if (isSuiteFile(suite, relative) && !found.has(relative)) {found.set(relative, { path: relative, bytes: new Uint8Array(readFileSync(absolute)) });}
       return;
     }
-    if (!entry.isDirectory()) return;
+    if (!entry.isDirectory()) {return;}
     for (const name of readdirSync(absolute)) {
-      if (name !== '.git') visit(relative === '' ? name : posix.join(relative, name));
+      if (name !== '.git') {visit(relative === '' ? name : posix.join(relative, name));}
     }
   };
-  for (const glob of suite.paths) visit(globFolder(glob));
+  for (const glob of suite.paths) {visit(globFolder(glob));}
   return [...found.values()];
 }
 
@@ -233,12 +233,12 @@ const refusalFor = (code: WorkloadErrorCode) => ({ code });
 
 export async function runSuite(project: Project, suiteName: string, ports: SuiteRunPorts): Promise<RunResult> {
   const chosen = declaredSuite(project, suiteName);
-  if (!chosen.ok) return refusedSuiteResult(suiteName, chosen.error);
+  if (!chosen.ok) {return refusedSuiteResult(suiteName, chosen.error);}
   const suite = chosen.value;
   const limits = project.evidenceMode?.limits;
-  if (limits === undefined) return refusedSuiteResult(suiteName, { code: RefusalCode.EvidenceModeDisabled });
+  if (limits === undefined) {return refusedSuiteResult(suiteName, { code: RefusalCode.EvidenceModeDisabled });}
   const environment = suiteEnvironment(suite, ports.secrets);
-  if (!environment.ok) return refusedSuiteResult(suiteName, { code: RefusalCode.SecretMissing, secretName: environment.error });
+  if (!environment.ok) {return refusedSuiteResult(suiteName, { code: RefusalCode.SecretMissing, secretName: environment.error });}
 
   // The suite files are pinned before anything runs, so the manifest says what was run.
   const files = suiteFiles(ports.checkout, suite);
@@ -266,7 +266,7 @@ export async function runSuite(project: Project, suiteName: string, ports: Suite
 
   if (suite.setupCommand !== undefined) {
     const setup = await ports.workload.run(request(suite.setupCommand, environment.value.variables));
-    if (!setup.ok) return refusedSuiteResult(suiteName, refusalFor(setup.error));
+    if (!setup.ok) {return refusedSuiteResult(suiteName, refusalFor(setup.error));}
     if (setup.value.kind === WorkloadOutcomeKind.TimedOut || setup.value.exitCode !== 0) {
       // The suite never ran, but its setup ran behind the egress proxy, so its result says what the
       // proxy refused, or that the proxy's record could not be read.
@@ -289,7 +289,7 @@ export async function runSuite(project: Project, suiteName: string, ports: Suite
   ];
   // The project parser refuses a declared variable of a name Revisum sets, such as the report's.
   const ran = await ports.workload.run(request(built.argv, variables));
-  if (!ran.ok) return refusedSuiteResult(suiteName, refusalFor(ran.error));
+  if (!ran.ok) {return refusedSuiteResult(suiteName, refusalFor(ran.error));}
   const exitCode = exitCodeOf(ran.value);
   const timedOut = ran.value.kind === WorkloadOutcomeKind.TimedOut;
   const egress = egressOf(ran.value);

@@ -47,8 +47,8 @@ export function deriveView(report: ReportInput): ReportView {
     const pageLevel: NumberedFinding[] = [];
     for (const entry of onImage) {
       const box = usableBox(entry.finding.image?.box ?? null, image.width, image.height);
-      if (box === null) pageLevel.push(entry);
-      else callouts.push({ number: entry.number, finding: entry.finding, box });
+      if (box === null) {pageLevel.push(entry);}
+      else {callouts.push({ number: entry.number, finding: entry.finding, box });}
     }
     return { imageId: image.id, callouts, pageLevel };
   });

@@ -20,9 +20,9 @@ const cacheFolder = join(repositoryRoot, '.browsers');
 // Chrome for Testing itself, or its headless shell: the same build without a window system.
 async function installChromeForTesting(browser: Browser.CHROME | Browser.CHROMEHEADLESSSHELL): Promise<string> {
   const platform = detectBrowserPlatform();
-  if (platform === undefined) throw new Error('Chrome for Testing has no build for this operating system');
+  if (platform === undefined) {throw new Error('Chrome for Testing has no build for this operating system');}
   const executablePath = computeExecutablePath({ browser, buildId: CHROME_FOR_TESTING_BUILD, cacheDir: cacheFolder, platform });
-  if (existsSync(executablePath)) return executablePath;
+  if (existsSync(executablePath)) {return executablePath;}
   const installed = await install({ browser, buildId: CHROME_FOR_TESTING_BUILD, cacheDir: cacheFolder, platform });
   return installed.executablePath;
 }
@@ -35,4 +35,4 @@ async function main(): Promise<number> {
   return 0;
 }
 
-if (import.meta.main) process.exitCode = await main();
+if (import.meta.main) {process.exitCode = await main();}

@@ -39,38 +39,38 @@ const isMeasure = (value: unknown): value is number => typeof value === 'number'
 
 // Decodes a samples file. Every fault is named by its run and field; nothing is guessed or dropped.
 export function decodeSamples(input: unknown): Decoded<Samples> {
-  if (!isRecord(input)) return { ok: false, faults: ['the samples must be a JSON object with platform and runs'] };
+  if (!isRecord(input)) {return { ok: false, faults: ['the samples must be a JSON object with platform and runs'] };}
   const faults: string[] = [];
-  for (const key of Object.keys(input)) if (key !== 'platform' && key !== 'runs') faults.push(`unknown field ${key}`);
+  for (const key of Object.keys(input)) {if (key !== 'platform' && key !== 'runs') {faults.push(`unknown field ${key}`);}}
   const platformName = input['platform'];
-  if (typeof platformName !== 'string' || platformName === '') faults.push('platform is missing or not text');
+  if (typeof platformName !== 'string' || platformName === '') {faults.push('platform is missing or not text');}
   const runs = input['runs'];
-  if (!Array.isArray(runs)) return { ok: false, faults: [...faults, 'runs is missing or not a list'] };
+  if (!Array.isArray(runs)) {return { ok: false, faults: [...faults, 'runs is missing or not a list'] };}
   const decoded: Sample[] = [];
   runs.forEach((run: unknown, index) => {
     const where = `run ${index + 1}`;
     if (!isRecord(run)) { faults.push(`${where} is not an object`); return; }
-    for (const key of Object.keys(run)) if (key !== 'setupMilliseconds' && key !== 'peakMemoryMegabytes') faults.push(`${where}: unknown field ${key}`);
+    for (const key of Object.keys(run)) {if (key !== 'setupMilliseconds' && key !== 'peakMemoryMegabytes') {faults.push(`${where}: unknown field ${key}`);}}
     const { setupMilliseconds, peakMemoryMegabytes } = run;
-    if (!isMeasure(setupMilliseconds)) faults.push(`${where}: setupMilliseconds is missing or not a number of at least 0`);
-    if (!isMeasure(peakMemoryMegabytes)) faults.push(`${where}: peakMemoryMegabytes is missing or not a number of at least 0`);
-    if (isMeasure(setupMilliseconds) && isMeasure(peakMemoryMegabytes)) decoded.push({ setupMilliseconds, peakMemoryMegabytes });
+    if (!isMeasure(setupMilliseconds)) {faults.push(`${where}: setupMilliseconds is missing or not a number of at least 0`);}
+    if (!isMeasure(peakMemoryMegabytes)) {faults.push(`${where}: peakMemoryMegabytes is missing or not a number of at least 0`);}
+    if (isMeasure(setupMilliseconds) && isMeasure(peakMemoryMegabytes)) {decoded.push({ setupMilliseconds, peakMemoryMegabytes });}
   });
-  if (faults.length > 0 || typeof platformName !== 'string') return { ok: false, faults };
+  if (faults.length > 0 || typeof platformName !== 'string') {return { ok: false, faults };}
   return { ok: true, value: { platform: platformName, runs: decoded } };
 }
 
 // Decodes the baseline file's entry for one platform; null when the file has none for it.
 export function decodeBaseline(input: unknown, platformName: string): Decoded<Baseline | null> {
-  if (!isRecord(input)) return { ok: false, faults: ['the baseline must be a JSON object keyed by platform'] };
+  if (!isRecord(input)) {return { ok: false, faults: ['the baseline must be a JSON object keyed by platform'] };}
   const entry = input[platformName];
-  if (entry === undefined) return { ok: true, value: null };
-  if (!isRecord(entry)) return { ok: false, faults: [`the ${platformName} baseline is not an object`] };
+  if (entry === undefined) {return { ok: true, value: null };}
+  if (!isRecord(entry)) {return { ok: false, faults: [`the ${platformName} baseline is not an object`] };}
   const { setupMedianMilliseconds, peakMemoryMegabytes } = entry;
   const faults: string[] = [];
-  if (!isMeasure(setupMedianMilliseconds) || setupMedianMilliseconds === 0) faults.push(`${platformName}: setupMedianMilliseconds is not a positive number`);
-  if (!isMeasure(peakMemoryMegabytes) || peakMemoryMegabytes === 0) faults.push(`${platformName}: peakMemoryMegabytes is not a positive number`);
-  if (!isMeasure(setupMedianMilliseconds) || !isMeasure(peakMemoryMegabytes) || faults.length > 0) return { ok: false, faults };
+  if (!isMeasure(setupMedianMilliseconds) || setupMedianMilliseconds === 0) {faults.push(`${platformName}: setupMedianMilliseconds is not a positive number`);}
+  if (!isMeasure(peakMemoryMegabytes) || peakMemoryMegabytes === 0) {faults.push(`${platformName}: peakMemoryMegabytes is not a positive number`);}
+  if (!isMeasure(setupMedianMilliseconds) || !isMeasure(peakMemoryMegabytes) || faults.length > 0) {return { ok: false, faults };}
   return { ok: true, value: { setupMedianMilliseconds, peakMemoryMegabytes } };
 }
 
@@ -100,9 +100,9 @@ export function compare(samples: Samples, baseline: Baseline | null): Report {
   const recorded = (why: string): Report => ({
     lines: [...measured, why], alarms: [], summary: [`Benchmark on ${samples.platform}: setup time median ${shown(setup)} ms, peak memory median ${shown(memory)} MB. ${why}`],
   });
-  if (samples.platform !== COMPARED_PLATFORM) return recorded(`Recorded with no comparison: only ${COMPARED_PLATFORM} is compared.`);
-  if (samples.runs.length !== BENCHMARK_RUNS) return recorded(`Not compared: a comparison needs exactly ${BENCHMARK_RUNS} runs, and there are ${samples.runs.length}.`);
-  if (baseline === null) return recorded(`Recorded with no comparison: the baseline file has no ${COMPARED_PLATFORM} entry.`);
+  if (samples.platform !== COMPARED_PLATFORM) {return recorded(`Recorded with no comparison: only ${COMPARED_PLATFORM} is compared.`);}
+  if (samples.runs.length !== BENCHMARK_RUNS) {return recorded(`Not compared: a comparison needs exactly ${BENCHMARK_RUNS} runs, and there are ${samples.runs.length}.`);}
+  if (baseline === null) {return recorded(`Recorded with no comparison: the baseline file has no ${COMPARED_PLATFORM} entry.`);}
   const measures = [
     { name: 'setup time', value: setup, baseline: baseline.setupMedianMilliseconds, unit: 'ms' },
     { name: 'peak memory', value: memory, baseline: baseline.peakMemoryMegabytes, unit: 'MB' },
@@ -140,7 +140,7 @@ function readJson(path: string): Decoded<unknown> {
 // The headless shell's executable, as tools/browsers/ChromeForTestingBuild.ts installs it; CHROME_HEADLESS_SHELL_PATH overrides it.
 async function headlessShellPath(root: string): Promise<string> {
   const override = process.env['CHROME_HEADLESS_SHELL_PATH'];
-  if (override !== undefined) return override;
+  if (override !== undefined) {return override;}
   const { CHROME_FOR_TESTING_BUILD } = await import('../browsers/ChromeForTestingBuild.ts');
   const cache = join(root, '.browsers', 'chrome-headless-shell');
   return platform() === 'win32'
@@ -153,7 +153,7 @@ async function headlessShellPath(root: string): Promise<string> {
 async function measuredSamples(root: string): Promise<unknown> {
   const cli: unknown = await import(pathToFileURL(join(root, 'packages', 'cli', 'src', 'index.ts')).href);
   const benchmarkRuns: unknown = isRecord(cli) ? cli['benchmarkRuns'] : undefined;
-  if (typeof benchmarkRuns !== 'function') throw new Error('@revisum/cli does not export benchmarkRuns');
+  if (typeof benchmarkRuns !== 'function') {throw new Error('@revisum/cli does not export benchmarkRuns');}
   return Reflect.apply(benchmarkRuns, undefined, [{ repositoryRoot: root, executablePath: await headlessShellPath(root), runs: BENCHMARK_RUNS }]);
 }
 
@@ -177,7 +177,7 @@ async function main(words: readonly string[]): Promise<void> {
   const samples = decodeSamples(input);
   if (!samples.ok) {
     say('The samples do not decode, so nothing was compared:');
-    for (const fault of samples.faults) say(`  ${fault}`);
+    for (const fault of samples.faults) {say(`  ${fault}`);}
     return;
   }
   const baselinePath = optionValue(words, '--baseline') ?? join(root, BASELINE_FILE);
@@ -185,12 +185,12 @@ async function main(words: readonly string[]): Promise<void> {
   const baseline = baselineJson.ok ? decodeBaseline(baselineJson.value, samples.value.platform) : baselineJson;
   if (!baseline.ok) {
     say(`The baseline ${baselinePath} does not decode, so nothing was compared:`);
-    for (const fault of baseline.faults) say(`  ${fault}`);
+    for (const fault of baseline.faults) {say(`  ${fault}`);}
   }
   const report = compare(samples.value, baseline.ok ? baseline.value : null);
-  for (const line of [...report.lines, ...report.alarms]) say(line);
+  for (const line of [...report.lines, ...report.alarms]) {say(line);}
   const summaryFile = process.env['GITHUB_STEP_SUMMARY'];
-  if (summaryFile !== undefined && summaryFile !== '') appendFileSync(summaryFile, `${report.summary.join('\n')}\n`);
+  if (summaryFile !== undefined && summaryFile !== '') {appendFileSync(summaryFile, `${report.summary.join('\n')}\n`);}
 }
 
 if (import.meta.main) {

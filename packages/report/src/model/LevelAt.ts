@@ -46,15 +46,15 @@ function holds(level: 1 | 2 | 3 | 4, metrics: PeriodMetrics): boolean {
 export function levelAt(history: History, index: number): Level {
   const periods = history.periods;
   const period = periods[index];
-  if (period === undefined) return 0;
+  if (period === undefined) {return 0;}
   const metrics = metricsFor(period);
   const lastPeriods = (count: number): readonly HistoryPeriod[] => periods.slice(Math.max(0, index - count + 1), index + 1);
-  if (!holds(1, metrics)) return 0;
-  if (!holds(2, metrics)) return 1;
-  if (!holds(3, metrics)) return 2;
+  if (!holds(1, metrics)) {return 0;}
+  if (!holds(2, metrics)) {return 1;}
+  if (!holds(3, metrics)) {return 2;}
   const noEscapes = (window: readonly HistoryPeriod[], severities: readonly Severity[]): boolean =>
     window.every((entry) => severities.every((severity) => entry.escaped[severity] === 0));
-  if (!holds(4, metrics) || !noEscapes(lastPeriods(4), ['P1', 'P2'])) return 3;
+  if (!holds(4, metrics) || !noEscapes(lastPeriods(4), ['P1', 'P2'])) {return 3;}
   const lastEight = lastPeriods(8);
   const levelFive = lastEight.length === 8
     && lastEight.every((entry) => { const entryMetrics = metricsFor(entry); return holds(4, entryMetrics) && atLeast(entryMetrics.verifiedWithoutReviewShare, 0.95); })

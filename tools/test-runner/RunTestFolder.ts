@@ -109,8 +109,8 @@ function checkEveryFileHasResults(folders: readonly string[]): number {
 // Whether the file imports the browser module, following its imports of other test files.
 function drivesBrowser(file: string, seen = new Set<string>()): boolean {
   const path = resolve(file);
-  if (path === BROWSER_MODULE) return true;
-  if (seen.has(path) || !existsSync(path)) return false;
+  if (path === BROWSER_MODULE) {return true;}
+  if (seen.has(path) || !existsSync(path)) {return false;}
   seen.add(path);
   const source = readFileSync(path, 'utf8');
   for (const match of source.matchAll(TEST_IMPORT)) {
@@ -121,7 +121,7 @@ function drivesBrowser(file: string, seen = new Set<string>()): boolean {
     const importedPath = imported.startsWith(TEST_SUPPORT_PREFIX)
       ? resolve('test/support', imported.slice(TEST_SUPPORT_PREFIX.length))
       : join(dirname(path), imported);
-    if (drivesBrowser(importedPath, seen)) return true;
+    if (drivesBrowser(importedPath, seen)) {return true;}
   }
   return false;
 }
@@ -130,7 +130,7 @@ type Attempt = { readonly status: number; readonly lines: readonly string[] };
 
 // Runs the files once, printing the usual report and collecting the result lines.
 function runTests(files: readonly string[], concurrency: number | null, scratchFolder: string): Attempt {
-  if (files.length === 0) return { status: 0, lines: [] };
+  if (files.length === 0) {return { status: 0, lines: [] };}
   const destination = mkdtempSync(join(scratchFolder, 'attempt-'));
   const resultsPath = join(destination, 'results.jsonl');
   const limit = concurrency === null ? [] : [`--test-concurrency=${concurrency}`];
@@ -152,18 +152,18 @@ function failedFiles(lines: readonly string[]): Set<string> {
   for (const line of lines) {
     const value: unknown = JSON.parse(line);
     const file = fieldOf(value, 'file');
-    if (typeof file === 'string' && fieldOf(value, 'passed') === false && fieldOf(value, 'skipped') === false) files.add(file);
+    if (typeof file === 'string' && fieldOf(value, 'passed') === false && fieldOf(value, 'skipped') === false) {files.add(file);}
   }
   return files;
 }
 
 function findTestFiles(folder: string): string[] {
-  if (!existsSync(folder)) return [];
+  if (!existsSync(folder)) {return [];}
   const files: string[] = [];
   for (const entry of readdirSync(folder, { withFileTypes: true })) {
     const path = join(folder, entry.name);
-    if (entry.isDirectory()) files.push(...findTestFiles(path));
-    else if (/\.test\.(ts|mts|js|mjs)$/.test(entry.name)) files.push(path);
+    if (entry.isDirectory()) {files.push(...findTestFiles(path));}
+    else if (/\.test\.(ts|mts|js|mjs)$/.test(entry.name)) {files.push(path);}
   }
   return files.sort();
 }
@@ -181,7 +181,7 @@ function main(request: RunRequest): number {
   const files: string[] = [];
   for (const folder of folders) {
     const found = findTestFiles(folder);
-    if (found.length === 0) console.log(`no tests in ${folder} yet`);
+    if (found.length === 0) {console.log(`no tests in ${folder} yet`);}
     files.push(...found);
   }
   mkdirSync(RESULTS_FOLDER, { recursive: true });
@@ -227,7 +227,7 @@ function main(request: RunRequest): number {
     }
     const rerunLines = reruns.map((rerun) => JSON.stringify(rerun));
     writeFileSync(resultsFile, [...lines, ...rerunLines].map((line) => `${line}\n`).join(''));
-    if (reruns.some((rerun) => rerun.passed)) console.log('flaky: a failed file passed when run again; the run still fails');
+    if (reruns.some((rerun) => rerun.passed)) {console.log('flaky: a failed file passed when run again; the run still fails');}
     return other.status !== 0 ? other.status : browser.status;
   } finally {
     rmSync(scratchFolder, { recursive: true, force: true });
@@ -243,4 +243,4 @@ function start(words: readonly string[]): number {
   return request.shouldCheckResults ? checkEveryFileHasResults(request.folders) : main(request);
 }
 
-if (import.meta.main) process.exitCode = start(process.argv.slice(2));
+if (import.meta.main) {process.exitCode = start(process.argv.slice(2));}

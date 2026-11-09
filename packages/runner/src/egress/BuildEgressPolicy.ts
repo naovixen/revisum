@@ -24,11 +24,11 @@ export function buildEgressPolicy(input: EgressPolicyInput): Result<EgressPolicy
   const fixtureOrigins = input.fixtureOrigins ?? [];
   const rewrites = input.responseRewrites ?? [];
   for (const fixture of fixtureOrigins) {
-    if (!input.allowOrigins.includes(fixture)) return failure({ code: 'fixture-origin-undeclared', origin: fixture });
-    if (!isPlainHttpOrigin(fixture)) return failure({ code: 'fixture-origin-not-plain-http', origin: fixture });
+    if (!input.allowOrigins.includes(fixture)) {return failure({ code: 'fixture-origin-undeclared', origin: fixture });}
+    if (!isPlainHttpOrigin(fixture)) {return failure({ code: 'fixture-origin-not-plain-http', origin: fixture });}
   }
   const outside = rewrites.find((entry) => !fixtureOrigins.includes(entry.origin));
-  if (outside !== undefined) return failure({ code: 'rewrite-origin-not-fixture', origin: outside.origin });
+  if (outside !== undefined) {return failure({ code: 'rewrite-origin-not-fixture', origin: outside.origin });}
   return success({
     allowOrigins: [...input.allowOrigins],
     allowServices: [...input.allowServices],

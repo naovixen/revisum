@@ -79,7 +79,7 @@ function afterMark(line: string, indent: number): number | undefined {
 // for a step that runs no inline script.
 function inlineScriptOf(step: Fields): Fields | undefined {
   const script = step[SCRIPT_FIELD];
-  if (!isRecord(script) || !isRecord(script[INLINE_FIELD])) return undefined;
+  if (!isRecord(script) || !isRecord(script[INLINE_FIELD])) {return undefined;}
   const inline: Fields = { ...script[INLINE_FIELD] };
   step[SCRIPT_FIELD] = { ...script, [INLINE_FIELD]: inline };
   return inline;
@@ -92,7 +92,7 @@ const INLINE_STATEMENT_START = /^\s*(run|expect)\s+inline\b/i;
 // Reads readable text into plain JSON for the plan parser. Pure: it never builds a Plan.
 export function readPlanText(text: string, limits: PlanLimits): Result<TextReading, readonly DraftError[]> {
   // Text larger than any plan may be is refused whole, before any line is read.
-  if (new TextEncoder().encode(text).length > limits.maximumPlanBytes) return failure([{ stage: ClipboardRead.Text, code: TextErrorCode.TooLarge, position: LINE_START }]);
+  if (new TextEncoder().encode(text).length > limits.maximumPlanBytes) {return failure([{ stage: ClipboardRead.Text, code: TextErrorCode.TooLarge, position: LINE_START }]);}
 
   const errors: DraftError[] = [];
   const warnings: TextWarning[] = [];
@@ -125,7 +125,7 @@ export function readPlanText(text: string, limits: PlanLimits): Result<TextReadi
     let holder = headerFields;
     path.forEach((key, depth) => {
       const jsonPath = `$.${path.slice(0, depth + 1).join('.')}`;
-      if (!positions.has(jsonPath)) positions.set(jsonPath, at(line));
+      if (!positions.has(jsonPath)) {positions.set(jsonPath, at(line));}
       if (depth === path.length - 1) { holder[key] = value; return; }
       const inner = holder[key];
       const next: Fields = isRecord(inner) ? { ...inner } : {};
@@ -135,7 +135,7 @@ export function readPlanText(text: string, limits: PlanLimits): Result<TextReadi
   }
 
   // Only a step line may carry the Unsafe: mark; any other line that reads with one is refused.
-  const refuseMark = (marked: boolean, number: number): void => { if (marked) refuse('unneeded-unsafe-mark', number, 1); };
+  const refuseMark = (marked: boolean, number: number): void => { if (marked) {refuse('unneeded-unsafe-mark', number, 1);} };
 
   // A Criterion: line, or a step, into `target`. True when it was a step. A step line's mark must
   // match what its statement holds, as needsUnsafeMark decides from the words read.
@@ -151,20 +151,20 @@ export function readPlanText(text: string, limits: PlanLimits): Result<TextReadi
     const blockLine = line.endsWith(':') ? line.slice(0, -1).replace(/ +$/, '') : undefined;
     for (const { type, syntax, opens } of STEP_STATEMENTS) {
       const statementText = opens === undefined ? line : blockLine;
-      if (statementText === undefined) continue;
+      if (statementText === undefined) {continue;}
       const reading = syntax.read(statementText, indent);
       if (!reading.ok) { found = better(found, reading.failure); continue; }
       const step: Fields = isRecord(reading.value) ? { ...reading.value } : {};
       const needed = needsUnsafeMark(step);
-      if (needed && !marked) refuse('missing-unsafe-mark', number, 1);
-      if (!needed && marked) refuse('unneeded-unsafe-mark', number, 1);
+      if (needed && !marked) {refuse('missing-unsafe-mark', number, 1);}
+      if (!needed && marked) {refuse('unneeded-unsafe-mark', number, 1);}
       const stepPath = `${path}[${target.length}]`;
       positions.set(stepPath, at(number));
       // With an Origin: header, a path in Go to or In new tab at is resolved against it.
       const url = step['url'];
-      if (origin !== undefined && typeof url === 'string' && url.startsWith('/')) step['url'] = `${origin.replace(/\/+$/, '')}${url}`;
+      if (origin !== undefined && typeof url === 'string' && url.startsWith('/')) {step['url'] = `${origin.replace(/\/+$/, '')}${url}`;}
       if (isAssertionStepType(type)) {
-        if (criterion === undefined) refuse('no-criterion', number, 1);
+        if (criterion === undefined) {refuse('no-criterion', number, 1);}
         else { step[CRITERION_FIELD] = criterion.id; positions.set(`${stepPath}.${CRITERION_FIELD}`, criterion.position); }
       }
       if (opens === StatementBlock.Steps) {
@@ -196,16 +196,16 @@ export function readPlanText(text: string, limits: PlanLimits): Result<TextReadi
       const reading = header.line.read(line, indent);
       if (!reading.ok) { found = better(found, reading.failure); continue; }
       refuseMark(marked, number);
-      if (!placeHeader(header.name, number)) return;
+      if (!placeHeader(header.name, number)) {return;}
       const value = isRecord(reading.value) ? reading.value['value'] : undefined;
-      if (header.path !== null) setHeaderField(header.path, value, number);
-      else origin = typeof value === 'string' ? value : undefined;
+      if (header.path !== null) {setHeaderField(header.path, value, number);}
+      else {origin = typeof value === 'string' ? value : undefined;}
       return;
     }
     const valuesLine = VALUES_LINE.read(line, indent);
     if (valuesLine.ok) {
       refuseMark(marked, number);
-      if (!placeHeader('Values:', number)) return;
+      if (!placeHeader('Values:', number)) {return;}
       values = newMap();
       positions.set('$.values', at(number));
       blocks.push({ kind: 'values', values });
@@ -222,7 +222,7 @@ export function readPlanText(text: string, limits: PlanLimits): Result<TextReadi
     }
     if (phase === 'cleanup') { refuse('unknown-statement', number, 1); return; }
     found = better(found, better(valuesLine.failure, cleanupLine.ok ? undefined : cleanupLine.failure));
-    if (readStepLine(steps, '$.steps', line, indent, number, marked, found)) phase = 'steps';
+    if (readStepLine(steps, '$.steps', line, indent, number, marked, found)) {phase = 'steps';}
   }
 
   // One script line of a source block: quoted text and nothing else, a mark included. Anything
@@ -231,7 +231,7 @@ export function readPlanText(text: string, limits: PlanLimits): Result<TextReadi
     const reading = SCRIPT_LINE.read(line, indent);
     if (!reading.ok) { refuse('bad-string', number, reading.failure.code === TextErrorCode.BadString ? reading.failure.column : indent + 1); return; }
     if (reading.next < line.length) { refuse('bad-string', number, reading.next + 1); return; }
-    if (block.lines.length === 0) positions.set(block.path, at(number));
+    if (block.lines.length === 0) {positions.set(block.path, at(number));}
     block.lines.push(typeof reading.value === 'string' ? reading.value : '');
     block.inline[SOURCE_FIELD] = block.lines.join(SCRIPT_LINE_BREAK);
   }
@@ -251,7 +251,7 @@ export function readPlanText(text: string, limits: PlanLimits): Result<TextReadi
   const lines = text.replace(/^﻿/, '').split('\n').map((line) => line.replace(/\r$/, '').replace(/ +$/, ''));
   lines.forEach((line, index) => {
     const number = index + 1;
-    if (line.trim() === '') return;
+    if (line.trim() === '') {return;}
     if (/^\s*#/.test(line)) { warnings.push({ code: 'comment-dropped', position: at(number) }); return; }
     const indent = skipSpaces(line, 0);
     const depth = indent / 2;
@@ -271,8 +271,8 @@ export function readPlanText(text: string, limits: PlanLimits): Result<TextReadi
     }
   });
 
-  for (const header of HEADERS) if (header.required && !seenHeaders.has(header.name)) refuse('missing-header', LINE_START.line, LINE_START.column);
-  if (errors.length > 0) return failure(errors);
+  for (const header of HEADERS) {if (header.required && !seenHeaders.has(header.name)) {refuse('missing-header', LINE_START.line, LINE_START.column);}}
+  if (errors.length > 0) {return failure(errors);}
   const json: Fields = {
     ...headerFields, ...(values === undefined ? {} : { values }), steps, ...(cleanup === undefined ? {} : { cleanup }),
   };
@@ -284,9 +284,9 @@ export function readPlanText(text: string, limits: PlanLimits): Result<TextReadi
 function positionOf(path: string, positions: ReadonlyMap<string, TextPosition>): TextPosition | null {
   for (let current = path; ; ) {
     const found = positions.get(current);
-    if (found !== undefined) return found;
+    if (found !== undefined) {return found;}
     const cut = Math.max(current.lastIndexOf('.'), current.lastIndexOf('['));
-    if (cut <= 0) return positions.get('$') ?? null;
+    if (cut <= 0) {return positions.get('$') ?? null;}
     current = current.slice(0, cut);
   }
 }
@@ -315,7 +315,7 @@ export function readablePlanText(plan: Plan): Result<string, NoReadableForm> {
 // the statement, and the source; the fields as they are for any other step.
 function withoutSource(fields: Fields): { readonly statement: Fields; readonly source: unknown } {
   const script = fields[SCRIPT_FIELD];
-  if (!isRecord(script) || !isRecord(script[INLINE_FIELD])) return { statement: fields, source: undefined };
+  if (!isRecord(script) || !isRecord(script[INLINE_FIELD])) {return { statement: fields, source: undefined };}
   const { [SOURCE_FIELD]: source, ...inline } = script[INLINE_FIELD];
   return { statement: { ...fields, [SCRIPT_FIELD]: { ...script, [INLINE_FIELD]: inline } }, source };
 }
@@ -325,16 +325,16 @@ export function writePlanText(plan: Plan): string {
   const lines: string[] = [];
   const put = (depth: number, text: string | undefined): void => {
     // Every construct of the language has a readable form, so this is a broken grammar.
-    if (text === undefined) throw new Error('the readable grammar has no form for part of this plan');
+    if (text === undefined) {throw new Error('the readable grammar has no form for part of this plan');}
     lines.push(`${INDENT.repeat(depth)}${text}`);
   };
   for (const header of HEADERS) {
     const value = header.path === null ? undefined : valueAt(plan, header.path);
-    if (value !== undefined) put(0, header.line.write({ value }));
+    if (value !== undefined) {put(0, header.line.write({ value }));}
   }
   if (plan.values !== undefined) {
     put(0, VALUES_LINE.write({}));
-    for (const [name, value] of entriesInKeyOrder(plan.values)) put(1, VALUE_DEFINITION.write(name, value));
+    for (const [name, value] of entriesInKeyOrder(plan.values)) {put(1, VALUE_DEFINITION.write(name, value));}
   }
   let criterion: unknown;
   const writeSteps = (steps: readonly unknown[], depth: number): void => {
@@ -348,7 +348,7 @@ export function writePlanText(plan: Plan): string {
       let written: { readonly text: string; readonly opens: StatementBlock | undefined; readonly source: unknown } | undefined;
       let type: StepType | undefined;
       for (const candidate of STEP_STATEMENTS) {
-        if (candidate.type !== fields['type']) continue;
+        if (candidate.type !== fields['type']) {continue;}
         type = candidate.type;
         const { statement, source } = candidate.opens === StatementBlock.Source ? withoutSource(fields) : { statement: fields, source: undefined };
         const text = candidate.syntax.write(statement);
@@ -361,9 +361,9 @@ export function writePlanText(plan: Plan): string {
       }
       const mark = needsUnsafeMark(fields) ? `${UNSAFE_MARK} ` : '';
       put(depth, `${mark}${written.text}${written.opens === undefined ? '' : ':'}`);
-      if (written.opens === StatementBlock.Steps && Array.isArray(nested)) writeSteps(nested, depth + 1);
+      if (written.opens === StatementBlock.Steps && Array.isArray(nested)) {writeSteps(nested, depth + 1);}
       if (written.opens === StatementBlock.Source && typeof written.source === 'string') {
-        for (const scriptLine of written.source.split(SCRIPT_LINE_BREAK)) put(depth + 1, SCRIPT_LINE.write(scriptLine));
+        for (const scriptLine of written.source.split(SCRIPT_LINE_BREAK)) {put(depth + 1, SCRIPT_LINE.write(scriptLine));}
       }
     }
   };

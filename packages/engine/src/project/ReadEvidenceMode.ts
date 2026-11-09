@@ -81,16 +81,16 @@ type SuiteContext = { readonly issues: Issues; readonly secretNames: readonly Se
 
 // The evidenceMode section, or undefined when the project has none, which means evidence mode is off.
 export function readEvidenceMode(input: unknown, issues: Issues, secretNames: readonly SecretName[]): Parsed<EvidenceMode | undefined> {
-  if (input === undefined) return undefined;
+  if (input === undefined) {return undefined;}
   const path = '$.evidenceMode';
   const fields = readRecord(input, path, issues, SECTION_FIELDS, ['suites']);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const context: SuiteContext = { issues, secretNames };
   const limits = readEvidenceLimits(fields['limits'], `${path}.limits`, issues);
   const raw = readList(fields['suites'], `${path}.suites`, issues, MAXIMUM_SUITES);
-  if (raw === INVALID || limits === INVALID) return INVALID;
+  if (raw === INVALID || limits === INVALID) {return INVALID;}
   const suites = raw.map((suite, index) => readSuite(suite, `${path}.suites[${index}]`, context));
-  if (!allValid(suites)) return INVALID;
+  if (!allValid(suites)) {return INVALID;}
   const seen = new Set<string>();
   for (const [index, suite] of suites.entries()) {
     if (seen.has(suite.name)) { issues.push({ code: PlanErrorCode.Duplicate, path: `${path}.suites[${index}].name` }); return INVALID; }
@@ -102,16 +102,16 @@ export function readEvidenceMode(input: unknown, issues: Issues, secretNames: re
 // Each limit the project sets, within its ceiling, and the default for the rest. The report depth
 // is kept only when set, so a project that leaves it out reads exactly the default limits.
 function readEvidenceLimits(input: unknown, path: string, issues: Issues): Parsed<EvidenceLimits> {
-  if (input === undefined) return DEFAULT_EVIDENCE_LIMITS;
+  if (input === undefined) {return DEFAULT_EVIDENCE_LIMITS;}
   const fields = readRecord(input, path, issues, EVIDENCE_LIMIT_KEYS, []);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const limits: { -readonly [Key in keyof EvidenceLimits]: EvidenceLimits[Key] } = { ...DEFAULT_EVIDENCE_LIMITS };
   let valid = true;
   for (const key of EVIDENCE_LIMIT_KEYS) {
-    if (fields[key] === undefined) continue;
+    if (fields[key] === undefined) {continue;}
     const value = readInteger(fields[key], `${path}.${key}`, issues, 1, EVIDENCE_LIMIT_CEILINGS[key]);
-    if (value === INVALID) valid = false;
-    else limits[key] = value;
+    if (value === INVALID) {valid = false;}
+    else {limits[key] = value;}
   }
   return valid ? limits : INVALID;
 }
@@ -119,7 +119,7 @@ function readEvidenceLimits(input: unknown, path: string, issues: Issues): Parse
 function readSuite(input: unknown, path: string, context: SuiteContext): Parsed<EvidenceSuiteDeclaration> {
   const { issues } = context;
   const fields = readRecord(input, path, issues, SUITE_FIELDS, REQUIRED_SUITE_FIELDS);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const setupCommand = fields['setupCommand'] === undefined ? undefined : readArgumentVector(fields['setupCommand'], `${path}.setupCommand`, issues);
   const parts = [
     readSuiteName(fields['name'], `${path}.name`, issues),
@@ -137,7 +137,7 @@ function readSuite(input: unknown, path: string, context: SuiteContext): Parsed<
       ? DEFAULT_SUITE_TIMEOUT_MILLISECONDS
       : readInteger(fields['timeoutMilliseconds'], `${path}.timeoutMilliseconds`, issues, 1, MAXIMUM_SUITE_TIMEOUT_MILLISECONDS),
   ] as const;
-  if (!allValid(parts) || setupCommand === INVALID) return INVALID;
+  if (!allValid(parts) || setupCommand === INVALID) {return INVALID;}
   const [
     name, framework, paths, workingDirectory, image, command, projects, environment, runChangedTestsAsProposal, keepTraces,
     keepSuiteScreenshots, timeoutMilliseconds,
@@ -163,16 +163,16 @@ export function readImageDigest(input: unknown, path: string, issues: Issues): P
 // Repository-relative text that stays inside the repository.
 function readInsidePath(input: unknown, path: string, issues: Issues): Parsed<SafeText> {
   const text = readUnscannedText(input, path, issues, MAXIMUM_PATH_LENGTH);
-  if (text === INVALID) return INVALID;
+  if (text === INVALID) {return INVALID;}
   if (!staysInside(text)) { issues.push({ code: PlanErrorCode.PathNotAllowed, path }); return INVALID; }
   return text;
 }
 
 function readSuitePaths(input: unknown, path: string, issues: Issues): Parsed<readonly SafeText[]> {
   const raw = readList(input, path, issues, MAXIMUM_PATHS);
-  if (raw === INVALID) return INVALID;
+  if (raw === INVALID) {return INVALID;}
   const paths = raw.map((entry, index) => readInsidePath(entry, `${path}[${index}]`, issues));
-  if (!allValid(paths)) return INVALID;
+  if (!allValid(paths)) {return INVALID;}
   if (new Set(paths).size !== paths.length) { issues.push({ code: PlanErrorCode.Duplicate, path }); return INVALID; }
   return paths;
 }
@@ -180,7 +180,7 @@ function readSuitePaths(input: unknown, path: string, issues: Issues): Parsed<re
 // An argument vector: each argument is passed to the process as it is, with no shell.
 function readArgumentVector(input: unknown, path: string, issues: Issues): Parsed<readonly SafeText[]> {
   const raw = readList(input, path, issues, MAXIMUM_ARGUMENTS);
-  if (raw === INVALID) return INVALID;
+  if (raw === INVALID) {return INVALID;}
   const argumentVector = raw.map((entry, index) => readUnscannedText(entry, `${path}[${index}]`, issues, MAXIMUM_ARGUMENT_LENGTH));
   return allValid(argumentVector) ? argumentVector : INVALID;
 }
@@ -189,7 +189,7 @@ function readArgumentVector(input: unknown, path: string, issues: Issues): Parse
 // one Revisum appends itself.
 function readPlaywrightCommand(input: unknown, path: string, issues: Issues): Parsed<readonly SafeText[]> {
   const command = readArgumentVector(input, path, issues);
-  if (command === INVALID) return INVALID;
+  if (command === INVALID) {return INVALID;}
   const invocation = PLAYWRIGHT_TEST_INVOCATIONS.find((prefix) => prefix.every((word, index) => command[index] === word));
   const ownArguments = invocation === undefined ? [] : command.slice(invocation.length);
   const setsOwnArgument = ownArguments.some((argument) =>
@@ -200,9 +200,9 @@ function readPlaywrightCommand(input: unknown, path: string, issues: Issues): Pa
 
 function readProjects(input: unknown, path: string, issues: Issues): Parsed<readonly SafeText[]> {
   const raw = readList(input, path, issues, MAXIMUM_PROJECTS);
-  if (raw === INVALID) return INVALID;
+  if (raw === INVALID) {return INVALID;}
   const projects = raw.map((entry, index) => readUnscannedText(entry, `${path}[${index}]`, issues, MAXIMUM_PROJECT_NAME_LENGTH));
-  if (!allValid(projects)) return INVALID;
+  if (!allValid(projects)) {return INVALID;}
   if (new Set(projects).size !== projects.length) { issues.push({ code: PlanErrorCode.Duplicate, path }); return INVALID; }
   return projects;
 }
@@ -228,15 +228,15 @@ function readEnvironmentValue(input: unknown, path: string, context: SuiteContex
   const { issues } = context;
   if (typeof input === 'object' && input !== null && Object.hasOwn(input, 'literal')) {
     const fields = readRecord(input, path, issues, ['literal']);
-    if (fields === INVALID) return INVALID;
+    if (fields === INVALID) {return INVALID;}
     const at = `${path}.literal`;
     const literal = readUnscannedText(fields['literal'], at, issues, MAXIMUM_LITERAL_LENGTH, 0);
-    if (literal === INVALID) return INVALID;
+    if (literal === INVALID) {return INVALID;}
     if (looksLikeCredential(literal)) { issues.push({ code: PlanErrorCode.LiteralSecret, path: at }); return INVALID; }
     return { literal };
   }
   const fields = readRecord(input, path, issues, ['secretName']);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const at = `${path}.secretName`;
   const secretName = fields['secretName'];
   if (typeof secretName !== 'string') { issues.push({ code: PlanErrorCode.WrongType, path: at }); return INVALID; }

@@ -14,13 +14,13 @@ const CONTROL_CHARACTER = /[\u0000-\u001f\u007f]/;
 // at any point. A backslash is refused outright because Windows reads it as a separator, so
 // "..\\x" would leave. In a glob, "**" may match no folder at all, so it counts as no depth.
 export function staysInside(path: string): boolean {
-  if (path === '' || path.includes('\\') || path.startsWith('/') || DRIVE_LETTER.test(path) || CONTROL_CHARACTER.test(path)) return false;
+  if (path === '' || path.includes('\\') || path.startsWith('/') || DRIVE_LETTER.test(path) || CONTROL_CHARACTER.test(path)) {return false;}
   let depth = 0;
   for (const segment of path.split('/')) {
-    if (segment === '' || segment === '.' || segment === '**') continue;
+    if (segment === '' || segment === '.' || segment === '**') {continue;}
     if (segment === '..') {
       depth -= 1;
-      if (depth < 0) return false;
+      if (depth < 0) {return false;}
     } else {
       depth += 1;
     }

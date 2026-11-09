@@ -18,12 +18,12 @@ export interface Callout { readonly number: number; readonly finding: Finding; r
 
 // The box clamped to the image, or null when it has no area inside the image (a page-level finding).
 export function usableBox(box: PixelBox | null, width: number, height: number): PixelBox | null {
-  if (box === null) return null;
+  if (box === null) {return null;}
   const left = Math.max(0, box.x);
   const top = Math.max(0, box.y);
   const right = Math.min(width, box.x + box.width);
   const bottom = Math.min(height, box.y + box.height);
-  if (!(right - left > 0) || !(bottom - top > 0) || box.width <= 0 || box.height <= 0) return null;
+  if (!(right - left > 0) || !(bottom - top > 0) || box.width <= 0 || box.height <= 0) {return null;}
   const round = (value: number): number => Math.round(value * 100) / 100;
   return { x: round(left), y: round(top), width: round(right - left), height: round(bottom - top) };
 }
@@ -32,7 +32,7 @@ type ViewArea = { x: number; y: number; width: number; height: number };
 
 // A viewBox around the callouts, with the image's aspect ratio, inside the image.
 export function cropFor(boxes: readonly PixelBox[], width: number, height: number): ViewArea {
-  if (boxes.length === 0) return { x: 0, y: 0, width, height };
+  if (boxes.length === 0) {return { x: 0, y: 0, width, height };}
   const left = Math.min(...boxes.map((box) => box.x));
   const top = Math.min(...boxes.map((box) => box.y));
   const right = Math.max(...boxes.map((box) => box.x + box.width));

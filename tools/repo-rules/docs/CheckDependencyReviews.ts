@@ -60,7 +60,7 @@ function installedEntry(packages: Readonly<Record<string, LockEntry>>, from: str
   const nested = `${from === '' ? '' : `${from}/`}node_modules/${name}`;
   for (const path of [nested, `node_modules/${name}`]) {
     const entry = packages[path];
-    if (entry !== undefined) return { path, entry };
+    if (entry !== undefined) {return { path, entry };}
   }
   return undefined;
 }
@@ -78,17 +78,17 @@ export function trustPath(root: string): Map<string, string> | undefined {
   const queue: { readonly from: string; readonly name: string }[] = [];
   for (const workspace of workspaces) {
     const entry = packages[workspace];
-    if (entry !== undefined) for (const name of runtimeNames(entry)) queue.push({ from: workspace, name });
+    if (entry !== undefined) {for (const name of runtimeNames(entry)) {queue.push({ from: workspace, name });}}
   }
   const visited = new Set<string>();
   for (let next = queue.shift(); next !== undefined; next = queue.shift()) {
     const installed = installedEntry(packages, next.from, next.name);
     // Workspace packages are ours, not third-party; they link to packages/.
-    if (installed === undefined || next.name.startsWith('@revisum/') || visited.has(installed.path)) continue;
+    if (installed === undefined || next.name.startsWith('@revisum/') || visited.has(installed.path)) {continue;}
     visited.add(installed.path);
-    if (installed.entry.dev === true) continue;
+    if (installed.entry.dev === true) {continue;}
     found.set(next.name, typeof installed.entry.version === 'string' ? installed.entry.version : 'unknown');
-    for (const name of runtimeNames(installed.entry)) queue.push({ from: installed.path, name });
+    for (const name of runtimeNames(installed.entry)) {queue.push({ from: installed.path, name });}
   }
   return found;
 }
@@ -101,7 +101,7 @@ function manifestVersions(root: string): Map<string, { readonly folder: string; 
     const manifest: unknown = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, 'utf8')) : {};
     for (const field of ['dependencies', 'optionalDependencies', 'peerDependencies']) {
       const listed: unknown = typeof manifest === 'object' && manifest !== null ? Object.getOwnPropertyDescriptor(manifest, field)?.value : undefined;
-      if (typeof listed !== 'object' || listed === null) continue;
+      if (typeof listed !== 'object' || listed === null) {continue;}
       for (const [name, version] of Object.entries(listed)) {
         const list = versions.get(name) ?? [];
         list.push({ folder: workspacePackage.folder, version: String(version) });
@@ -115,7 +115,7 @@ function manifestVersions(root: string): Map<string, { readonly folder: string; 
 // Evidence that names a file in this repository: a path with a folder and an extension, or a test
 // id whose file part is one. URLs and plain descriptions are not checked.
 function evidencePath(evidence: string): string | undefined {
-  if (/^[a-z]+:\/\//i.test(evidence)) return undefined;
+  if (/^[a-z]+:\/\//i.test(evidence)) {return undefined;}
   const path = evidence.split('#')[0] ?? '';
   return /^[\w.-]+(?:\/[\w.-]+)+\.\w+$/.test(path) ? path : undefined;
 }
@@ -186,9 +186,9 @@ export function checkDependencyReviews(root: string, reviews: readonly Dependenc
       problems.push(`${name} ${version} is on the trust path but has no dependency review in tools/repo-rules/docs/DependencyReviews.ts`);
       continue;
     }
-    if (review.version !== version) problems.push(`${name}: the review is of ${review.version}, but the lock file installs ${version}`);
+    if (review.version !== version) {problems.push(`${name}: the review is of ${review.version}, but the lock file installs ${version}`);}
     for (const manifest of requested.get(name) ?? []) {
-      if (manifest.version !== review.version) problems.push(`${name}: packages/${manifest.folder}/package.json asks for ${manifest.version}, not the reviewed ${review.version} exactly`);
+      if (manifest.version !== review.version) {problems.push(`${name}: packages/${manifest.folder}/package.json asks for ${manifest.version}, not the reviewed ${review.version} exactly`);}
     }
   }
   for (const review of reviews) {
@@ -214,4 +214,4 @@ export function checkDependencyReviews(root: string, reviews: readonly Dependenc
   return problems;
 }
 
-if (import.meta.main) process.exitCode = reportProblems('dependency review check', checkDependencyReviews(process.cwd()));
+if (import.meta.main) {process.exitCode = reportProblems('dependency review check', checkDependencyReviews(process.cwd()));}

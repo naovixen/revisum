@@ -30,16 +30,16 @@ const imageNameRule: StaticRule = {
   evaluate(snapshot) {
     const results: TargetResult[] = [];
     for (const node of elementsOf(snapshot)) {
-      if (!isHtmlElement(snapshot, node)) continue;
+      if (!isHtmlElement(snapshot, node)) {continue;}
       const semanticImage = accessibilityRole(node) === 'img' || (node.accessibility === null && explicitRole(node) === 'img');
-      if (node.name !== 'img' && !semanticImage) continue;
-      if (programmaticallyHidden(snapshot, node)) continue;
+      if (node.name !== 'img' && !semanticImage) {continue;}
+      if (programmaticallyHidden(snapshot, node)) {continue;}
       const role = node.accessibility ? accessibilityRole(node) : '';
       const decorative = presentational(snapshot, node) || role === 'none' || role === 'presentation'
         || (node.name === 'img' && node.attributes['alt'] === '' && (node.accessibility === null || node.accessibility.ignored));
       if (decorative) { results.push(passed(node, 'decorative')); continue; }
-      if (node.accessibility && node.accessibility.name.trim() !== '') results.push(passed(node));
-      else results.push(failed(node, 'Image has no accessible name'));
+      if (node.accessibility && node.accessibility.name.trim() !== '') {results.push(passed(node));}
+      else {results.push(failed(node, 'Image has no accessible name'));}
     }
     return results;
   },
@@ -51,10 +51,10 @@ const imageButtonNameRule: StaticRule = {
   evaluate(snapshot) {
     const results: TargetResult[] = [];
     for (const node of elementsOf(snapshot)) {
-      if (node.name !== 'input' || typeAttribute(node) !== 'image' || !inAccessibilityTree(node)) continue;
+      if (node.name !== 'input' || typeAttribute(node) !== 'image' || !inAccessibilityTree(node)) {continue;}
       const name = nameOf(node).trim();
-      if (name === '' || /^submit( query)?$/i.test(name)) results.push(failed(node, 'Image button has no accessible name other than the default'));
-      else results.push(passed(node));
+      if (name === '' || /^submit( query)?$/i.test(name)) {results.push(failed(node, 'Image button has no accessible name other than the default'));}
+      else {results.push(passed(node));}
     }
     return results;
   },
@@ -66,10 +66,10 @@ const buttonNameRule: StaticRule = {
   evaluate(snapshot) {
     const results: TargetResult[] = [];
     for (const node of elementsOf(snapshot)) {
-      if (!inAccessibilityTree(node) || accessibilityRole(node) !== 'button') continue;
-      if (node.name === 'input' && typeAttribute(node) === 'image') continue;
-      if (nameOf(node).trim() === '' && nameOf(node) === '') results.push(failed(node, 'Button has no accessible name'));
-      else results.push(passed(node));
+      if (!inAccessibilityTree(node) || accessibilityRole(node) !== 'button') {continue;}
+      if (node.name === 'input' && typeAttribute(node) === 'image') {continue;}
+      if (nameOf(node).trim() === '' && nameOf(node) === '') {results.push(failed(node, 'Button has no accessible name'));}
+      else {results.push(passed(node));}
     }
     return results;
   },
@@ -82,11 +82,11 @@ const linkNameRule: StaticRule = {
   evaluate(snapshot) {
     const results: TargetResult[] = [];
     for (const node of elementsOf(snapshot)) {
-      if (!inAccessibilityTree(node)) continue;
+      if (!inAccessibilityTree(node)) {continue;}
       const explicit = explicitRole(node);
-      if (!(accessibilityRole(node) === 'link' || (explicit !== null && LINK_ROLES.has(explicit)))) continue;
-      if (nameOf(node) === '') results.push(failed(node, 'Link has no accessible name'));
-      else results.push(passed(node));
+      if (!(accessibilityRole(node) === 'link' || (explicit !== null && LINK_ROLES.has(explicit)))) {continue;}
+      if (nameOf(node) === '') {results.push(failed(node, 'Link has no accessible name'));}
+      else {results.push(passed(node));}
     }
     return results;
   },
@@ -100,13 +100,13 @@ const formFieldNameRule: StaticRule = {
   evaluate(snapshot) {
     const results: TargetResult[] = [];
     for (const node of elementsOf(snapshot)) {
-      if (!inAccessibilityTree(node)) continue;
+      if (!inAccessibilityTree(node)) {continue;}
       const explicit = explicitRole(node);
       const role = explicit !== null && ARIA_ROLES.has(explicit) ? explicit : accessibilityRole(node);
       const typedField = node.name === 'input' && explicit === null && FIELD_INPUT_TYPES.has(typeAttribute(node));
-      if (!FIELD_ROLES.has(role) && !typedField) continue;
-      if (nameOf(node) === '') results.push(failed(node, 'Form field has no accessible name'));
-      else results.push(passed(node));
+      if (!FIELD_ROLES.has(role) && !typedField) {continue;}
+      if (nameOf(node) === '') {results.push(failed(node, 'Form field has no accessible name'));}
+      else {results.push(passed(node));}
     }
     return results;
   },
@@ -119,11 +119,11 @@ const validRoleRule: StaticRule = {
     const results: TargetResult[] = [];
     for (const node of elementsOf(snapshot)) {
       const role = node.attributes['role'];
-      if (role === undefined || role.trim() === '') continue;
-      if (programmaticallyHidden(snapshot, node)) continue;
+      if (role === undefined || role.trim() === '') {continue;}
+      if (programmaticallyHidden(snapshot, node)) {continue;}
       const tokens = role.trim().toLowerCase().split(/\s+/);
-      if (tokens.some((token) => ARIA_ROLES.has(token))) results.push(passed(node));
-      else results.push(failed(node, `No valid WAI-ARIA role in "${role}"`));
+      if (tokens.some((token) => ARIA_ROLES.has(token))) {results.push(passed(node));}
+      else {results.push(failed(node, `No valid WAI-ARIA role in "${role}"`));}
     }
     return results;
   },
@@ -138,12 +138,12 @@ export const ariaHiddenFocusRule: InteractiveRule = {
   async run(page, snapshot) {
     const results: TargetResult[] = [];
     for (const node of elementsOf(snapshot)) {
-      if (node.attributes['aria-hidden'] !== 'true') continue;
+      if (node.attributes['aria-hidden'] !== 'true') {continue;}
       const candidates = [node, ...descendants(snapshot, node)].filter((candidate) => candidate.nodeType === 1 && inSequentialFocus(snapshot, candidate));
       const keptFocus: SnapshotNode[] = [];
-      for (const candidate of candidates) if (await page.focusBackend(candidate.backendId)) keptFocus.push(candidate);
-      if (keptFocus.length) results.push(failed(node, `aria-hidden content contains ${keptFocus.length} element(s) in the tab order`));
-      else results.push(passed(node));
+      for (const candidate of candidates) {if (await page.focusBackend(candidate.backendId)) {keptFocus.push(candidate);}}
+      if (keptFocus.length) {results.push(failed(node, `aria-hidden content contains ${keptFocus.length} element(s) in the tab order`));}
+      else {results.push(passed(node));}
     }
     return results;
   },
@@ -160,7 +160,7 @@ const REQUIRED_OWNED: Record<string, string[]> = {
 function semanticRole(node: SnapshotNode, snapshot?: PageSnapshot): string {
   const explicit = explicitRole(node);
   const explicitRoleHolds = !(snapshot && (explicit === 'none' || explicit === 'presentation') && !presentational(snapshot, node));
-  if (explicit !== null && ARIA_ROLES.has(explicit) && explicitRoleHolds) return explicit;
+  if (explicit !== null && ARIA_ROLES.has(explicit) && explicitRoleHolds) {return explicit;}
   return (snapshot ? implicitRole(snapshot, node) : null) ?? accessibilityRole(node);
 }
 function ownedElements(snapshot: PageSnapshot, owner: SnapshotNode): SnapshotNode[] {
@@ -168,12 +168,12 @@ function ownedElements(snapshot: PageSnapshot, owner: SnapshotNode): SnapshotNod
   const visit = (parent: SnapshotNode): void => {
     for (const childIndex of parent.children) {
       const child = snapshot.nodes[childIndex];
-      if (!child) continue;
+      if (!child) {continue;}
       if (child.nodeType === 11) { visit(child); continue; }
-      if (child.nodeType !== 1 || child.name.startsWith('::')) continue;
+      if (child.nodeType !== 1 || child.name.startsWith('::')) {continue;}
       const skipped = (child.style === null && !['option', 'optgroup'].includes(child.name)) || child.attributes['aria-hidden'] === 'true'
         || ['br', 'wbr', 'script', 'style', 'template', 'slot'].includes(child.name);
-      if (skipped) { if (child.name === 'slot') visit(child); continue; }
+      if (skipped) { if (child.name === 'slot') {visit(child);} continue; }
       if (presentational(snapshot, child)) { visit(child); continue; }
       owned.push(child);
     }
@@ -182,7 +182,7 @@ function ownedElements(snapshot: PageSnapshot, owner: SnapshotNode): SnapshotNod
   // Kept exactly as the rule was scored: the id list is split on the letter "s" (pattern /s+/), not on white space.
   for (const id of (owner.attributes['aria-owns'] ?? '').split(/s+/).filter(Boolean)) {
     const target = snapshot.nodes.find((node) => node.nodeType === 1 && node.document === owner.document && node.attributes['id'] === id);
-    if (target && !owned.includes(target)) owned.push(target);
+    if (target && !owned.includes(target)) {owned.push(target);}
   }
   return owned;
 }
@@ -191,24 +191,24 @@ const requiredOwnedRule: StaticRule = {
   evaluate(snapshot) {
     const results: TargetResult[] = [];
     for (const node of elementsOf(snapshot)) {
-      if (!inAccessibilityTree(node) && !(node.accessibility && node.style)) continue;
-      if (programmaticallyHidden(snapshot, node)) continue;
+      if (!inAccessibilityTree(node) && !(node.accessibility && node.style)) {continue;}
+      if (programmaticallyHidden(snapshot, node)) {continue;}
       const role = semanticRole(node, snapshot);
       const required = REQUIRED_OWNED[role];
-      if (!required) continue;
-      if ([node, ...ancestors(snapshot, node)].some((ancestor) => inAccessibilityTree(ancestor) && ancestor.attributes['aria-busy'] === 'true')) continue;
+      if (!required) {continue;}
+      if ([node, ...ancestors(snapshot, node)].some((ancestor) => inAccessibilityTree(ancestor) && ancestor.attributes['aria-busy'] === 'true')) {continue;}
       const owned = ownedElements(snapshot, node);
       const disallowed = (list: SnapshotNode[], allowed: string[]): SnapshotNode[] => list.filter((child) => {
         const childRole = semanticRole(child, snapshot);
-        if (allowed.includes(childRole)) return false;
+        if (allowed.includes(childRole)) {return false;}
         const nested = allowed.filter((entry) => entry.startsWith(childRole + '>')).map((entry) => entry.split('>')[1] ?? '');
-        if (nested.length === 0) return true;
+        if (nested.length === 0) {return true;}
         // A group may own the nested roles, or further groups.
         return disallowed(ownedElements(snapshot, child), [...nested, ...nested.map((entry) => childRole + '>' + entry)]).length > 0;
       });
       const wrong = disallowed(owned, required);
-      if (wrong.length) results.push(failed(node, `${role} owns ${wrong.map((child) => semanticRole(child, snapshot) || child.name).join(', ')}`));
-      else results.push(passed(node));
+      if (wrong.length) {results.push(failed(node, `${role} owns ${wrong.map((child) => semanticRole(child, snapshot) || child.name).join(', ')}`));}
+      else {results.push(passed(node));}
     }
     return results;
   },
@@ -219,10 +219,10 @@ const pageTitleRule: StaticRule = {
   meta: actRuleMeta('2779a5', 'HTML page has non-empty title', ['2.4.2'], 'P3'),
   evaluate(snapshot) {
     const root = topHtmlRoot(snapshot);
-    if (!root || root.name !== 'html') return [];
+    if (!root || root.name !== 'html') {return [];}
     const title = descendants(snapshot, root).find((descendant) => descendant.nodeType === 1 && descendant.name === 'title'
       && !inSvg(snapshot, descendant) && descendant.document === root.document && !inShadowTree(snapshot, descendant));
-    if (!title) return [failed(root, 'Page has no title element')];
+    if (!title) {return [failed(root, 'Page has no title element')];}
     const text = title.children.map((childIndex) => snapshot.nodes[childIndex]).filter((child) => child?.nodeType === 3).map((child) => child?.value ?? '').join('');
     return [text.trim() === '' ? failed(root, 'Page title is empty') : passed(root)];
   },
@@ -233,7 +233,7 @@ const pageLanguageRule: StaticRule = {
   meta: actRuleMeta('b5c3f8', 'HTML page has lang attribute', ['3.1.1'], 'P3', false),
   evaluate(snapshot) {
     const root = topHtmlRoot(snapshot);
-    if (!root || root.name !== 'html' || snapshotExtras(snapshot).contentType !== 'text/html') return [];
+    if (!root || root.name !== 'html' || snapshotExtras(snapshot).contentType !== 'text/html') {return [];}
     const language = root.attributes['lang'];
     return [language === undefined || language.trim() === '' ? failed(root, 'Page has no lang attribute') : passed(root)];
   },
@@ -244,9 +244,9 @@ const pageLanguageValidRule: StaticRule = {
   meta: actRuleMeta('bf051a', 'HTML page lang attribute has valid language tag', ['3.1.1'], 'P3', false),
   evaluate(snapshot) {
     const root = topHtmlRoot(snapshot);
-    if (!root || root.name !== 'html' || snapshotExtras(snapshot).contentType !== 'text/html') return [];
+    if (!root || root.name !== 'html' || snapshotExtras(snapshot).contentType !== 'text/html') {return [];}
     const language = root.attributes['lang'];
-    if (language === undefined || language.trim() === '') return [];
+    if (language === undefined || language.trim() === '') {return [];}
     return [hasKnownPrimaryLanguage(language) ? passed(root) : failed(root, `Unknown primary language in lang="${language}"`)];
   },
 };
@@ -255,7 +255,7 @@ const pageLanguageValidRule: StaticRule = {
 function languageOwner(snapshot: PageSnapshot, node: SnapshotNode): SnapshotNode | undefined {
   let parent = parentElement(snapshot, node);
   while (parent) {
-    if (parent.attributes['lang'] !== undefined) return parent;
+    if (parent.attributes['lang'] !== undefined) {return parent;}
     parent = parentElement(snapshot, parent);
   }
   return undefined;
@@ -267,8 +267,8 @@ const elementLanguageRule: StaticRule = {
     const results: TargetResult[] = [];
     for (const node of elementsOf(snapshot)) {
       const language = node.attributes['lang'];
-      if (language === undefined || language === '' || !isHtmlElement(snapshot, node)) continue;
-      if (!ancestors(snapshot, node).some((ancestor) => ancestor.name === 'body') && node.name !== 'body') continue;
+      if (language === undefined || language === '' || !isHtmlElement(snapshot, node)) {continue;}
+      if (!ancestors(snapshot, node).some((ancestor) => ancestor.name === 'body') && node.name !== 'body') {continue;}
       // Text that inherits the language: visible text or text in the accessibility tree (text nodes, or alt, aria-label or title on elements).
       const inheriting = descendants(snapshot, node).filter((descendant) => {
         if (descendant.nodeType === 3) {
@@ -283,7 +283,7 @@ const elementLanguageRule: StaticRule = {
         return false;
       });
       const namedItself = NAMING_ATTRIBUTES.some((attribute) => (node.attributes[attribute] ?? '').trim() !== '') && inAccessibilityTree(node);
-      if (inheriting.length === 0 && !namedItself) continue;
+      if (inheriting.length === 0 && !namedItself) {continue;}
       results.push(hasKnownPrimaryLanguage(language) ? passed(node) : failed(node, `Unknown primary language in lang="${language}"`));
     }
     return results;
@@ -300,15 +300,15 @@ const AUTOFILL_CONTACT_FIELDS = new Set(['tel', 'tel-country-code', 'tel-nationa
 function validAutocomplete(value: string): boolean {
   const tokens = value.trim().toLowerCase().split(/\s+/);
   let position = 0;
-  if (tokens[position]?.startsWith('section-')) position++;
-  if (tokens[position] === 'shipping' || tokens[position] === 'billing') position++;
+  if (tokens[position]?.startsWith('section-')) {position++;}
+  if (tokens[position] === 'shipping' || tokens[position] === 'billing') {position++;}
   if (['home', 'work', 'mobile', 'fax', 'pager'].includes(tokens[position] ?? '')) {
     position++;
-    if (!AUTOFILL_CONTACT_FIELDS.has(tokens[position] ?? '')) return false;
+    if (!AUTOFILL_CONTACT_FIELDS.has(tokens[position] ?? '')) {return false;}
     position++;
-  } else if (AUTOFILL_FIELDS.has(tokens[position] ?? '') || AUTOFILL_CONTACT_FIELDS.has(tokens[position] ?? '')) position++;
-  else return false;
-  if (tokens[position] === 'webauthn') position++;
+  } else if (AUTOFILL_FIELDS.has(tokens[position] ?? '') || AUTOFILL_CONTACT_FIELDS.has(tokens[position] ?? '')) {position++;}
+  else {return false;}
+  if (tokens[position] === 'webauthn') {position++;}
   return position === tokens.length;
 }
 const FIXED_INPUT_TYPES = new Set(['button', 'checkbox', 'file', 'image', 'radio', 'reset', 'submit']);
@@ -317,16 +317,16 @@ const autocompleteRule: StaticRule = {
   evaluate(snapshot) {
     const results: TargetResult[] = [];
     for (const node of elementsOf(snapshot)) {
-      if (!['input', 'select', 'textarea'].includes(node.name)) continue;
+      if (!['input', 'select', 'textarea'].includes(node.name)) {continue;}
       const value = node.attributes['autocomplete'];
-      if (value === undefined || value.trim() === '') continue;
+      if (value === undefined || value.trim() === '') {continue;}
       const tokens = value.trim().split(/\s+/);
-      if (tokens.length === 1 && /^(on|off)$/i.test(tokens[0] ?? '')) continue;
-      if (actuallyDisabled(snapshot, node) || node.attributes['aria-disabled'] === 'true') continue;
-      if (node.name === 'input' && FIXED_INPUT_TYPES.has(typeAttribute(node))) continue;
-      if (!isVisible(snapshot, node) && !inAccessibilityTree(node)) continue;
+      if (tokens.length === 1 && /^(on|off)$/i.test(tokens[0] ?? '')) {continue;}
+      if (actuallyDisabled(snapshot, node) || node.attributes['aria-disabled'] === 'true') {continue;}
+      if (node.name === 'input' && FIXED_INPUT_TYPES.has(typeAttribute(node))) {continue;}
+      if (!isVisible(snapshot, node) && !inAccessibilityTree(node)) {continue;}
       const role = explicitRole(node) ?? accessibilityRole(node);
-      if (!inSequentialFocus(snapshot, node) && !WIDGET_ROLES.has(role)) continue;
+      if (!inSequentialFocus(snapshot, node) && !WIDGET_ROLES.has(role)) {continue;}
       results.push(validAutocomplete(value) ? passed(node) : failed(node, `Invalid autocomplete value "${value}"`));
     }
     return results;
@@ -355,38 +355,38 @@ const ROLES_THAT_PASS_ON_DISABLED = new Set(['button', 'checkbox', 'combobox', '
   'menu', 'menubar', 'tablist', 'toolbar', 'tree', 'grid', 'treegrid', 'row', 'rowgroup', 'listitem']);
 function hasDisabledAncestor(snapshot: PageSnapshot, text: SnapshotNode): boolean {
   for (const ancestor of ancestors(snapshot, text)) {
-    if (actuallyDisabled(snapshot, ancestor)) return true;
-    if (ancestor.attributes['aria-disabled'] === 'true' && ROLES_THAT_PASS_ON_DISABLED.has(explicitRole(ancestor) ?? accessibilityRole(ancestor))) return true;
-    if (ancestor.accessibility?.properties['disabled'] === true) return true;
+    if (actuallyDisabled(snapshot, ancestor)) {return true;}
+    if (ancestor.attributes['aria-disabled'] === 'true' && ROLES_THAT_PASS_ON_DISABLED.has(explicitRole(ancestor) ?? accessibilityRole(ancestor))) {return true;}
+    if (ancestor.accessibility?.properties['disabled'] === true) {return true;}
     if (ancestor.name === 'label') {
       const forId = ancestor.attributes['for'];
       const control = forId
         ? snapshot.nodes.find((node) => node.document === ancestor.document && node.attributes['id'] === forId)
         : descendants(snapshot, ancestor).find((descendant) => ['input', 'select', 'textarea', 'button'].includes(descendant.name));
-      if (control && (actuallyDisabled(snapshot, control) || control.attributes['aria-disabled'] === 'true')) return true;
+      if (control && (actuallyDisabled(snapshot, control) || control.attributes['aria-disabled'] === 'true')) {return true;}
     }
     const labelling = snapshot.nodes.filter((node) => node.document === ancestor.document && node.nodeType === 1
       && (node.attributes['aria-labelledby'] ?? '').split(/\s+/).includes(ancestor.attributes['id'] ?? '\u0000'));
-    if (labelling.some((node) => actuallyDisabled(snapshot, node) || node.attributes['aria-disabled'] === 'true')) return true;
+    if (labelling.some((node) => actuallyDisabled(snapshot, node) || node.attributes['aria-disabled'] === 'true')) {return true;}
   }
   return false;
 }
 interface TextShadow { colour: Rgba; blur: number }
 function parseTextShadows(value: string | undefined): TextShadow[] {
-  if (!value || value === 'none') return [];
+  if (!value || value === 'none') {return [];}
   const parts: string[] = [];
   let depth = 0;
   let current = '';
   for (const character of value) {
-    if (character === '(') depth++;
-    if (character === ')') depth--;
-    if (character === ',' && depth === 0) { parts.push(current); current = ''; } else current += character;
+    if (character === '(') {depth++;}
+    if (character === ')') {depth--;}
+    if (character === ',' && depth === 0) { parts.push(current); current = ''; } else {current += character;}
   }
   parts.push(current);
   const shadows: TextShadow[] = [];
   for (const part of parts) {
     const colour = parseColour(part);
-    if (!colour) continue;
+    if (!colour) {continue;}
     const lengths = part.replace(/rgba?\([^)]*\)/, '').trim().split(/\s+/).map((length) => pixels(length)).filter((length) => !Number.isNaN(length));
     shadows.push({ colour, blur: lengths[2] ?? 0 });
   }
@@ -402,11 +402,11 @@ export const textContrastRule: InteractiveRule = {
     const results: TargetResult[] = [];
     const extras = snapshotExtras(snapshot);
     for (const text of snapshot.nodes) {
-      if (text.nodeType !== 3 || !textVisible(snapshot, text)) continue;
+      if (text.nodeType !== 3 || !textVisible(snapshot, text)) {continue;}
       const parent = parentElement(snapshot, text);
-      if (!parent || !parent.style || !isHtmlElement(snapshot, parent)) continue;
-      if (hasDisabledAncestor(snapshot, text)) continue;
-      if (parent.style['text-indent'] && pixels(parent.style['text-indent']) < -999) continue; // moved off screen
+      if (!parent || !parent.style || !isHtmlElement(snapshot, parent)) {continue;}
+      if (hasDisabledAncestor(snapshot, text)) {continue;}
+      if (parent.style['text-indent'] && pixels(parent.style['text-indent']) < -999) {continue;} // moved off screen
       if (!HUMAN_LANGUAGE_TEXT.test(text.value)) { results.push(passed(parent, 'Text does not express anything in human language')); continue; }
       const textColour = parseColour(parent.style['color']);
       if (!textColour) { results.push(cantTell(parent, 'Unparsed text colour')); continue; }
@@ -418,7 +418,7 @@ export const textContrastRule: InteractiveRule = {
       for (const ancestor of [parent, ...ancestors(snapshot, parent)]) {
         if ((ancestor.style?.['background-image'] ?? 'none') !== 'none') { imageBackground = true; break; }
         const backgroundColour = parseColour(ancestor.style?.['background-color']);
-        if (backgroundColour && backgroundColour[3] === 1) break;
+        if (backgroundColour && backgroundColour[3] === 1) {break;}
       }
       const blended = parseColour(extras.blendedBackground.get(parent.index) ?? extras.blendedBackground.get(text.index) ?? 'rgb(255, 255, 255)');
       const solid: Rgb = blended ? rgbOf(blended) : [255, 255, 255];
@@ -441,7 +441,7 @@ export const textContrastRule: InteractiveRule = {
       const weight = Number(parent.style['font-weight'] ?? '400');
       const large = size >= 24 || (size >= 18.66 && weight >= 700);
       const required = large ? 3 : 4.5;
-      if (!halo && !imageBackground && ratio <= 1.0001) continue; // the same colour: not a visual presentation of text (rule assumption)
+      if (!halo && !imageBackground && ratio <= 1.0001) {continue;} // the same colour: not a visual presentation of text (rule assumption)
       results.push(ratio + 1e-9 >= required ? passed(parent) : failed(parent, `Highest possible contrast ${ratio.toFixed(2)}:1 (${method}) is below ${required}:1`));
     }
     return results;
@@ -453,7 +453,7 @@ function viewportSettings(content: string): Map<string, string> {
   const settings = new Map<string, string>();
   for (const part of content.split(/[,;]/)) {
     const [key, value] = part.split('=').map((piece) => piece.trim().toLowerCase());
-    if (key) settings.set(key, value ?? '');
+    if (key) {settings.set(key, value ?? '');}
   }
   return settings;
 }
@@ -466,9 +466,9 @@ const viewportZoomRule: StaticRule = {
   evaluate(snapshot) {
     const results: TargetResult[] = [];
     for (const node of elementsOf(snapshot)) {
-      if (node.name !== 'meta' || (node.attributes['name'] ?? '').toLowerCase() !== 'viewport' || node.attributes['content'] === undefined) continue;
+      if (node.name !== 'meta' || (node.attributes['name'] ?? '').toLowerCase() !== 'viewport' || node.attributes['content'] === undefined) {continue;}
       const settings = viewportSettings(node.attributes['content'] ?? '');
-      if (!settings.has('maximum-scale') && !settings.has('user-scalable')) continue;
+      if (!settings.has('maximum-scale') && !settings.has('user-scalable')) {continue;}
       let allowsZoom = true;
       const reasons: string[] = [];
       const userScalable = settings.get('user-scalable');
@@ -502,12 +502,12 @@ function importantFromStyleAttribute(snapshot: PageSnapshot, node: SnapshotNode,
     const parent = parentElement(snapshot, current);
     if (winner) {
       const value = winner.value.toLowerCase();
-      if (value !== 'inherit' && value !== 'unset') return winner.important;
+      if (value !== 'inherit' && value !== 'unset') {return winner.important;}
       current = parent;
       continue; // inherit or unset (an inherited property): the value comes from the parent
     }
     // No declaration in the style attribute: inherited only if the computed value equals the parent's.
-    if (!parent || !parent.style || !current.style || parent.style[property] !== current.style[property]) return false;
+    if (!parent || !parent.style || !current.style || parent.style[property] !== current.style[property]) {return false;}
     current = parent;
   }
   return false;
@@ -518,11 +518,11 @@ function textSpacingRule(id: string, title: string, property: 'letter-spacing' |
     evaluate(snapshot) {
       const results: TargetResult[] = [];
       for (const node of elementsOf(snapshot)) {
-        if (!isHtmlElement(snapshot, node) || !node.style) continue;
-        if (!importantFromStyleAttribute(snapshot, node, property)) continue;
+        if (!isHtmlElement(snapshot, node) || !node.style) {continue;}
+        if (!importantFromStyleAttribute(snapshot, node, property)) {continue;}
         const texts = node.children.map((childIndex) => snapshot.nodes[childIndex])
           .filter((child): child is SnapshotNode => child !== undefined && child.nodeType === 3 && textVisible(snapshot, child));
-        if (texts.length === 0) continue;
+        if (texts.length === 0) {continue;}
         const fontSize = pixels(node.style['font-size']);
         let value: number;
         if (property === 'line-height') {
@@ -530,7 +530,7 @@ function textSpacingRule(id: string, title: string, property: 'letter-spacing' |
           value = lineHeight === 'normal' ? 1.2 * fontSize : pixels(lineHeight);
           // Applicable only when the text wraps: its box is taller than one line.
           const tallest = Math.max(...texts.map((text) => text.bounds?.height ?? 0));
-          if (!(tallest > Math.max(value, fontSize) * 1.5)) continue;
+          if (!(tallest > Math.max(value, fontSize) * 1.5)) {continue;}
         } else {
           const spacing = node.style[property] ?? 'normal';
           value = spacing === 'normal' ? 0 : pixels(spacing);
@@ -546,13 +546,13 @@ function textSpacingRule(id: string, title: string, property: 'letter-spacing' |
 const REPLACED_ELEMENTS = new Set(['img', 'svg', 'video', 'canvas', 'iframe', 'input', 'select', 'textarea', 'button', 'object', 'embed', 'hr', 'meter', 'progress']);
 // True when the element itself paints pixels: replaced content, a background or a border.
 function paints(node: SnapshotNode): boolean {
-  if (REPLACED_ELEMENTS.has(node.name)) return true;
+  if (REPLACED_ELEMENTS.has(node.name)) {return true;}
   const style = node.style;
-  if (!style) return false;
+  if (!style) {return false;}
   const background = parseColour(style['background-color']);
-  if (background && background[3] > 0) return true;
-  if ((style['background-image'] ?? 'none') !== 'none') return true;
-  if ((style['border-top-style'] ?? 'none') !== 'none' && pixels(style['border-top-width']) > 0) return true;
+  if (background && background[3] > 0) {return true;}
+  if ((style['background-image'] ?? 'none') !== 'none') {return true;}
+  if ((style['border-top-style'] ?? 'none') !== 'none' && pixels(style['border-top-width']) > 0) {return true;}
   return false;
 }
 // ACT 0ssw9k: scrollable content can be reached with sequential focus navigation.
@@ -562,22 +562,22 @@ const scrollableReachRule: StaticRule = {
     const results: TargetResult[] = [];
     const scroll = snapshotExtras(snapshot).scroll;
     for (const node of elementsOf(snapshot)) {
-      if (!node.style || !isHtmlElement(snapshot, node) || node.name === 'html' || node.name === 'body' || node.name === 'iframe') continue;
+      if (!node.style || !isHtmlElement(snapshot, node) || node.name === 'html' || node.name === 'body' || node.name === 'iframe') {continue;}
       const overflowX = node.style['overflow-x'];
       const overflowY = node.style['overflow-y'];
       const scrollsX = overflowX === 'auto' || overflowX === 'scroll';
       const scrollsY = overflowY === 'auto' || overflowY === 'scroll';
-      if (!scrollsX && !scrollsY) continue;
+      if (!scrollsX && !scrollsY) {continue;}
       const sizes = scroll.get(node.index);
-      if (!sizes) continue;
+      if (!sizes) {continue;}
       const [scrollWidth, scrollHeight, clientWidth, clientHeight] = sizes;
       const horizontalOverflow = scrollWidth - clientWidth;
       const verticalOverflow = scrollHeight - clientHeight;
       const horizontalPadding = Math.max(pixels(node.style['padding-left']) || 0, pixels(node.style['padding-right']) || 0);
       const verticalPadding = Math.max(pixels(node.style['padding-top']) || 0, pixels(node.style['padding-bottom']) || 0);
-      if (!((scrollsX && horizontalOverflow > horizontalPadding) || (scrollsY && verticalOverflow > verticalPadding))) continue;
+      if (!((scrollsX && horizontalOverflow > horizontalPadding) || (scrollsY && verticalOverflow > verticalPadding))) {continue;}
       const contents = descendants(snapshot, node);
-      if (!contents.some((child) => (child.nodeType === 3 && textVisible(snapshot, child)) || (child.nodeType === 1 && isVisible(snapshot, child) && paints(child)))) continue;
+      if (!contents.some((child) => (child.nodeType === 3 && textVisible(snapshot, child)) || (child.nodeType === 1 && isVisible(snapshot, child) && paints(child)))) {continue;}
       if (inert(snapshot, node) || inSequentialFocus(snapshot, node) || contents.some((child) => child.nodeType === 1 && inSequentialFocus(snapshot, child))) {
         results.push(passed(node));
       } else {
@@ -592,9 +592,9 @@ const scrollableReachRule: StaticRule = {
 function refreshDelay(content: string): number | null {
   // The HTML "shared declarative refresh steps": leading white space, digits with an optional fraction, then a separator or the end.
   const match = content.match(/^[\t\n\f\r ]*(\d*)(\.[\d.]*)?/);
-  if (!match || (match[1] === '' && (match[2] ?? '') === '')) return null;
+  if (!match || (match[1] === '' && (match[2] ?? '') === '')) {return null;}
   const rest = content.slice(match[0].length);
-  if (rest !== '' && !/^[\t\n\f\r ;,]/.test(rest)) return null;
+  if (rest !== '' && !/^[\t\n\f\r ;,]/.test(rest)) {return null;}
   return match[1] === '' ? 0 : Number(match[1]);
 }
 const metaRefreshRule: StaticRule = {
@@ -606,7 +606,7 @@ const metaRefreshRule: StaticRule = {
       const first = elementsOf(snapshot).find((node) => node.document === documentIndex && node.name === 'meta'
         && (node.attributes['http-equiv'] ?? '').toLowerCase() === 'refresh' && node.attributes['content'] !== undefined
         && refreshDelay(node.attributes['content'] ?? '') !== null);
-      if (!first) continue;
+      if (!first) {continue;}
       const delay = refreshDelay(first.attributes['content'] ?? '') ?? 0;
       results.push(delay === 0 || delay > 72000 ? passed(first) : failed(first, `Page refreshes or redirects after ${delay} s`));
     }
@@ -620,21 +620,21 @@ function visibleInnerText(snapshot: PageSnapshot, node: SnapshotNode): string {
   const childrenText = (): string => node.children.map((childIndex) => snapshot.nodes[childIndex])
     .filter((child): child is SnapshotNode => child !== undefined).map((child) => visibleInnerText(snapshot, child)).join('');
   if (node.nodeType === 3) {
-    if (textVisible(snapshot, node)) return node.value.replace(/\s+/g, ' ');
+    if (textVisible(snapshot, node)) {return node.value.replace(/\s+/g, ' ');}
     return node.style !== null && node.value.trim() === '' ? ' ' : (parentElement(snapshot, node)?.style && node.value.trim() === '' ? ' ' : '');
   }
-  if (node.nodeType !== 1) return childrenText();
-  if (!node.style) return '';
+  if (node.nodeType !== 1) {return childrenText();}
+  if (!node.style) {return '';}
   if (!isVisible(snapshot, node) && node.name !== 'br') {
     const inner = childrenText();
-    if (inner.trim() !== '') return inner; // visible descendants of a zero-size inline wrapper
+    if (inner.trim() !== '') {return inner;} // visible descendants of a zero-size inline wrapper
     return (node.bounds?.width ?? 0) > 0 ? ' ' : '';
   }
-  if (node.name === 'br') return '\n';
+  if (node.name === 'br') {return '\n';}
   const inner = childrenText();
   const display = node.style['display'] ?? 'inline';
-  if (/^(block|flex|grid|list-item|table|flow-root)/.test(display) || display === 'table-caption') return '\n' + inner + '\n';
-  if (display === 'table-cell' || display === 'table-row') return ' ' + inner + ' ';
+  if (/^(block|flex|grid|list-item|table|flow-root)/.test(display) || display === 'table-caption') {return '\n' + inner + '\n';}
+  if (display === 'table-cell' || display === 'table-row') {return ' ' + inner + ' ';}
   return inner;
 }
 function nameTokens(value: string): string[] {
@@ -650,8 +650,8 @@ function nameTokens(value: string): string[] {
   return trimmed === '' ? [] : trimmed.split(/\s+/);
 }
 function containsInOrder(label: string[], name: string[]): boolean {
-  if (label.length === 0) return true;
-  for (let i = 0; i + label.length <= name.length; i++) if (label.every((token, j) => name[i + j] === token)) return true;
+  if (label.length === 0) {return true;}
+  for (let i = 0; i + label.length <= name.length; i++) {if (label.every((token, j) => name[i + j] === token)) {return true;}}
   return false;
 }
 const labelInNameRule: StaticRule = {
@@ -659,13 +659,13 @@ const labelInNameRule: StaticRule = {
   evaluate(snapshot) {
     const results: TargetResult[] = [];
     for (const node of elementsOf(snapshot)) {
-      if (!inAccessibilityTree(node)) continue;
+      if (!inAccessibilityTree(node)) {continue;}
       const explicit = explicitRole(node);
       const role = explicit !== null && ARIA_ROLES.has(explicit) ? explicit : accessibilityRole(node);
-      if (!NAME_FROM_CONTENT_ROLES.has(role)) continue;
-      if (node.attributes['aria-label'] === undefined && node.attributes['aria-labelledby'] === undefined) continue;
+      if (!NAME_FROM_CONTENT_ROLES.has(role)) {continue;}
+      if (node.attributes['aria-label'] === undefined && node.attributes['aria-labelledby'] === undefined) {continue;}
       const label = visibleInnerText(snapshot, node).replace(/\s+/g, ' ').trim();
-      if (label === '') continue;
+      if (label === '') {continue;}
       const included = containsInOrder(nameTokens(label), nameTokens(nameOf(node)));
       results.push(included ? passed(node) : failed(node, `Visible label "${label}" is not part of the accessible name "${nameOf(node)}"`));
     }

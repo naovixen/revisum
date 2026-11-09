@@ -169,7 +169,7 @@ export function readId<Name extends string>(input: unknown, path: string, issues
 function readLocale(input: unknown, path: string, issues: Issues): Parsed<Locale> {
   if (typeof input !== 'string') { issues.push({ code: PlanErrorCode.WrongType, path }); return INVALID; }
   try {
-    if (Intl.getCanonicalLocales(input)[0] === input) return brand<string, 'Locale'>(input);
+    if (Intl.getCanonicalLocales(input)[0] === input) {return brand<string, 'Locale'>(input);}
   } catch { /* not a language tag: reported below */ }
   issues.push({ code: PlanErrorCode.UnknownValue, path });
   return INVALID;
@@ -177,7 +177,7 @@ function readLocale(input: unknown, path: string, issues: Issues): Parsed<Locale
 
 function readTimeZone(input: unknown, path: string, issues: Issues): Parsed<TimeZone> {
   if (typeof input !== 'string') { issues.push({ code: PlanErrorCode.WrongType, path }); return INVALID; }
-  if (input === 'UTC' || Intl.supportedValuesOf('timeZone').includes(input)) return brand<string, 'TimeZone'>(input);
+  if (input === 'UTC' || Intl.supportedValuesOf('timeZone').includes(input)) {return brand<string, 'TimeZone'>(input);}
   issues.push({ code: PlanErrorCode.UnknownValue, path });
   return INVALID;
 }
@@ -205,11 +205,11 @@ function readBoolean(input: unknown, path: string, issues: Issues): Parsed<boole
 
 // A plain JSON value: what a project file can hold, and what canonical JSON can hash.
 function isJsonValue(input: unknown, depth: number): boolean {
-  if (input === null || typeof input === 'string' || typeof input === 'boolean') return true;
-  if (typeof input === 'number') return Number.isFinite(input);
-  if (depth >= MAXIMUM_EXTENSION_DEPTH || typeof input !== 'object') return false;
-  if (Array.isArray(input)) return !hasHoles(input) && input.every((item) => isJsonValue(item, depth + 1));
-  if (!isPlainObject(input)) return false;
+  if (input === null || typeof input === 'string' || typeof input === 'boolean') {return true;}
+  if (typeof input === 'number') {return Number.isFinite(input);}
+  if (depth >= MAXIMUM_EXTENSION_DEPTH || typeof input !== 'object') {return false;}
+  if (Array.isArray(input)) {return !hasHoles(input) && input.every((item) => isJsonValue(item, depth + 1));}
+  if (!isPlainObject(input)) {return false;}
   return Object.values(input).every((item) => isJsonValue(item, depth + 1));
 }
 
@@ -219,11 +219,11 @@ const isVendorExtensionKey = (key: string): key is VendorExtensionKey => VENDOR_
 // every value plain JSON, so the manifest can record and hash them.
 function readVendorExtensions(input: unknown, path: string, issues: Issues): Parsed<Readonly<Record<VendorExtensionKey, unknown>>> {
   const fields = peekRecord(input, path, issues);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const before = issues.length;
   const extensions: Record<VendorExtensionKey, unknown> = {};
   const keys = Object.keys(fields);
-  if (keys.length > MAXIMUM_VENDOR_EXTENSIONS) issues.push({ code: PlanErrorCode.TooLarge, path });
+  if (keys.length > MAXIMUM_VENDOR_EXTENSIONS) {issues.push({ code: PlanErrorCode.TooLarge, path });}
   for (const key of keys) {
     if (!isVendorExtensionKey(key)) { issues.push({ code: PlanErrorCode.UnknownField, path: `${path}.${key}` }); continue; }
     if (!isJsonValue(fields[key], 0)) { issues.push({ code: PlanErrorCode.WrongType, path: `${path}.${key}` }); continue; }
@@ -243,7 +243,7 @@ function readOptional<Value>(
 
 export function readTarget(input: unknown, path: string, issues: Issues): Parsed<Target> {
   const fields = readRecord(input, path, issues, [...REQUIRED_TARGET_KEYS, ...OPTIONAL_TARGET_KEYS], REQUIRED_TARGET_KEYS);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const parts = [
     readId<'TargetId'>(fields['id'], `${path}.id`, issues),
     readId<'AdapterId'>(fields['adapter'], `${path}.adapter`, issues),
@@ -260,7 +260,7 @@ export function readTarget(input: unknown, path: string, issues: Issues): Parsed
     readOptional(fields, 'required', path, issues, readBoolean),
     readOptional(fields, 'vendorExtensions', path, issues, readVendorExtensions),
   ] as const;
-  if (!allValid(parts) || !allValid(optional)) return INVALID;
+  if (!allValid(parts) || !allValid(optional)) {return INVALID;}
   const [id, adapter, engine, device, locale, timezone, colorScheme, reducedMotion] = parts;
   const [version, fidelity, required, vendorExtensions] = optional;
   return {
@@ -285,16 +285,16 @@ const LIMIT_KEYS: readonly (keyof Limits)[] = Object.keys(LIMIT_CEILINGS).filter
 
 // The project's limits: each one it sets, within its ceiling, and the default for the rest.
 function readLimits(input: unknown, path: string, issues: Issues): Parsed<Limits> {
-  if (input === undefined) return DEFAULT_LIMITS;
+  if (input === undefined) {return DEFAULT_LIMITS;}
   const fields = readRecord(input, path, issues, LIMIT_KEYS, []);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const limits: { -readonly [Key in keyof Limits]: number } = { ...DEFAULT_LIMITS };
   let valid = true;
   for (const key of LIMIT_KEYS) {
-    if (fields[key] === undefined) continue;
+    if (fields[key] === undefined) {continue;}
     const value = readInteger(fields[key], `${path}.${key}`, issues, 1, LIMIT_CEILINGS[key]);
-    if (value === INVALID) valid = false;
-    else limits[key] = value;
+    if (value === INVALID) {valid = false;}
+    else {limits[key] = value;}
   }
   // One advance may not move the clock further than the whole plan may.
   if (valid && limits.maximumClockAdvanceMilliseconds > limits.maximumTotalClockAdvanceMilliseconds) {
@@ -308,16 +308,16 @@ function readLimits(input: unknown, path: string, issues: Issues): Parsed<Limits
 function readNameList<Name extends string>(
   input: unknown, path: string, issues: Issues, pattern: RegExp, extraRule: (name: string) => boolean = () => true,
 ): Parsed<readonly Brand<string, Name>[]> {
-  if (input === undefined) return [];
+  if (input === undefined) {return [];}
   const raw = readList(input, path, issues, 256, 0);
-  if (raw === INVALID) return INVALID;
+  if (raw === INVALID) {return INVALID;}
   const names = raw.map((value, index): Parsed<Brand<string, Name>> => {
     const at = `${path}[${index}]`;
     if (typeof value !== 'string') { issues.push({ code: PlanErrorCode.WrongType, path: at }); return INVALID; }
     if (!pattern.test(value) || !extraRule(value)) { issues.push({ code: PlanErrorCode.UnknownValue, path: at }); return INVALID; }
     return brand<string, Name>(value);
   });
-  if (!allValid(names)) return INVALID;
+  if (!allValid(names)) {return INVALID;}
   if (new Set(names).size !== names.length) { issues.push({ code: PlanErrorCode.Duplicate, path }); return INVALID; }
   return names;
 }
@@ -327,7 +327,7 @@ function readNameList<Name extends string>(
 function readNameListOr<Name extends string>(
   input: unknown, path: string, issues: Issues, pattern: RegExp, fallback: string,
 ): Parsed<readonly Brand<string, Name>[]> {
-  if (input === undefined) return [brand<string, Name>(fallback)];
+  if (input === undefined) {return [brand<string, Name>(fallback)];}
   const names = readNameList<Name>(input, path, issues, pattern);
   if (names !== INVALID && names.length === 0) { issues.push({ code: PlanErrorCode.Empty, path }); return INVALID; }
   return names;
@@ -335,11 +335,11 @@ function readNameListOr<Name extends string>(
 
 // An optional list of distinct origins; absent means the project declares none.
 function readProductionOrigins(input: unknown, issues: Issues): Parsed<readonly Origin[]> {
-  if (input === undefined) return [];
+  if (input === undefined) {return [];}
   const raw = readList(input, '$.productionOrigins', issues, 32, 0);
-  if (raw === INVALID) return INVALID;
+  if (raw === INVALID) {return INVALID;}
   const origins = raw.map((origin, index) => readOrigin(origin, `$.productionOrigins[${index}]`, issues));
-  if (!allValid(origins)) return INVALID;
+  if (!allValid(origins)) {return INVALID;}
   if (new Set(origins).size !== origins.length) { issues.push({ code: PlanErrorCode.Duplicate, path: '$.productionOrigins' }); return INVALID; }
   return origins;
 }
@@ -351,9 +351,9 @@ const PATH_BASE = new URL('https://path.invalid');
 
 // An optional list of distinct, non-blank texts. Absent means none.
 function readTextList(input: unknown, path: string, issues: Issues, maximumLength: number, minimumCount = 0): Parsed<readonly SafeText[]> {
-  if (input === undefined) return [];
+  if (input === undefined) {return [];}
   const raw = readList(input, path, issues, MAXIMUM_POLICY_LIST, minimumCount);
-  if (raw === INVALID) return INVALID;
+  if (raw === INVALID) {return INVALID;}
   const texts = raw.map((value, index): Parsed<SafeText> => {
     const at = `${path}[${index}]`;
     const text = readUnscannedText(value, at, issues, maximumLength);
@@ -361,7 +361,7 @@ function readTextList(input: unknown, path: string, issues: Issues, maximumLengt
     if (text !== INVALID && text.trim() === '') { issues.push({ code: PlanErrorCode.Empty, path: at }); return INVALID; }
     return text;
   });
-  if (!allValid(texts)) return INVALID;
+  if (!allValid(texts)) {return INVALID;}
   if (new Set(texts).size !== texts.length) { issues.push({ code: PlanErrorCode.Duplicate, path }); return INVALID; }
   return texts;
 }
@@ -369,27 +369,27 @@ function readTextList(input: unknown, path: string, issues: Issues, maximumLengt
 // Per locale, a non-empty list of words. A declared locale with no words would hide the fact
 // that nothing is denied there, so an empty list is refused.
 function readIrreversiblePatterns(input: unknown, path: string, issues: Issues): Parsed<IrreversiblePatterns> {
-  if (input === undefined) return {};
+  if (input === undefined) {return {};}
   const fields = peekRecord(input, path, issues);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const entries = Object.entries(fields).map(([key, value]): Parsed<readonly [Locale, readonly SafeText[]]> => {
     const locale = readLocale(key, `${path}.${key}`, issues);
     const words = readTextList(value, `${path}.${key}`, issues, MAXIMUM_PATTERN_LENGTH, 1);
     return locale === INVALID || words === INVALID ? INVALID : [locale, words];
   });
-  if (!allValid(entries)) return INVALID;
+  if (!allValid(entries)) {return INVALID;}
   return Object.fromEntries(entries);
 }
 
 // URL paths such as /account/delete, with no query or fragment, kept as the URL standard writes them.
 function readDestructivePaths(input: unknown, path: string, issues: Issues): Parsed<readonly string[]> {
-  if (input === undefined) return [];
+  if (input === undefined) {return [];}
   const raw = readList(input, path, issues, MAXIMUM_POLICY_LIST, 0);
-  if (raw === INVALID) return INVALID;
+  if (raw === INVALID) {return INVALID;}
   const paths = raw.map((value, index): Parsed<string> => {
     const at = `${path}[${index}]`;
     const text = readUnscannedText(value, at, issues, MAXIMUM_URL_LENGTH);
-    if (text === INVALID) return INVALID;
+    if (text === INVALID) {return INVALID;}
     let url: URL | undefined;
     try { url = new URL(text, PATH_BASE); } catch { url = undefined; }
     if (url === undefined || !text.startsWith('/') || url.origin !== PATH_BASE.origin || url.search !== '' || url.hash !== '') {
@@ -398,7 +398,7 @@ function readDestructivePaths(input: unknown, path: string, issues: Issues): Par
     }
     return url.pathname;
   });
-  if (!allValid(paths)) return INVALID;
+  if (!allValid(paths)) {return INVALID;}
   if (new Set(paths).size !== paths.length) { issues.push({ code: PlanErrorCode.Duplicate, path }); return INVALID; }
   return paths;
 }
@@ -410,13 +410,13 @@ const POLICY_KEYS = [
 
 // Every field is optional; a missing one keeps the strict default.
 function readPolicy(input: unknown, path: string, issues: Issues, limits: Parsed<Limits>): Parsed<ProjectPolicy> {
-  if (input === undefined) return DEFAULT_POLICY;
+  if (input === undefined) {return DEFAULT_POLICY;}
   const fields = readRecord(input, path, issues, POLICY_KEYS, []);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const longestName = limits === INVALID ? DEFAULT_LIMITS.maximumTextLength : limits.maximumTextLength;
   // Present but null is not "absent": only true or false is a setting.
   const allowProduction = Object.hasOwn(fields, 'allowProductionForApprovedPlans') ? fields['allowProductionForApprovedPlans'] : false;
-  if (typeof allowProduction !== 'boolean') issues.push({ code: PlanErrorCode.WrongType, path: `${path}.allowProductionForApprovedPlans` });
+  if (typeof allowProduction !== 'boolean') {issues.push({ code: PlanErrorCode.WrongType, path: `${path}.allowProductionForApprovedPlans` });}
   const parts = [
     readIrreversiblePatterns(fields['irreversiblePatterns'], `${path}.irreversiblePatterns`, issues),
     readTextList(fields['allowedIrreversibleNames'], `${path}.allowedIrreversibleNames`, issues, longestName),
@@ -424,7 +424,7 @@ function readPolicy(input: unknown, path: string, issues: Issues, limits: Parsed
     readTextList(fields['unnamedControlsAllowedByTestId'], `${path}.unnamedControlsAllowedByTestId`, issues, MAXIMUM_TEST_ID_LENGTH),
     typeof allowProduction === 'boolean' ? allowProduction : INVALID,
   ] as const;
-  if (!allValid(parts)) return INVALID;
+  if (!allValid(parts)) {return INVALID;}
   const [irreversiblePatterns, allowedIrreversibleNames, destructiveUrlPatterns, unnamedControlsAllowedByTestId, allowProductionForApprovedPlans] = parts;
   return { irreversiblePatterns, allowedIrreversibleNames, destructiveUrlPatterns, unnamedControlsAllowedByTestId, allowProductionForApprovedPlans };
 }
@@ -438,10 +438,10 @@ export function readSecretName(input: unknown, path: string, issues: Issues): Pa
 
 // The replay section: recordReplies, true or false. The section is closed.
 function readReplaySettings(input: unknown, issues: Issues): Parsed<ReplaySettings | undefined> {
-  if (input === undefined) return undefined;
+  if (input === undefined) {return undefined;}
   const path = '$.replay';
   const fields = readRecord(input, path, issues, ['recordReplies']);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const recordReplies = fields['recordReplies'];
   if (typeof recordReplies !== 'boolean') { issues.push({ code: PlanErrorCode.WrongType, path: `${path}.recordReplies` }); return INVALID; }
   return { recordReplies };
@@ -449,9 +449,9 @@ function readReplaySettings(input: unknown, issues: Issues): Parsed<ReplaySettin
 
 // Every field is optional; a missing one keeps the default. The section is closed.
 function readEvidence(input: unknown, path: string, issues: Issues): Parsed<EvidenceSettings> {
-  if (input === undefined) return DEFAULT_EVIDENCE;
+  if (input === undefined) {return DEFAULT_EVIDENCE;}
   const fields = readRecord(input, path, issues, ['keepDownloads'], []);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   // Present but null is not "absent": only true or false is a setting.
   const keepDownloads = Object.hasOwn(fields, 'keepDownloads') ? fields['keepDownloads'] : DEFAULT_EVIDENCE.keepDownloads;
   if (typeof keepDownloads !== 'boolean') { issues.push({ code: PlanErrorCode.WrongType, path: `${path}.keepDownloads` }); return INVALID; }
@@ -466,21 +466,21 @@ const MAXIMUM_MODEL_LENGTH = 200;
 // key never travels in plain text. A local endpoint may be http:; the draft command keeps it to
 // the loopback interface. The key is a declared secret, named, never written here.
 function readPlannerEndpoint(input: unknown, issues: Issues, secretNames: readonly SecretName[]): Parsed<PlannerEndpoint | undefined> {
-  if (input === undefined) return undefined;
+  if (input === undefined) {return undefined;}
   const path = '$.planner';
   // The kind is read first, because it decides whether the key is required.
   const shape = peekRecord(input, path, issues);
-  if (shape === INVALID) return INVALID;
+  if (shape === INVALID) {return INVALID;}
   const kind = readOneOf(shape['kind'], `${path}.kind`, issues, PLANNER_KINDS);
-  if (kind === INVALID) return INVALID;
+  if (kind === INVALID) {return INVALID;}
   const keys = ['kind', 'url', 'model', 'wire', 'apiKey'];
   const fields = readRecord(input, path, issues, keys, kind === PlannerEndpointKind.CustomerKey ? keys : ['kind', 'url', 'model', 'wire']);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const address = readPlannerUrl(fields['url'], `${path}.url`, issues, kind);
   const model = readUnscannedText(fields['model'], `${path}.model`, issues, MAXIMUM_MODEL_LENGTH);
   const wire = readOneOf(fields['wire'], `${path}.wire`, issues, PLANNER_WIRES);
   const apiKey = fields['apiKey'] === undefined ? undefined : readPlannerKey(fields['apiKey'], `${path}.apiKey`, issues, secretNames);
-  if (address === INVALID || model === INVALID || wire === INVALID || apiKey === INVALID) return INVALID;
+  if (address === INVALID || model === INVALID || wire === INVALID || apiKey === INVALID) {return INVALID;}
   if (kind === PlannerEndpointKind.CustomerKey) {
     // readRecord has already required the key, so it is present here.
     return apiKey === undefined ? INVALID : { kind, ...address, model, wire, apiKey };
@@ -497,7 +497,7 @@ const isLoopbackHost = (hostname: string): boolean =>
 // the loopback interface. Its origin and path are read here once, for the draft command.
 function readPlannerUrl(input: unknown, path: string, issues: Issues, kind: PlannerEndpointKind): Parsed<PlannerAddress & { readonly url: PlannerUrl }> {
   const text = readUnscannedText(input, path, issues, MAXIMUM_URL_LENGTH);
-  if (text === INVALID) return INVALID;
+  if (text === INVALID) {return INVALID;}
   let url: URL;
   try { url = new URL(text); } catch { issues.push({ code: PlanErrorCode.InvalidUrl, path }); return INVALID; }
   if (url.protocol !== 'https:' && (kind === PlannerEndpointKind.CustomerKey || url.protocol !== 'http:')) { issues.push({ code: PlanErrorCode.SchemeNotAllowed, path }); return INVALID; }
@@ -512,7 +512,7 @@ function readPlannerUrl(input: unknown, path: string, issues: Issues, kind: Plan
 
 function readPlannerKey(input: unknown, path: string, issues: Issues, secretNames: readonly SecretName[]): Parsed<{ readonly secretName: SecretName }> {
   const fields = readRecord(input, path, issues, ['secretName']);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const at = `${path}.secretName`;
   if (typeof fields['secretName'] !== 'string') { issues.push({ code: PlanErrorCode.WrongType, path: at }); return INVALID; }
   const found = secretNames.find((name) => name === fields['secretName']);
@@ -531,7 +531,7 @@ export function parseProject(input: unknown): Result<Project, readonly PlanError
     ],
     ['origins', 'matrix'],
   );
-  if (fields === INVALID) return failure(issues);
+  if (fields === INVALID) {return failure(issues);}
   const rawOrigins = readList(fields['origins'], '$.origins', issues, 32);
   const rawMatrix = readList(fields['matrix'], '$.matrix', issues, 64);
   const limits = readLimits(fields['limits'], '$.limits', issues);
@@ -580,15 +580,15 @@ export function parseProject(input: unknown): Result<Project, readonly PlanError
   const matrix = rawMatrix === INVALID ? [] : rawMatrix.map((target, index) => readTarget(target, `$.matrix[${index}]`, issues));
   const seen = new Set<string>();
   matrix.forEach((target, index) => {
-    if (target === INVALID) return;
-    if (seen.has(target.id)) issues.push({ code: PlanErrorCode.Duplicate, path: `$.matrix[${index}].id` });
+    if (target === INVALID) {return;}
+    if (seen.has(target.id)) {issues.push({ code: PlanErrorCode.Duplicate, path: `$.matrix[${index}].id` });}
     seen.add(target.id);
   });
   if (issues.length > 0 || limits === INVALID || secretNames === INVALID || fixtures === INVALID
     || productionOrigins === INVALID || policy === INVALID || testIdAttributes === INVALID || generatedEmailDomains === INVALID
     || evidence === INVALID || services === INVALID || calls === INVALID
     || stubs === INVALID || observedRequests === INVALID || storageEntries === INVALID || evidenceMode === INVALID
-    || unsafeFeatures === INVALID || planner === INVALID || replay === INVALID || !allValid(origins) || !allValid(matrix)) return failure(issues);
+    || unsafeFeatures === INVALID || planner === INVALID || replay === INVALID || !allValid(origins) || !allValid(matrix)) {return failure(issues);}
   // Left out when absent, so a project without evidence mode or unsafe features parses exactly as
   // it did before.
   return success(brand<ProjectData, 'Project'>({

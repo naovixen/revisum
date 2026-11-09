@@ -18,10 +18,10 @@ function listFolder(root: string, folder: string): string[] {
   }
   const files: string[] = [];
   for (const entry of entries) {
-    if (SKIPPED_FOLDERS.has(entry.name)) continue;
+    if (SKIPPED_FOLDERS.has(entry.name)) {continue;}
     const path = `${folder}/${entry.name}`;
-    if (entry.isDirectory()) files.push(...listFolder(root, path));
-    else if (entry.isFile() && CODE_FILE.test(entry.name)) files.push(path);
+    if (entry.isDirectory()) {files.push(...listFolder(root, path));}
+    else if (entry.isFile() && CODE_FILE.test(entry.name)) {files.push(path);}
   }
   return files;
 }

@@ -31,7 +31,7 @@ export function readValueName(input: unknown, path: string, issues: Issues): Par
 
 function readRelativeDay(input: unknown, path: string, issues: Issues): Parsed<RelativeDay> {
   const fields = readRecord(input, path, issues, [FROM_FIELD, 'addDays']);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const parts = [
     readOneOf(fields[FROM_FIELD], `${path}.${FROM_FIELD}`, issues, DATE_ANCHORS),
     readInteger(fields['addDays'], `${path}.addDays`, issues, -MAXIMUM_DAY_OFFSET, MAXIMUM_DAY_OFFSET),
@@ -41,7 +41,7 @@ function readRelativeDay(input: unknown, path: string, issues: Issues): Parsed<R
 
 export function readPlanClock(input: unknown, path: string, issues: Issues): Parsed<PlanClock> {
   const fields = readRecord(input, path, issues, ['day', 'time']);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const day = readRelativeDay(fields['day'], `${path}.day`, issues);
   const time = fields['time'];
   if (typeof time !== 'string') { issues.push({ code: PlanErrorCode.WrongType, path: `${path}.time` }); return INVALID; }
@@ -60,34 +60,34 @@ function readEmailDomain(input: unknown, path: string, context: ValueContext): P
 function readGeneratedValue(input: unknown, path: string, context: ValueContext): Parsed<GeneratedValue> {
   const { issues } = context;
   const head = peekRecord(input, path, issues);
-  if (head === INVALID) return INVALID;
+  if (head === INVALID) {return INVALID;}
   const kind = readOneOf(head['kind'], `${path}.kind`, issues, GENERATED_VALUE_KINDS);
-  if (kind === INVALID) return INVALID;
+  if (kind === INVALID) {return INVALID;}
   switch (kind) {
     case GeneratedValueKind.UniqueText: {
-      if (readRecord(input, path, issues, ['kind', 'prefix']) === INVALID) return INVALID;
+      if (readRecord(input, path, issues, ['kind', 'prefix']) === INVALID) {return INVALID;}
       const prefix = context.readText(head['prefix'], `${path}.prefix`, MAXIMUM_VALUE_PREFIX_LENGTH);
       return prefix === INVALID ? INVALID : { kind, prefix };
     }
     case GeneratedValueKind.UniqueEmail: {
-      if (readRecord(input, path, issues, ['kind', 'localPrefix', 'domain'], ['kind', 'localPrefix']) === INVALID) return INVALID;
+      if (readRecord(input, path, issues, ['kind', 'localPrefix', 'domain'], ['kind', 'localPrefix']) === INVALID) {return INVALID;}
       // Only characters every mail system accepts, so the address is always well formed.
       const localPrefix = context.readText(head['localPrefix'], `${path}.localPrefix`, MAXIMUM_VALUE_PREFIX_LENGTH);
       if (localPrefix !== INVALID && !EMAIL_LOCAL_PREFIX.test(localPrefix)) {
         issues.push({ code: PlanErrorCode.UnknownValue, path: `${path}.localPrefix` });
         return INVALID;
       }
-      if (!Object.hasOwn(head, 'domain')) return localPrefix === INVALID ? INVALID : { kind, localPrefix };
+      if (!Object.hasOwn(head, 'domain')) {return localPrefix === INVALID ? INVALID : { kind, localPrefix };}
       const domain = readEmailDomain(head['domain'], `${path}.domain`, context);
       return localPrefix === INVALID || domain === INVALID ? INVALID : { kind, localPrefix, domain };
     }
     case GeneratedValueKind.UniqueNumber: {
-      if (readRecord(input, path, issues, ['kind', 'digits']) === INVALID) return INVALID;
+      if (readRecord(input, path, issues, ['kind', 'digits']) === INVALID) {return INVALID;}
       const digits = readInteger(head['digits'], `${path}.digits`, issues, UNIQUE_NUMBER_DIGITS.fewest, UNIQUE_NUMBER_DIGITS.most);
       return digits === INVALID ? INVALID : { kind, digits };
     }
     case GeneratedValueKind.Date: {
-      if (readRecord(input, path, issues, ['kind', 'day', 'format']) === INVALID) return INVALID;
+      if (readRecord(input, path, issues, ['kind', 'day', 'format']) === INVALID) {return INVALID;}
       const parts = [readRelativeDay(head['day'], `${path}.day`, issues), readOneOf(head['format'], `${path}.format`, issues, DATE_FORMATS)] as const;
       return allValid(parts) ? { kind, day: parts[0], format: parts[1] } : INVALID;
     }
@@ -102,7 +102,7 @@ export function readGeneratedValues(
 ): Parsed<Readonly<Record<string, GeneratedValue>>> {
   const { issues } = context;
   const fields = peekRecord(input, path, issues);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const names = Object.keys(fields);
   if (names.length > MAXIMUM_VALUES) { issues.push({ code: PlanErrorCode.TooLarge, path }); return INVALID; }
   const entries = names.map((name): Parsed<readonly [string, GeneratedValue]> => {

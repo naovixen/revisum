@@ -20,7 +20,7 @@ export function suiteEnvironment(suite: EvidenceSuiteDeclaration, store: SecretS
       continue;
     }
     const secret = store.resolve(value.secretName);
-    if (secret === null) return failure(value.secretName);
+    if (secret === null) {return failure(value.secretName);}
     secrets.push(secret);
     variables.push({ name, value: secret });
   }

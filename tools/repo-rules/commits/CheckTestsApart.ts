@@ -58,7 +58,7 @@ function main(words: readonly string[]): number {
       return 2;
     }
     const mixed = mixedCommits(range);
-    for (const { commit, result } of mixed) report(`commit ${commit.slice(0, 12)}`, result);
+    for (const { commit, result } of mixed) {report(`commit ${commit.slice(0, 12)}`, result);}
     console.log(mixed.length === 0 ? `tests-apart passed: no commit in ${range} mixes the test set and other files` : `tests-apart failed: ${mixed.length} commit(s) mix them`);
     return mixed.length === 0 ? 0 : 1;
   }
@@ -72,4 +72,4 @@ function main(words: readonly string[]): number {
   return 1;
 }
 
-if (import.meta.main) process.exitCode = main(process.argv.slice(2));
+if (import.meta.main) {process.exitCode = main(process.argv.slice(2));}

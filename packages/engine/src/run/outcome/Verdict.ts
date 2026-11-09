@@ -37,7 +37,7 @@ function checkDom(assertion: DomCheckWith<SafeText>, probe: OneElementRead): Ver
   const read = probe.dom;
   switch (assertion.kind) {
     case DomCheckKind.HasClass: case DomCheckKind.LacksClass: {
-      if (read?.kind !== DomReadKind.Classes) return FAILED;
+      if (read?.kind !== DomReadKind.Classes) {return FAILED;}
       return read.classes.includes(assertion.value) === (assertion.kind === DomCheckKind.HasClass) ? PASSED : FAILED;
     }
     case DomCheckKind.ComputedStyleEquals:
@@ -62,7 +62,7 @@ const STATE_CHECKS = {
 function checkState(kind: keyof typeof STATE_CHECKS, probe: OneElementRead): Verdict {
   const [state, wanted] = STATE_CHECKS[kind];
   const exposed = probe.states[state];
-  if (exposed === null) return STATE_NOT_EXPOSED;
+  if (exposed === null) {return STATE_NOT_EXPOSED;}
   return exposed === wanted ? PASSED : FAILED;
 }
 
@@ -78,7 +78,7 @@ function absoluteUrl(text: string, baseUrl: string | undefined): string | undefi
 
 // Two URLs are the same when both parse and their normalised forms are equal.
 function sameUrl(expected: string, actual: string | null | undefined, baseUrl: string | undefined): boolean {
-  if (actual === null || actual === undefined) return false;
+  if (actual === null || actual === undefined) {return false;}
   const wanted = absoluteUrl(expected, baseUrl);
   const seen = absoluteUrl(actual, undefined);
   return wanted !== undefined && wanted === seen;
@@ -93,8 +93,8 @@ export function checkElement(assertion: ResolvedElementAssertion, probe: Element
     return { pass: false, code: probe.count };
   }
   // Checks on how many elements match come before the single-element rule below.
-  if (assertion.kind === ElementStateKind.Absent) return probe.count === 0 ? PASSED : FAILED;
-  if (assertion.kind === ElementAssertionKind.CountEquals) return probe.count === assertion.value ? PASSED : FAILED;
+  if (assertion.kind === ElementStateKind.Absent) {return probe.count === 0 ? PASSED : FAILED;}
+  if (assertion.kind === ElementAssertionKind.CountEquals) {return probe.count === assertion.value ? PASSED : FAILED;}
   if (assertion.kind === ElementAssertionKind.Hidden && probe.count === 0) {
     return PASSED;
   }
@@ -144,7 +144,7 @@ export function checkPage(assertion: PageAssertion, probe: PageProbe, baseUrl?: 
     // fails. A value reference left in the check never matches.
     case PageAssertionKind.MetaContent: {
       const expected = literalText(assertion.value);
-      if (expected === undefined) return FAILED;
+      if (expected === undefined) {return FAILED;}
       const found = probe.meta.some((tag) => sameMetaName(tag.name, assertion.name) && normalise(tag.content) === normalise(expected));
       return found ? PASSED : FAILED;
     }

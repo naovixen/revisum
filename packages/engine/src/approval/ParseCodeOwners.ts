@@ -28,9 +28,9 @@ function patternExpression(pattern: string): RegExp {
     const character = body[index] ?? '';
     if (body.startsWith('**/', index)) { expression += '(?:.*/)?'; index += 2; }
     else if (body.startsWith('**', index)) { expression += '.*'; index += 1; }
-    else if (character === '*') expression += '[^/]*';
-    else if (character === '?') expression += '[^/]';
-    else expression += character.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+    else if (character === '*') {expression += '[^/]*';}
+    else if (character === '?') {expression += '[^/]';}
+    else {expression += character.replace(/[.+^${}()|[\]\\]/g, '\\$&');}
   }
   const start = anchored ? '^' : '^(?:.*/)?';
   return new RegExp(`${start}${expression}${patternEnd(body, folder)}`);
@@ -40,9 +40,9 @@ export function parseCodeOwners(text: string): readonly CodeOwnerRule[] {
   const rules: CodeOwnerRule[] = [];
   for (const rawLine of text.split(/\r?\n/)) {
     const line = rawLine.replace(/(^|\s)#.*$/, '').trim();
-    if (line === '') continue;
+    if (line === '') {continue;}
     const [pattern, ...owners] = line.split(/\s+/);
-    if (pattern === undefined) continue;
+    if (pattern === undefined) {continue;}
     rules.push({ pattern: patternExpression(pattern), owners });
   }
   return rules;

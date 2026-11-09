@@ -120,8 +120,8 @@ const EXPLORE_ONLY_FLAGS = ['--after', '--max-pages', '--max-depth', '--host'];
 
 // A whole number from `lowest` to `highest`, written in digits alone, or undefined.
 function boundOf(text: string | undefined, fallback: number, lowest: number, highest: number): number | undefined {
-  if (text === undefined) return fallback;
-  if (!/^\d{1,3}$/.test(text)) return undefined;
+  if (text === undefined) {return fallback;}
+  if (!/^\d{1,3}$/.test(text)) {return undefined;}
   const value = Number(text);
   return value >= lowest && value <= highest ? value : undefined;
 }
@@ -134,9 +134,9 @@ function readArguments(argv: readonly string[]): DraftArguments | Stop {
     const word = argv[index];
     if (word === '--json') { json = true; continue; }
     if (word === '--host') { host = true; continue; }
-    if (word === undefined || !VALUE_FLAGS.includes(word)) return stop('usage', word);
+    if (word === undefined || !VALUE_FLAGS.includes(word)) {return stop('usage', word);}
     const value = argv[index + 1];
-    if (value === undefined || value.startsWith('--') || values.has(word)) return stop('usage', word);
+    if (value === undefined || value.startsWith('--') || values.has(word)) {return stop('usage', word);}
     values.set(word, value);
     index += 1;
   }
@@ -145,20 +145,20 @@ function readArguments(argv: readonly string[]): DraftArguments | Stop {
   const start = values.get('--explore');
   if (start === undefined) {
     const exploreOnly = EXPLORE_ONLY_FLAGS.find((flag) => values.has(flag) || (flag === '--host' && host));
-    if (exploreOnly !== undefined) return stop('usage', exploreOnly);
+    if (exploreOnly !== undefined) {return stop('usage', exploreOnly);}
   }
-  if (from === undefined && start === undefined) return stop('usage', '--from');
-  if (out === undefined) return stop('usage', '--out');
+  if (from === undefined && start === undefined) {return stop('usage', '--from');}
+  if (out === undefined) {return stop('usage', '--out');}
   const criteriaText = values.get('--criteria');
-  if (criteriaText !== undefined && from === undefined) return stop('usage', '--criteria');
+  if (criteriaText !== undefined && from === undefined) {return stop('usage', '--criteria');}
   const criteria = criteriaText?.split(',').map((id) => id.trim()).filter((id) => id !== '');
   const common = { out, json, ...(from === undefined ? {} : { from }), ...(criteria === undefined ? {} : { criteria }) };
-  if (start === undefined) return common;
+  if (start === undefined) {return common;}
   // Bounds outside their range are refused before any browser starts, naming the flag.
   const maximumPages = boundOf(values.get('--max-pages'), DEFAULT_EXPLORE_PAGES, 1, MAXIMUM_EXPLORE_PAGES);
-  if (maximumPages === undefined) return stop('usage', '--max-pages');
+  if (maximumPages === undefined) {return stop('usage', '--max-pages');}
   const maximumDepth = boundOf(values.get('--max-depth'), DEFAULT_EXPLORE_DEPTH, 0, MAXIMUM_EXPLORE_DEPTH);
-  if (maximumDepth === undefined) return stop('usage', '--max-depth');
+  if (maximumDepth === undefined) {return stop('usage', '--max-depth');}
   const after = values.get('--after');
   return { ...common, explore: { start, maximumPages, maximumDepth, host, ...(after === undefined ? {} : { after }) } };
 }
@@ -166,17 +166,17 @@ function readArguments(argv: readonly string[]): DraftArguments | Stop {
 // A path inside the project folder, by its forward-slash relative form, or undefined for one that
 // is absolute or leads out of the folder.
 function insideFolder(folder: string, path: string): string | undefined {
-  if (isAbsolute(path)) return undefined;
+  if (isAbsolute(path)) {return undefined;}
   const within = relative(folder, resolve(folder, path));
-  if (within === '' || within.startsWith('..') || isAbsolute(within)) return undefined;
+  if (within === '' || within.startsWith('..') || isAbsolute(within)) {return undefined;}
   return within.replaceAll('\\', '/');
 }
 
 // The criteria --criteria names, in the spec's order, or the id it names that the spec lacks.
 function chosenCriteria(all: readonly CriterionText[], named: readonly string[] | undefined): readonly CriterionText[] | Stop {
-  if (named === undefined) return all;
+  if (named === undefined) {return all;}
   const missing = named.find((id) => !all.some((criterion) => criterion.criterion === id));
-  if (missing !== undefined || named.length === 0) return stop('usage', '--criteria');
+  if (missing !== undefined || named.length === 0) {return stop('usage', '--criteria');}
   return all.filter((criterion) => named.includes(criterion.criterion));
 }
 
@@ -201,9 +201,9 @@ const unusedPath = (ports: DraftCommandPorts, path: string): boolean => !existsS
 
 // The spec's criteria, or none when there is no spec.
 function readCriteria(options: DraftArguments, ports: DraftCommandPorts): { readonly specPath?: string; readonly criteria: readonly CriterionText[] } | Stop {
-  if (options.from === undefined) return { criteria: [] };
+  if (options.from === undefined) {return { criteria: [] };}
   const specPath = insideFolder(ports.workingDirectory, options.from);
-  if (specPath === undefined) return stop('usage', '--from');
+  if (specPath === undefined) {return stop('usage', '--from');}
   let spec: string;
   try {
     spec = readFileSync(resolve(ports.workingDirectory, specPath), 'utf8');
@@ -211,7 +211,7 @@ function readCriteria(options: DraftArguments, ports: DraftCommandPorts): { read
     return stop('usage', '--from');
   }
   const extracted = extractCriteria(spec);
-  if (!extracted.ok) return stop('usage', '--from');
+  if (!extracted.ok) {return stop('usage', '--from');}
   const criteria = chosenCriteria(extracted.value, options.criteria);
   return isStop(criteria) ? criteria : { specPath, criteria };
 }
@@ -219,7 +219,7 @@ function readCriteria(options: DraftArguments, ports: DraftCommandPorts): { read
 // Why the trusted project could not be used. A local planner off the loopback interface has a code
 // of its own, so the person sees which rule the endpoint broke.
 function projectRefusal(error: ProjectLoadError): Stop {
-  if (error.code !== 'config-invalid') return stop('untrusted-source', PROJECT_FILE);
+  if (error.code !== 'config-invalid') {return stop('untrusted-source', PROJECT_FILE);}
   return error.errors.some((issue) => issue.code === PlanErrorCode.NotLoopback)
     ? stop('planner-endpoint-not-loopback', `${PROJECT_FILE}#planner.url`)
     : stop('config-invalid', PROJECT_FILE);
@@ -227,20 +227,20 @@ function projectRefusal(error: ProjectLoadError): Stop {
 
 async function prepare(options: DraftArguments, ports: DraftCommandPorts): Promise<Prepared | Stop> {
   const loaded = await loadTrustedProject(PROJECT_FILE, ports.versionControl, { files: [], events: ports.events });
-  if (!loaded.ok) return projectRefusal(loaded.error);
+  if (!loaded.ok) {return projectRefusal(loaded.error);}
   const { project, asWritten: written } = loaded.value;
-  if (project.planner === undefined) return stop('usage', `${PROJECT_FILE}#planner`);
+  if (project.planner === undefined) {return stop('usage', `${PROJECT_FILE}#planner`);}
   const endpoint = project.planner;
 
   // The spec's path is checked before the draft's, as the command line names them.
-  if (options.from !== undefined && insideFolder(ports.workingDirectory, options.from) === undefined) return stop('usage', '--from');
+  if (options.from !== undefined && insideFolder(ports.workingDirectory, options.from) === undefined) {return stop('usage', '--from');}
   const draftPath = insideFolder(ports.workingDirectory, options.out);
   // A draft is readable text, and never replaces a file already there, such as an approved plan.
-  if (draftPath === undefined || !draftPath.endsWith(DRAFT_EXTENSION) || !unusedPath(ports, draftPath)) return stop('usage', '--out');
+  if (draftPath === undefined || !draftPath.endsWith(DRAFT_EXTENSION) || !unusedPath(ports, draftPath)) {return stop('usage', '--out');}
   const pageMapPath = options.explore === undefined ? undefined : `${draftPath.slice(0, -DRAFT_EXTENSION.length)}${PAGE_MAP_EXTENSION}`;
-  if (pageMapPath !== undefined && !unusedPath(ports, pageMapPath)) return stop('usage', '--out');
+  if (pageMapPath !== undefined && !unusedPath(ports, pageMapPath)) {return stop('usage', '--out');}
   const read = readCriteria(options, ports);
-  if (isStop(read)) return read;
+  if (isStop(read)) {return read;}
   const request: DraftRequest = {
     criteria: read.criteria, grammarVersion: READABLE_GRAMMAR_VERSION, origins: project.origins, targets: project.matrix.map((target) => target.id),
   };
@@ -278,7 +278,7 @@ type Login = { readonly cleared: ClearedRun; readonly text: string };
 // A denial is recorded on the command's audit log.
 function clearedLogin(path: string, project: Project, target: Target, ports: DraftCommandPorts): Login | Stop {
   const planPath = insideFolder(ports.workingDirectory, path);
-  if (planPath === undefined) return stop('usage', '--after');
+  if (planPath === undefined) {return stop('usage', '--after');}
   let text: string;
   try {
     text = readFileSync(resolve(ports.workingDirectory, planPath), 'utf8');
@@ -286,13 +286,13 @@ function clearedLogin(path: string, project: Project, target: Target, ports: Dra
     return stop('usage', '--after');
   }
   const read = readPlanText(text, project.limits);
-  if (!read.ok) return stop('plan-rejected', '--after');
+  if (!read.ok) {return stop('plan-rejected', '--after');}
   const parsed = planParser(project)(read.value.json);
-  if (!parsed.ok) return stop('plan-rejected', '--after');
+  if (!parsed.ok) {return stop('plan-rejected', '--after');}
   const standing = planStanding(parsed.value, ports.approvals ?? NO_APPROVALS);
-  if (standing.mode !== 'approved') return stop('after-plan-unapproved', '--after');
+  if (standing.mode !== 'approved') {return stop('after-plan-unapproved', '--after');}
   const decision = policyGate({ project, events: ports.events }).clear(parsed.value, target.id, standing);
-  if (decision.kind !== 'allow') return stop('plan-rejected', '--after');
+  if (decision.kind !== 'allow') {return stop('plan-rejected', '--after');}
   return { cleared: decision.run, text };
 }
 
@@ -307,12 +307,12 @@ function crawlStop(code: CrawlStop, closeFailure: string | null): Stop {
 
 async function exploreSite(explore: ExploreArguments, prepared: Prepared, ports: DraftCommandPorts): Promise<Explored | Stop> {
   const origin = exploreStartOrigin(prepared.project, explore.start);
-  if (origin === undefined) return stop('explore-origin-refused', '--explore');
+  if (origin === undefined) {return stop('explore-origin-refused', '--explore');}
   const { project, written } = prepared;
   const target = crawlTarget(project);
-  if (target === undefined) return stop('target-unavailable', `${PROJECT_FILE}#matrix`);
+  if (target === undefined) {return stop('target-unavailable', `${PROJECT_FILE}#matrix`);}
   const login = explore.after === undefined ? undefined : clearedLogin(explore.after, project, target, ports);
-  if (login !== undefined && isStop(login)) return login;
+  if (login !== undefined && isStop(login)) {return login;}
   // Page text is redacted of every declared secret, then of personal-data shapes.
   const redactor: Redactor = withDeclaredSecretRedaction(ports.redactor, project.secretNames, ports.secrets);
   const bounds = { start: explore.start, maximumPages: explore.maximumPages, maximumDepth: explore.maximumDepth, pageTimeoutMilliseconds: DEFAULT_PAGE_TIMEOUT_MILLISECONDS };
@@ -351,20 +351,20 @@ function writeNew(ports: DraftCommandPorts, path: string, content: string): bool
 
 async function draft(options: DraftArguments, ports: DraftCommandPorts): Promise<Drafted | Stop> {
   const prepared = await prepare(options, ports);
-  if (isStop(prepared)) return prepared;
+  if (isStop(prepared)) {return prepared;}
   const { project, endpoint, draftPath, pageMapPath } = prepared;
   const explored = options.explore === undefined ? undefined : await exploreSite(options.explore, prepared, ports);
-  if (explored !== undefined && isStop(explored)) return explored;
+  if (explored !== undefined && isStop(explored)) {return explored;}
   const request: DraftRequest = explored === undefined ? prepared.request : { ...prepared.request, pages: explored.map.pages };
   const called = await ports.planner(endpoint, request);
-  if (called.kind !== 'answered') return plannerCallStop(called);
+  if (called.kind !== 'answered') {return plannerCallStop(called);}
 
   // The reply is outside input: decoded by the engine, then bounded as text no longer than the
   // largest plan the project allows. Anything else is refused whole, and nothing of it is shown.
   const replyText = plannerReplyText(endpoint.wire, called.reply);
-  if (!replyText.ok) return stop('plan-rejected', draftPath);
+  if (!replyText.ok) {return stop('plan-rejected', draftPath);}
   const text = parseAiText(replyText.value, project.limits.maximumPlanBytes);
-  if (!text.ok) return stop('plan-rejected', draftPath);
+  if (!text.ok) {return stop('plan-rejected', draftPath);}
 
   // An explore draft opens with the command's notice, so the model's text cannot replace it, and
   // the lines of its errors and warnings count it.
@@ -377,11 +377,11 @@ async function draft(options: DraftArguments, ports: DraftCommandPorts): Promise
   let warnings: readonly DraftWarning[] = [];
   if (explored !== undefined && admitted.ok) {
     const reading = readPlanText(content, project.limits);
-    if (reading.ok) warnings = checkDraftLocators(admitted.value, reading.value, explored.map);
+    if (reading.ok) {warnings = checkDraftLocators(admitted.value, reading.value, explored.map);}
   }
   // A draft with errors is still written, so a person can fix it; its errors point at its lines.
-  if (explored !== undefined && pageMapPath !== undefined && !writeNew(ports, pageMapPath, explored.text)) return stop('internal', pageMapPath);
-  if (!writeNew(ports, draftPath, content)) return stop('internal', draftPath);
+  if (explored !== undefined && pageMapPath !== undefined && !writeNew(ports, pageMapPath, explored.text)) {return stop('internal', pageMapPath);}
+  if (!writeNew(ports, draftPath, content)) {return stop('internal', draftPath);}
   const result: DraftCommandResult = {
     draftPath, provenance, errors: admitted.ok ? [] : admitted.error, approved: false,
     ...(explored === undefined || pageMapPath === undefined ? {} : { pageMapPath }),
@@ -395,12 +395,12 @@ async function draft(options: DraftArguments, ports: DraftCommandPorts): Promise
 // The human-readable account of a draft, one fact per line.
 function draftReport(result: DraftCommandResult): string {
   const lines = [`Draft written to ${result.draftPath}, unapproved, source ${result.provenance.source}.`];
-  if (result.pageMapPath !== undefined) lines.push(`Page map written to ${result.pageMapPath}.`);
-  if (result.egressEnforced === false) lines.push('Egress was not enforced: the crawl ran in a browser on this machine (--host).');
+  if (result.pageMapPath !== undefined) {lines.push(`Page map written to ${result.pageMapPath}.`);}
+  if (result.egressEnforced === false) {lines.push('Egress was not enforced: the crawl ran in a browser on this machine (--host).');}
   for (const error of result.errors) {
     lines.push(error.position === null ? `  ${error.code}` : `  line ${error.position.line}, column ${error.position.column}: ${error.code}`);
   }
-  for (const warning of result.warnings) lines.push(`  line ${warning.position.line}, column ${warning.position.column}: ${warning.code} (warning)`);
+  for (const warning of result.warnings) {lines.push(`  line ${warning.position.line}, column ${warning.position.column}: ${warning.code} (warning)`);}
   return `${lines.join('\n')}\n`;
 }
 

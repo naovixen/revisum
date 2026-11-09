@@ -38,8 +38,8 @@ export function exploreStartOrigin(project: CrawlProject, start: string): Origin
   } catch {
     return undefined;
   }
-  if ((url.protocol !== 'http:' && url.protocol !== 'https:') || url.username !== '' || url.password !== '') return undefined;
-  if (project.productionOrigins.some((origin) => origin === url.origin)) return undefined;
+  if ((url.protocol !== 'http:' && url.protocol !== 'https:') || url.username !== '' || url.password !== '') {return undefined;}
+  if (project.productionOrigins.some((origin) => origin === url.origin)) {return undefined;}
   return project.origins.find((origin) => origin === url.origin);
 }
 
@@ -98,7 +98,7 @@ export async function crawlSite(
 ): Promise<Result<PageMap, { readonly code: CrawlErrorCode }>> {
   // Refused before any driver call.
   const origin = exploreStartOrigin(project, options.start);
-  if (origin === undefined) return failure({ code: ExploreErrorCode.ExploreOriginRefused });
+  if (origin === undefined) {return failure({ code: ExploreErrorCode.ExploreOriginRefused });}
   const maximumPages = clamp(options.maximumPages, 1, MAXIMUM_EXPLORE_PAGES);
   const maximumDepth = clamp(options.maximumDepth, 0, MAXIMUM_EXPLORE_DEPTH);
   const pageTimeout = Math.max(options.pageTimeoutMilliseconds, 1);
@@ -114,7 +114,7 @@ export async function crawlSite(
     const url = `${origin}${next.path}`;
     const read = await loadedInTime(driver, url, pageTimeout) ? await readLoadedPage(driver, origin) : success(undefined);
     if (!read.ok || read.value === undefined) {
-      if (next.depth === 0) return failure({ code: ExploreErrorCode.ExploreStartUnreachable });
+      if (next.depth === 0) {return failure({ code: ExploreErrorCode.ExploreStartUnreachable });}
       truncated ||= !read.ok;
       continue;
     }
@@ -122,7 +122,7 @@ export async function crawlSite(
     const found = new Set<string>();
     for (const target of read.value.linkTargets) {
       const path = sameOriginPath(target, origin);
-      if (path !== undefined && !seen.has(path)) found.add(path);
+      if (path !== undefined && !seen.has(path)) {found.add(path);}
     }
     for (const path of [...found].sort()) {
       if (next.depth + 1 > maximumDepth) { truncated = true; continue; }

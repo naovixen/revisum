@@ -56,7 +56,7 @@ function describeLocator(locator: Locator): string {
 
 // Where a navigate step goes: its path, or a path template's segments with values by name.
 function describeNavigation(url: Extract<Step, { type: 'navigate' }>['url']): string {
-  if (typeof url === 'string') return new URL(url, 'http://relative.invalid').pathname;
+  if (typeof url === 'string') {return new URL(url, 'http://relative.invalid').pathname;}
   return `/${url.segments.map(plainText).join('/')}`;
 }
 
@@ -123,7 +123,7 @@ function describeRememberSource(from: RememberSource): string {
   if ('element' in from) {
     return `${describeElementRead(from)} of ${describeLocator(from.element)}`;
   }
-  if ('clipboard' in from) return "the clipboard's text";
+  if ('clipboard' in from) {return "the clipboard's text";}
   const field = `field "${markdownEscape(from.field)}" of the latest \`${codeSpanText(from.response)}\` response`;
   return from.read === ResponseRead.Text ? field : `the length of ${field}`;
 }
@@ -232,12 +232,12 @@ export async function writeReleaseNotes(
 ): Promise<ReleaseArtefacts> {
   const text = releaseNoteDraft(plan, results);
   const draft = await store.put('release-notes.md', new TextEncoder().encode(text), 'text/markdown');
-  if (writer === undefined) return { draft, suggestion: null, suggestionRejected: null };
+  if (writer === undefined) {return { draft, suggestion: null, suggestionRejected: null };}
   let proposal: unknown;
   try { proposal = await writer.suggest(text); } catch { return { draft, suggestion: null, suggestionRejected: 'writer-error' }; }
   // The suggestion is outside input: it is parsed before anything is stored, and stored only if it passes.
   const parsed = parseAiText(proposal, MAXIMUM_SUGGESTION_LENGTH);
-  if (!parsed.ok) return { draft, suggestion: null, suggestionRejected: REJECTION_REASONS[parsed.error.code] ?? parsed.error.code };
+  if (!parsed.ok) {return { draft, suggestion: null, suggestionRejected: REJECTION_REASONS[parsed.error.code] ?? parsed.error.code };}
   const banner = `<!-- AI suggestion, not reviewed. The source of truth is release-notes.md (sha256 ${draft.sha256}). -->\n`;
   const suggestion = await store.put('release-notes.suggestion.md', new TextEncoder().encode(banner + parsed.value), 'text/markdown');
   return { draft, suggestion, suggestionRejected: null };

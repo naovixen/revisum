@@ -56,7 +56,7 @@ export function splitWords(name: string): string[] {
     const part = parts[index] ?? '';
     words.push(part);
     const before = parts[index - 1];
-    if (/^\d+$/.test(part) && before !== undefined) words.push(before + part);
+    if (/^\d+$/.test(part) && before !== undefined) {words.push(before + part);}
   }
   return words;
 }
@@ -80,10 +80,10 @@ const WCAG_CRITERION_NUMBER = /\bsc\d[-.]\d{1,2}[-.]\d{1,2}(?![\d])/gi;
 function isOpaqueId(checker: Checker, part: string): boolean {
   const hasLetter = /[a-z]/.test(part);
   const hasDigit = /\d/.test(part);
-  if (!hasLetter || !hasDigit) return false;
-  if (/^[0-9a-f]{7,}$/.test(part)) return true;
-  if (!/^[a-z0-9]{6}$/.test(part)) return false;
-  if ((part.match(/\d+/g) ?? []).length >= 2) return true;
+  if (!hasLetter || !hasDigit) {return false;}
+  if (/^[0-9a-f]{7,}$/.test(part)) {return true;}
+  if (!/^[a-z0-9]{6}$/.test(part)) {return false;}
+  if ((part.match(/\d+/g) ?? []).length >= 2) {return true;}
   return splitWords(part).every((word) => firstMatch(checker.config.bannedWords, word) === undefined);
 }
 
@@ -128,14 +128,14 @@ function firstMatch(rules: readonly NamingRule[], text: string): string | undefi
 function nameProblems(checker: Checker, name: string, isDeclaredInCode: boolean): string[] {
   const problems: string[] = [];
   const claim = firstMatch(checker.config.bannedText, name);
-  if (claim !== undefined) problems.push(claim);
+  if (claim !== undefined) {problems.push(claim);}
   const checkAbbreviations = isDeclaredInCode;
   for (const word of splitWords(isDeclaredInCode ? name : withoutOpaqueIds(checker, name))) {
-    if (checker.config.allowedWords.includes(word)) continue;
+    if (checker.config.allowedWords.includes(word)) {continue;}
     const banned = firstMatch(checker.config.bannedWords, word);
-    if (banned !== undefined) problems.push(`${banned} ("${word}")`);
+    if (banned !== undefined) {problems.push(`${banned} ("${word}")`);}
     const replacement = checkAbbreviations ? checker.spellOutWords.get(word.toLowerCase()) : undefined;
-    if (replacement !== undefined) problems.push(`abbreviation "${word}": write "${replacement}"`);
+    if (replacement !== undefined) {problems.push(`abbreviation "${word}": write "${replacement}"`);}
   }
   return problems;
 }
@@ -159,7 +159,7 @@ export function tokenize(source: string): Token[] {
   const lastSignificant = (): Token | undefined => {
     for (let index = tokens.length - 1; index >= 0; index--) {
       const token = tokens[index];
-      if (token !== undefined && token.kind !== TokenKind.Comment) return token;
+      if (token !== undefined && token.kind !== TokenKind.Comment) {return token;}
     }
     return undefined;
   };
@@ -186,7 +186,7 @@ export function tokenize(source: string): Token[] {
         tokens.push({ kind: TokenKind.Template, text, line: startLine });
         return;
       }
-      if (character === '\n') line += 1;
+      if (character === '\n') {line += 1;}
       text += character;
       position += 1;
     }
@@ -233,13 +233,13 @@ export function tokenize(source: string): Token[] {
           index += 2;
           continue;
         }
-        if (current === '[') inClass = true;
-        else if (current === ']') inClass = false;
-        else if (current === '/' && !inClass) break;
+        if (current === '[') {inClass = true;}
+        else if (current === ']') {inClass = false;}
+        else if (current === '/' && !inClass) {break;}
         index += 1;
       }
       index += 1;
-      while (index < source.length && /[a-z]/i.test(source[index] ?? '')) index += 1;
+      while (index < source.length && /[a-z]/i.test(source[index] ?? '')) {index += 1;}
       tokens.push({ kind: TokenKind.Regex, text: source.slice(position, index), line });
       position = index;
     } else if (/[A-Za-z_$]/.test(character)) {
@@ -256,8 +256,8 @@ export function tokenize(source: string): Token[] {
       position += 1;
     } else if (character === '}') {
       position += 1;
-      if (braces.pop() === true) readTemplateText();
-      else tokens.push({ kind: TokenKind.Punctuator, text: character, line });
+      if (braces.pop() === true) {readTemplateText();}
+      else {tokens.push({ kind: TokenKind.Punctuator, text: character, line });}
     } else {
       tokens.push({ kind: TokenKind.Punctuator, text: character, line });
       position += 1;
@@ -267,9 +267,9 @@ export function tokenize(source: string): Token[] {
 }
 
 function startsExpression(previous: Token | undefined): boolean {
-  if (previous === undefined) return true;
-  if (previous.kind === TokenKind.Identifier) return KEYWORDS_BEFORE_EXPRESSION.has(previous.text);
-  if (previous.kind === TokenKind.Punctuator) return ![')', ']', '}'].includes(previous.text);
+  if (previous === undefined) {return true;}
+  if (previous.kind === TokenKind.Identifier) {return KEYWORDS_BEFORE_EXPRESSION.has(previous.text);}
+  if (previous.kind === TokenKind.Punctuator) {return ![')', ']', '}'].includes(previous.text);}
   return false;
 }
 
@@ -286,7 +286,7 @@ function lintComment(checker: Checker, file: string, line: number, comment: stri
   const text = stripCommentMarkers(comment);
   // A claim id is the more specific reason, so it is reported before the research-id patterns.
   const why = firstMatch(checker.config.bannedText, text) ?? firstMatch(checker.config.bannedInComments, text);
-  if (why !== undefined) violations.push({ file, line, name: text.trim().slice(0, 80), why });
+  if (why !== undefined) {violations.push({ file, line, name: text.trim().slice(0, 80), why });}
   if (isSpecReferenceBanned(checker, file, text)) {
     violations.push({ file, line, name: text.trim().slice(0, 80), why: SPEC_REFERENCE_WHY });
   }
@@ -300,24 +300,24 @@ function lintCode(checker: Checker, file: string, source: string, violations: Na
   // A run of "//" lines with no code between them is one comment.
   const comments: Token[] = [];
   tokens.forEach((token, index) => {
-    if (token.kind !== TokenKind.Comment) return;
+    if (token.kind !== TokenKind.Comment) {return;}
     const previous = tokens[index - 1];
     const last = comments.at(-1);
     const continuesRun = last !== undefined && previous?.kind === TokenKind.Comment && previous.text.startsWith('//')
       && token.text.startsWith('//') && token.line === previous.line + 1;
-    if (continuesRun) comments[comments.length - 1] = { ...last, text: `${last.text}\n${token.text}` };
-    else comments.push(token);
+    if (continuesRun) {comments[comments.length - 1] = { ...last, text: `${last.text}\n${token.text}` };}
+    else {comments.push(token);}
   });
-  for (const comment of comments) lintComment(checker, file, comment.line, comment.text, violations);
+  for (const comment of comments) {lintComment(checker, file, comment.line, comment.text, violations);}
 
   for (let index = 0; index < significant.length; index++) {
     const token = significant[index];
-    if (token === undefined) continue;
+    if (token === undefined) {continue;}
     const before = significant[index - 1];
     const twoBefore = significant[index - 2];
 
-    if (token.kind === TokenKind.Punctuator && token.text === '{' && before?.text === 'export') insideExportList = true;
-    if (token.kind === TokenKind.Punctuator && token.text === '}') insideExportList = false;
+    if (token.kind === TokenKind.Punctuator && token.text === '{' && before?.text === 'export') {insideExportList = true;}
+    if (token.kind === TokenKind.Punctuator && token.text === '}') {insideExportList = false;}
 
     if (token.kind === TokenKind.String || token.kind === TokenKind.Template) {
       if (checker.config.specReferencePattern.test(token.text)) {
@@ -329,14 +329,14 @@ function lintCode(checker: Checker, file: string, source: string, violations: Na
       const problems = token.kind === TokenKind.String && isNameLike(token.text) && !checker.config.allowedStringValues.includes(token.text)
         ? nameProblems(checker, token.text, false)
         : [firstMatch(checker.config.bannedText, token.text)].filter((why) => why !== undefined);
-      for (const why of problems) violations.push({ file, line: token.line, name: token.text, why });
+      for (const why of problems) {violations.push({ file, line: token.line, name: token.text, why });}
       continue;
     }
 
-    if (token.kind !== TokenKind.Identifier) continue;
+    if (token.kind !== TokenKind.Identifier) {continue;}
     // A name after "." belongs to whatever object it is read from; ours are checked where declared.
     const isMemberAccess = before?.text === '.' && twoBefore?.text !== '.';
-    if (isMemberAccess) continue;
+    if (isMemberAccess) {continue;}
 
     for (const why of nameProblems(checker, token.text, true)) {
       violations.push({ file, line: token.line, name: token.text, why });
@@ -355,8 +355,8 @@ function lintCode(checker: Checker, file: string, source: string, violations: Na
 function isExportedDeclaration(tokens: readonly Token[], index: number): boolean {
   for (let back = index - 1; back >= 0 && back >= index - 4; back--) {
     const text = tokens[back]?.text;
-    if (text === 'export') return true;
-    if (text === undefined || !DECLARATION_KEYWORDS.has(text)) return false;
+    if (text === 'export') {return true;}
+    if (text === undefined || !DECLARATION_KEYWORDS.has(text)) {return false;}
   }
   return false;
 }
@@ -387,12 +387,12 @@ function lintJson(checker: Checker, file: string, source: string, violations: Na
       const problems = isNameLike(value) && !userId && !checker.config.allowedStringValues.includes(value)
         ? nameProblems(checker, value, false)
         : [firstMatch(checker.config.bannedText, value)].filter((why) => why !== undefined);
-      for (const why of problems) violations.push({ file, line: lineOf(value), name: value, why });
+      for (const why of problems) {violations.push({ file, line: lineOf(value), name: value, why });}
     } else if (Array.isArray(value)) {
       value.forEach((item) => visit(item));
     } else if (typeof value === 'object' && value !== null) {
       for (const [key, child] of Object.entries(value)) {
-        for (const why of nameProblems(checker, key, false)) violations.push({ file, line: lineOf(key), name: key, why });
+        for (const why of nameProblems(checker, key, false)) {violations.push({ file, line: lineOf(key), name: key, why });}
         visit(child, key === USER_CRITERION_ID_FIELD);
       }
     }
@@ -404,10 +404,10 @@ function lintHashCommented(checker: Checker, file: string, source: string, viola
   source.split('\n').forEach((text, index) => {
     const line = index + 1;
     const commentStart = text.search(/(^|\s)#/);
-    if (commentStart !== -1) lintComment(checker, file, line, text.slice(commentStart).replace(/^\s*#/, ''), violations);
+    if (commentStart !== -1) {lintComment(checker, file, line, text.slice(commentStart).replace(/^\s*#/, ''), violations);}
     const key = /^\s*-?\s*([\w-]+)\s*:/.exec(text)?.[1];
     if (key !== undefined) {
-      for (const why of nameProblems(checker, key, false)) violations.push({ file, line, name: key, why });
+      for (const why of nameProblems(checker, key, false)) {violations.push({ file, line, name: key, why });}
     }
   });
 }
@@ -415,7 +415,7 @@ function lintHashCommented(checker: Checker, file: string, source: string, viola
 function lintPlainText(checker: Checker, file: string, source: string, violations: NamingViolation[]): void {
   source.split('\n').forEach((text, index) => {
     const why = firstMatch(checker.config.bannedText, text);
-    if (why !== undefined) violations.push({ file, line: index + 1, name: text.trim().slice(0, 80), why });
+    if (why !== undefined) {violations.push({ file, line: index + 1, name: text.trim().slice(0, 80), why });}
   });
 }
 
@@ -426,9 +426,9 @@ function listFiles(root: string, folder = ''): string[] {
   const files: string[] = [];
   for (const entry of readdirSync(join(root, folder), { withFileTypes: true })) {
     const path = folder === '' ? entry.name : `${folder}/${entry.name}`;
-    if (entry.name === '.git' || entry.name === 'node_modules') continue;
-    if (entry.isDirectory()) files.push(...listFiles(root, path));
-    else if (entry.isFile()) files.push(path);
+    if (entry.name === '.git' || entry.name === 'node_modules') {continue;}
+    if (entry.isDirectory()) {files.push(...listFiles(root, path));}
+    else if (entry.isFile()) {files.push(path);}
   }
   return files;
 }
@@ -446,24 +446,24 @@ export function lintRepository(root: string, config: NamingLintConfig = NAMING_L
     segments.forEach((segment, index) => {
       const path = segments.slice(0, index + 1).join('/');
       const isFolder = index < segments.length - 1;
-      if (isFolder && checkedFolders.has(path)) return;
-      if (isFolder) checkedFolders.add(path);
-      for (const why of nameProblems(checker, segment, false)) violations.push({ file: path, line: 0, name: segment, why });
+      if (isFolder && checkedFolders.has(path)) {return;}
+      if (isFolder) {checkedFolders.add(path);}
+      for (const why of nameProblems(checker, segment, false)) {violations.push({ file: path, line: 0, name: segment, why });}
     });
 
     const source = readFileSync(join(root, file), 'utf8');
     const fileName = segments.at(-1) ?? file;
     const extension = /\.[^.]+$/.exec(fileName)?.[0] ?? '';
-    if (CODE_EXTENSIONS.includes(extension)) lintCode(checker, file, source, violations);
-    else if (extension === '.json') lintJson(checker, file, source, violations);
-    else if (HASH_COMMENT_EXTENSIONS.includes(extension) || HASH_COMMENT_FILES.includes(fileName)) lintHashCommented(checker, file, source, violations);
-    else lintPlainText(checker, file, source, violations);
+    if (CODE_EXTENSIONS.includes(extension)) {lintCode(checker, file, source, violations);}
+    else if (extension === '.json') {lintJson(checker, file, source, violations);}
+    else if (HASH_COMMENT_EXTENSIONS.includes(extension) || HASH_COMMENT_FILES.includes(fileName)) {lintHashCommented(checker, file, source, violations);}
+    else {lintPlainText(checker, file, source, violations);}
   }
   // The same name used twice on one line is reported once.
   const seen = new Set<string>();
   return violations.filter((violation) => {
     const key = JSON.stringify(violation);
-    if (seen.has(key)) return false;
+    if (seen.has(key)) {return false;}
     seen.add(key);
     return true;
   });
@@ -558,8 +558,8 @@ function runSelfTest(): boolean {
     }
     for (const clean of CLEAN_FILES) {
       const cleanViolations = violations.filter((violation) => violation.file === clean.path);
-      for (const violation of cleanViolations) console.log(`FAIL clean file rejected: ${format(violation)}`);
-      if (cleanViolations.length === 0) console.log(`ok   clean ${clean.path}: accepted`);
+      for (const violation of cleanViolations) {console.log(`FAIL clean file rejected: ${format(violation)}`);}
+      if (cleanViolations.length === 0) {console.log(`ok   clean ${clean.path}: accepted`);}
       passed &&= cleanViolations.length === 0;
     }
   } finally {
@@ -580,9 +580,9 @@ function main(argumentList: readonly string[]): number {
   }
   const root = argumentList[0] ?? process.cwd();
   const violations = lintRepository(root);
-  for (const violation of violations) console.error(format(violation));
+  for (const violation of violations) {console.error(format(violation));}
   console.log(violations.length === 0 ? 'naming lint passed' : `naming lint failed: ${violations.length} problem(s)`);
   return violations.length === 0 ? 0 : 1;
 }
 
-if (import.meta.main) process.exitCode = main(process.argv.slice(2));
+if (import.meta.main) {process.exitCode = main(process.argv.slice(2));}

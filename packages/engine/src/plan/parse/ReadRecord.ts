@@ -90,12 +90,12 @@ export function readRecord(
   }
   const before = issues.length;
   for (const key of Object.keys(fields)) {
-    if (allowed.includes(key)) continue;
+    if (allowed.includes(key)) {continue;}
     // Errors are kept and shown, so a key shaped like a credential is reported by where it sits.
     issues.push(looksLikeCredential(key) ? { code: PlanErrorCode.LiteralSecret, path } : { code: PlanErrorCode.UnknownField, path: `${path}.${key}` });
   }
   for (const key of required) {
-    if (!Object.hasOwn(fields, key)) issues.push({ code: PlanErrorCode.MissingField, path: `${path}.${key}` });
+    if (!Object.hasOwn(fields, key)) {issues.push({ code: PlanErrorCode.MissingField, path: `${path}.${key}` });}
   }
   return issues.length === before ? fields : INVALID;
 }

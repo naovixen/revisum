@@ -38,9 +38,9 @@ function stop(code: number, reason: string): number {
 // The --after plan, cleared by the policy gate for the crawl's target, or undefined when it is refused.
 function clearedLogin(text: string, project: Project, target: Target, audit: EventSink): ClearedRun | undefined {
   const read = readPlanText(text, project.limits);
-  if (!read.ok) return undefined;
+  if (!read.ok) {return undefined;}
   const parsed = planParser(project)(read.value.json);
-  if (!parsed.ok) return undefined;
+  if (!parsed.ok) {return undefined;}
   // The host checked the approval; here the plan runs as the proposal it is to the container.
   const decision = policyGate({ project, events: audit }).clear(parsed.value, target.id);
   return decision.kind === 'allow' ? decision.run : undefined;
@@ -54,13 +54,13 @@ async function main(): Promise<number> {
     return stop(CONTAINER_EXIT.failed, 'the crawl input is not JSON');
   }
   const input = decodeContainerCrawlInput(given);
-  if (input === undefined) return stop(CONTAINER_EXIT.failed, 'the crawl input is not a crawl input');
+  if (input === undefined) {return stop(CONTAINER_EXIT.failed, 'the crawl input is not a crawl input');}
   const project = parseProject(input.project);
-  if (!project.ok) return stop(CONTAINER_EXIT.failed, 'the project is not a valid project');
+  if (!project.ok) {return stop(CONTAINER_EXIT.failed, 'the project is not a valid project');}
   const target = crawlTarget(project.value);
-  if (target === undefined || exploreStartOrigin(project.value, input.start) === undefined) return stop(CONTAINER_EXIT.failed, 'nothing may be crawled');
+  if (target === undefined || exploreStartOrigin(project.value, input.start) === undefined) {return stop(CONTAINER_EXIT.failed, 'nothing may be crawled');}
   const browserPath = input.browserPath ?? pinnedChrome();
-  if (browserPath === undefined) return stop(CONTAINER_EXIT.failed, 'no browser is installed');
+  if (browserPath === undefined) {return stop(CONTAINER_EXIT.failed, 'no browser is installed');}
   const built = buildAdapters.containerCrawlPorts({
     executablePath: browserPath, secretNames: project.value.secretNames, environment: process.env,
   });
@@ -71,7 +71,7 @@ async function main(): Promise<number> {
   let login: ClearedRun | undefined;
   if (input.afterPlan !== undefined) {
     login = clearedLogin(input.afterPlan, project.value, target, ports.audit);
-    if (login === undefined) return stop(CONTAINER_EXIT.loginRefused, 'the --after plan was refused');
+    if (login === undefined) {return stop(CONTAINER_EXIT.loginRefused, 'the --after plan was refused');}
   }
 
   const crawled = await crawlInBrowser(ports.browser, {
@@ -83,12 +83,12 @@ async function main(): Promise<number> {
     ...(login === undefined ? { project: project.value, target } : { login, runLogin: ports.runLogin }),
   });
   if (!crawled.ok) {
-    if (crawled.error === CrawlStop.ExploreStartUnreachable) return stop(CONTAINER_EXIT.startUnreachable, crawled.error);
-    if (crawled.error === CrawlStop.PlanRejected) return stop(CONTAINER_EXIT.loginRefused, crawled.error);
+    if (crawled.error === CrawlStop.ExploreStartUnreachable) {return stop(CONTAINER_EXIT.startUnreachable, crawled.error);}
+    if (crawled.error === CrawlStop.PlanRejected) {return stop(CONTAINER_EXIT.loginRefused, crawled.error);}
     return stop(CONTAINER_EXIT.failed, crawled.error);
   }
   process.stdout.write(pageMapText(crawled.value));
   return CONTAINER_EXIT.mapped;
 }
 
-if (import.meta.main) process.exitCode = await main();
+if (import.meta.main) {process.exitCode = await main();}

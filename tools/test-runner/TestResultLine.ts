@@ -39,7 +39,7 @@ function readEvent(data: unknown): EventFields | undefined {
   const name = fieldOf(data, 'name');
   const nesting = fieldOf(data, 'nesting');
   const file = fieldOf(data, 'file');
-  if (typeof name !== 'string' || typeof nesting !== 'number' || typeof file !== 'string') return undefined;
+  if (typeof name !== 'string' || typeof nesting !== 'number' || typeof file !== 'string') {return undefined;}
   const line = fieldOf(data, 'line');
   const details = fieldOf(data, 'details');
   const duration = fieldOf(details, 'duration_ms');
@@ -67,7 +67,7 @@ export default async function* testResultsReporter(source: AsyncIterable<Reporte
   let testFile = '';
   for await (const event of source) {
     const fields = readEvent(event.data);
-    if (fields === undefined) continue;
+    if (fields === undefined) {continue;}
     if (event.type === 'test:start') {
       if (fields.nesting === 0) {
         testFile = fields.file;

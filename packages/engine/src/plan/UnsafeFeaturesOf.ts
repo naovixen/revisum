@@ -44,8 +44,8 @@ export function declarationsNamedBy(plan: Plan): { readonly scripts: readonly Sc
   const scripts = new Set<ScriptName>();
   const commands = new Set<CommandName>();
   for (const step of everyPlanStep(plan)) {
-    if (isStepIn(step, StepSection.PageScripts) && !isInlineChoice(step.script)) scripts.add(step.script);
-    if (isStepIn(step, StepSection.DatabaseCommands)) commands.add(step.command);
+    if (isStepIn(step, StepSection.PageScripts) && !isInlineChoice(step.script)) {scripts.add(step.script);}
+    if (isStepIn(step, StepSection.DatabaseCommands)) {commands.add(step.command);}
   }
   return { scripts: [...scripts], commands: [...commands] };
 }

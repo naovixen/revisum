@@ -9,7 +9,7 @@ import { matchesAnyGlob, repositoryPath } from '../foundation/RepositoryPath.ts'
 // The suite of that name, or the refusal `run --suite` ends with before any container starts.
 // `project` is the trusted one, so a change's own evidenceMode section is never what is read here.
 export function declaredSuite(project: ProjectData, name: string): Result<EvidenceSuiteDeclaration, EvidenceRefusal> {
-  if (project.evidenceMode === undefined) return failure({ code: RefusalCode.EvidenceModeDisabled });
+  if (project.evidenceMode === undefined) {return failure({ code: RefusalCode.EvidenceModeDisabled });}
   const suite = project.evidenceMode.suites.find((candidate) => candidate.name === name);
   return suite === undefined ? failure({ code: RefusalCode.SuiteNotDeclared }) : success(suite);
 }

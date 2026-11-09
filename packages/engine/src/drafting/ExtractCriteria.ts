@@ -18,15 +18,15 @@ type CriteriaError = { readonly code: 'no-criteria' };
 export function extractCriteria(markdown: string): Result<readonly CriterionText[], CriteriaError> {
   const lines = markdown.split(/\r?\n/);
   const start = lines.findIndex((line) => CRITERIA_HEADING.test(line));
-  if (start === -1) return failure({ code: 'no-criteria' });
+  if (start === -1) {return failure({ code: 'no-criteria' });}
   const criteria: CriterionText[] = [];
   for (const line of lines.slice(start + 1)) {
-    if (HEADING.test(line)) break;
+    if (HEADING.test(line)) {break;}
     const item = CRITERION_ITEM.exec(line);
-    if (item === null) continue;
+    if (item === null) {continue;}
     const criterion = criterionIdFrom(item[1] ?? '');
     const text = (item[2] ?? '').trim();
-    if (criterion === undefined || text.length > MAXIMUM_CRITERION_LENGTH) continue;
+    if (criterion === undefined || text.length > MAXIMUM_CRITERION_LENGTH) {continue;}
     criteria.push({ criterion, text });
   }
   return criteria.length === 0 ? failure({ code: 'no-criteria' }) : success(criteria);

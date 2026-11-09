@@ -85,6 +85,6 @@ export const isSecret = (value: unknown): value is Secret =>
 // The secret's value. Only allow-listed modules may import this; see the comment at the top.
 export function reveal(secret: Secret): string {
   const value = SECRET_VALUES.get(secret);
-  if (value === undefined) throw new TypeError('not a secret made by createSecret');
+  if (value === undefined) {throw new TypeError('not a secret made by createSecret');}
   return value;
 }

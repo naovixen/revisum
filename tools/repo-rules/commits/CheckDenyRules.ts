@@ -49,7 +49,7 @@ export async function checkDenyRules(root: string): Promise<string[]> {
   const parseDenyRules = await loadEngineFunction(root, 'parseDenyRules');
   const deniesRequiredActions = await loadEngineFunction(root, 'deniesRequiredActions');
   const parsed = parseDenyRules(settings);
-  if (!Array.isArray(parsed)) return [`${SETTINGS_PATH} has no permissions.deny list`];
+  if (!Array.isArray(parsed)) {return [`${SETTINGS_PATH} has no permissions.deny list`];}
   const rules = parsed.filter((rule): rule is string => typeof rule === 'string');
 
   const problems: string[] = [];
@@ -62,10 +62,10 @@ export async function checkDenyRules(root: string): Promise<string[]> {
     const patterns = shellPatterns(rules, shell);
     for (const { action, commands } of HISTORY_DENIALS) {
       const denied = commands.some((command) => patterns.some((pattern) => pattern.test(command)));
-      if (!denied) problems.push(`${SETTINGS_PATH} does not deny ${action} in ${shell}`);
+      if (!denied) {problems.push(`${SETTINGS_PATH} does not deny ${action} in ${shell}`);}
     }
   }
   return problems;
 }
 
-if (import.meta.main) process.exitCode = reportProblems('deny rule check', await checkDenyRules(process.cwd()));
+if (import.meta.main) {process.exitCode = reportProblems('deny rule check', await checkDenyRules(process.cwd()));}

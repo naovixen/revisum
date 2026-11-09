@@ -41,7 +41,7 @@ const MAXIMUM_LIST_LENGTH = 100_000;
 // field of the wrong shape.
 export function decodeErrorOf(issues: Issues): DecodeError {
   const unknown = issues.find((issue) => issue.code === PlanErrorCode.UnknownField);
-  if (unknown !== undefined) return { code: ReplayErrorCode.VersionUnsupported, path: unknown.path };
+  if (unknown !== undefined) {return { code: ReplayErrorCode.VersionUnsupported, path: unknown.path };}
   return { code: ReplayErrorCode.ReplayMismatch, path: issues[0]?.path ?? '$' };
 }
 
@@ -57,7 +57,7 @@ export function readSha256(input: unknown, path: string, issues: Issues): Parsed
 
 function readStrings(input: unknown, path: string, issues: Issues): Parsed<readonly string[]> {
   const raw = readList(input, path, issues, MAXIMUM_LIST_LENGTH, 0);
-  if (raw === INVALID) return INVALID;
+  if (raw === INVALID) {return INVALID;}
   const values = raw.map((value, index) => readString(value, `${path}[${index}]`, issues));
   return allValid(values) ? values : INVALID;
 }
@@ -67,7 +67,7 @@ function readEach<Value>(
   input: unknown, path: string, issues: Issues, read: (entry: unknown, path: string, issues: Issues) => Parsed<Value>,
 ): Parsed<readonly Value[]> {
   const raw = readList(input, path, issues, MAXIMUM_LIST_LENGTH, 0);
-  if (raw === INVALID) return INVALID;
+  if (raw === INVALID) {return INVALID;}
   const values = raw.map((entry, index) => read(entry, `${path}[${index}]`, issues));
   return allValid(values) ? values : INVALID;
 }
@@ -84,21 +84,21 @@ const FURTHEST_CLOCK_START = LATEST_DATE_MILLISECONDS - (MAXIMUM_DAY_OFFSET + 1)
 
 function readAdapter(input: unknown, path: string, issues: Issues): Parsed<PlanRunManifest['adapter']> {
   const fields = readRecord(input, path, issues, ['id', 'version', 'protocol', 'cannotPin'], ['id', 'version', 'protocol']);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const parts = [
     readString(fields['id'], `${path}.id`, issues),
     readString(fields['version'], `${path}.version`, issues),
     readString(fields['protocol'], `${path}.protocol`, issues),
   ] as const;
   const cannotPin = fields['cannotPin'] === undefined ? undefined : readStrings(fields['cannotPin'], `${path}.cannotPin`, issues);
-  if (!allValid(parts) || cannotPin === INVALID) return INVALID;
+  if (!allValid(parts) || cannotPin === INVALID) {return INVALID;}
   const [id, version, protocol] = parts;
   return { id, version, protocol, ...(cannotPin === undefined ? {} : { cannotPin }) };
 }
 
 function readNamedVersion(input: unknown, path: string, issues: Issues): Parsed<{ readonly name: string; readonly version: string }> {
   const fields = readRecord(input, path, issues, ['name', 'version']);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const name = readString(fields['name'], `${path}.name`, issues);
   const version = readString(fields['version'], `${path}.version`, issues);
   return name === INVALID || version === INVALID ? INVALID : { name, version };
@@ -106,7 +106,7 @@ function readNamedVersion(input: unknown, path: string, issues: Issues): Parsed<
 
 function readFixture(input: unknown, path: string, issues: Issues): Parsed<FixtureReference> {
   const fields = readRecord(input, path, issues, ['path', 'sha256']);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const fixturePath = readString(fields['path'], `${path}.path`, issues);
   const hash = readSha256(fields['sha256'], `${path}.sha256`, issues);
   return fixturePath === INVALID || hash === INVALID ? INVALID : { path: fixturePath, sha256: hash };
@@ -114,7 +114,7 @@ function readFixture(input: unknown, path: string, issues: Issues): Parsed<Fixtu
 
 function readHost(input: unknown, path: string, issues: Issues): Parsed<HostInfo> {
   const fields = readRecord(input, path, issues, ['platform', 'arch']);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const platform = readString(fields['platform'], `${path}.platform`, issues);
   const arch = readString(fields['arch'], `${path}.arch`, issues);
   return platform === INVALID || arch === INVALID ? INVALID : { platform, arch };
@@ -122,7 +122,7 @@ function readHost(input: unknown, path: string, issues: Issues): Parsed<HostInfo
 
 function readSecretRecord(input: unknown, path: string, issues: Issues): Parsed<SecretRecord> {
   const fields = readRecord(input, path, issues, ['name', 'mode']);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const name = readSecretName(fields['name'], `${path}.name`, issues);
   const mode = readOneOf(fields['mode'], `${path}.mode`, issues, ['value', 'key-only'] as const);
   return name === INVALID || mode === INVALID ? INVALID : { name, mode };
@@ -130,7 +130,7 @@ function readSecretRecord(input: unknown, path: string, issues: Issues): Parsed<
 
 function readStorageState(input: unknown, path: string, issues: Issues): Parsed<StorageStateRecord> {
   const fields = readRecord(input, path, issues, ['name', 'sha256']);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const name = readSecretName(fields['name'], `${path}.name`, issues);
   const hash = readSha256(fields['sha256'], `${path}.sha256`, issues);
   return name === INVALID || hash === INVALID ? INVALID : { name, sha256: hash };
@@ -138,7 +138,7 @@ function readStorageState(input: unknown, path: string, issues: Issues): Parsed<
 
 function readUnsafeDeclaration(input: unknown, path: string, issues: Issues): Parsed<UnsafeDeclarationRecord> {
   const fields = readRecord(input, path, issues, ['kind', 'name', 'sha256']);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const kind = readOneOf(fields['kind'], `${path}.kind`, issues, ['script', 'command'] as const);
   const name = readString(fields['name'], `${path}.name`, issues);
   const hash = readSha256(fields['sha256'], `${path}.sha256`, issues);
@@ -147,7 +147,7 @@ function readUnsafeDeclaration(input: unknown, path: string, issues: Issues): Pa
 
 function readRewrite(input: unknown, path: string, issues: Issues): Parsed<{ readonly origin: string; readonly name: string }> {
   const fields = readRecord(input, path, issues, ['origin', 'name']);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const origin = readString(fields['origin'], `${path}.origin`, issues);
   const name = readString(fields['name'], `${path}.name`, issues);
   return origin === INVALID || name === INVALID ? INVALID : { origin, name };
@@ -158,7 +158,7 @@ const readStringOrNull = (input: unknown, path: string, issues: Issues): Parsed<
 
 function readEvidence(input: unknown, path: string, issues: Issues): Parsed<EvidenceManifestRecord> {
   const fields = readRecord(input, path, issues, ['suite', 'suiteFiles', 'commandSha256', 'image', 'selfReported']);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const suite = readSuiteName(fields['suite'], `${path}.suite`, issues);
   const files = readRecord(fields['suiteFiles'], `${path}.suiteFiles`, issues, ['count', 'sha256']);
   const count = files === INVALID ? INVALID : readInteger(files['count'], `${path}.suiteFiles.count`, issues, 0, Number.MAX_SAFE_INTEGER);
@@ -169,13 +169,13 @@ function readEvidence(input: unknown, path: string, issues: Issues): Parsed<Evid
   const playwrightVersion = reported === INVALID ? INVALID : readStringOrNull(reported['playwrightVersion'], `${path}.selfReported.playwrightVersion`, issues);
   const browsers = reported === INVALID ? INVALID : readStrings(reported['browsers'], `${path}.selfReported.browsers`, issues);
   if (suite === INVALID || count === INVALID || filesHash === INVALID || commandSha256 === INVALID || image === INVALID
-    || playwrightVersion === INVALID || browsers === INVALID) return INVALID;
+    || playwrightVersion === INVALID || browsers === INVALID) {return INVALID;}
   return { suite, suiteFiles: { count, sha256: filesHash }, commandSha256, image, selfReported: { playwrightVersion, browsers } };
 }
 
 function readVersions(input: unknown, path: string, issues: Issues): Parsed<RunVersions> {
   const fields = readRecord(input, path, issues, ['core', 'act', 'axe', 'node', 'packs']);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const parts = [
     readString(fields['core'], `${path}.core`, issues),
     readString(fields['act'], `${path}.act`, issues),
@@ -183,7 +183,7 @@ function readVersions(input: unknown, path: string, issues: Issues): Parsed<RunV
     readString(fields['node'], `${path}.node`, issues),
   ] as const;
   const packs = readStrings(fields['packs'], `${path}.packs`, issues);
-  if (!allValid(parts) || packs === INVALID) return INVALID;
+  if (!allValid(parts) || packs === INVALID) {return INVALID;}
   const [core, act, axe, node] = parts;
   return { core, act, axe, node, packs };
 }
@@ -202,12 +202,12 @@ function optional<Value>(
 
 export function decodeManifest(written: unknown): Result<RunManifest, DecodeError> {
   const input = readableCopy(written);
-  if (!isPlainObject(input)) return failure({ code: ReplayErrorCode.VersionUnsupported, path: '$' });
+  if (!isPlainObject(input)) {return failure({ code: ReplayErrorCode.VersionUnsupported, path: '$' });}
   // The schema first: a manifest of another version is refused whole, before any field is read.
-  if (input['schema'] !== MANIFEST_SCHEMA) return failure({ code: ReplayErrorCode.VersionUnsupported, path: '$.schema' });
+  if (input['schema'] !== MANIFEST_SCHEMA) {return failure({ code: ReplayErrorCode.VersionUnsupported, path: '$.schema' });}
   const issues: Issues = [];
   const fields = readRecord(input, '$', issues, [...REQUIRED_KEYS, ...OPTIONAL_KEYS], REQUIRED_KEYS);
-  if (fields === INVALID) return failure(decodeErrorOf(issues));
+  if (fields === INVALID) {return failure(decodeErrorOf(issues));}
   const seeds = readRecord(fields['seeds'], '$.seeds', issues, ['random']);
   const clock = readRecord(fields['clock'], '$.clock', issues, ['fixedTimeMilliseconds']);
   const required = [
@@ -242,7 +242,7 @@ export function decodeManifest(written: unknown): Result<RunManifest, DecodeErro
     optional(fields, 'fontsSha256', issues, readSha256),
     optional(fields, 'commit', issues, readCommit),
   ] as const;
-  if (!allValid(required) || !allValid(extras) || !allValid(pinned)) return failure(decodeErrorOf(issues));
+  if (!allValid(required) || !allValid(extras) || !allValid(pinned)) {return failure(decodeErrorOf(issues));}
   const [engineVersion, planHash, random, fixedTimeMilliseconds, fixtures, host, nonHermeticInputs] = required;
   const [target, adapter, browser, secrets, storageState, unsafeFeatures, unsafeDeclarations, responseRewrites, evidence] = extras;
   const [executableSha256, projectHash, versions, redactor, limits, baselinesHash, rulesetHash, imageDigest, fontsSha256, commit] = pinned;

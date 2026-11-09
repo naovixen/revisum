@@ -128,7 +128,7 @@ function undeclaredUseRule(plan: Plan, project: Project): PolicyRuleId | null {
 }
 
 function staticDenial(plan: Plan, targets: readonly Target[], standing: PlanStanding, project: Project): Denial | null {
-  if (isOverLimit(plan, project.limits)) return { rule: PolicyRuleId.OverLimit, stepIndex: null };
+  if (isOverLimit(plan, project.limits)) {return { rule: PolicyRuleId.OverLimit, stepIndex: null };}
   const undeclaredUse = undeclaredUseRule(plan, project);
   if (undeclaredUse !== null) {
     return { rule: undeclaredUse, stepIndex: null };
@@ -137,7 +137,7 @@ function staticDenial(plan: Plan, targets: readonly Target[], standing: PlanStan
   // With no targets no language is known, so every pattern applies: the engine's own never lapse.
   const patterns: string[] = targets.length === 0 ? [...everyIrreversiblePattern(project.policy.irreversiblePatterns)] : [];
   for (const set of patternSets) {
-    if (set === null) return { rule: PolicyRuleId.NoLocalePatterns, stepIndex: null };
+    if (set === null) {return { rule: PolicyRuleId.NoLocalePatterns, stepIndex: null };}
     patterns.push(...set);
   }
   // The standing is already the plan's own (ownStanding), never another plan's.
@@ -145,11 +145,11 @@ function staticDenial(plan: Plan, targets: readonly Target[], standing: PlanStan
   const context: StaticContext = { project, patterns, productionAllowed, approved: standing.mode === PlanStandingMode.Approved };
   for (const { step, index } of everyStep(plan.steps)) {
     const rule = ruleBeforeRun(step, context);
-    if (rule !== null) return { rule, stepIndex: index };
+    if (rule !== null) {return { rule, stepIndex: index };}
   }
   for (const { step, index } of callingSteps(plan)) {
     const rule = callRuleBeforeRun(step, context);
-    if (rule !== null) return { rule, stepIndex: index };
+    if (rule !== null) {return { rule, stepIndex: index };}
   }
   return null;
 }
@@ -177,7 +177,7 @@ export function policyGate(options: PolicyGateOptions): PolicyGate {
     // A standing made for another plan is no standing: the plan is judged as a proposal.
     const judged = ownStanding(plan, standing);
     const denial = staticDenial(plan, targets, judged, project);
-    if (denial === null) return { kind: PolicyVerdictKind.Allow, plan: authorised(plan), standing: judged };
+    if (denial === null) {return { kind: PolicyVerdictKind.Allow, plan: authorised(plan), standing: judged };}
     const recorded = record(denial.rule, plan);
     return { kind: PolicyVerdictKind.Deny, rule: denial.rule, stepIndex: denial.stepIndex, ...(recorded ? {} : UNRECORDED) };
   };
@@ -203,7 +203,7 @@ export function policyGate(options: PolicyGateOptions): PolicyGate {
     guardAction(step, stepIndex, element, dialogText, locale) {
       const patterns = patternsForLocale(locale, project.policy.irreversiblePatterns);
       const rule = patterns === null ? 'no-locale-patterns' : ruleDuringRun(step, { element, dialogText, patterns, project });
-      if (rule === null) return { kind: PolicyVerdictKind.Allow };
+      if (rule === null) {return { kind: PolicyVerdictKind.Allow };}
       const recorded = record(rule);
       return { kind: PolicyVerdictKind.Deny, rule, stepIndex, ...(recorded ? {} : UNRECORDED) };
     },

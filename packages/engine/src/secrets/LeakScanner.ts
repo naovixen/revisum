@@ -20,7 +20,7 @@ function inflated(bytes: Buffer): string {
 // The text of a PNG's compressed text chunks (zTXt, and iTXt with its compression flag set),
 // inflated. Uncompressed text chunks are already visible in the raw bytes.
 function compressedPngText(bytes: Buffer): string[] {
-  if (bytes.length < PNG_SIGNATURE.length || !bytes.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)) return [];
+  if (bytes.length < PNG_SIGNATURE.length || !bytes.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)) {return [];}
   const texts: string[] = [];
   let position = PNG_SIGNATURE.length;
   while (position + 8 <= bytes.length) {
@@ -28,13 +28,13 @@ function compressedPngText(bytes: Buffer): string[] {
     const type = bytes.toString('latin1', position + 4, position + 8);
     const data = bytes.subarray(position + 8, Math.min(position + 8 + length, bytes.length));
     const keywordEnd = data.indexOf(0);
-    if (type === 'zTXt' && keywordEnd !== -1) texts.push(inflated(data.subarray(keywordEnd + 2)));
+    if (type === 'zTXt' && keywordEnd !== -1) {texts.push(inflated(data.subarray(keywordEnd + 2)));}
     if (type === 'iTXt' && keywordEnd !== -1 && data[keywordEnd + 1] === 1) {
       // After the keyword: compression flag, method, language tag and translated keyword, each
       // of the last two ending in a zero byte.
       const languageEnd = data.indexOf(0, keywordEnd + 3);
       const translatedEnd = languageEnd === -1 ? -1 : data.indexOf(0, languageEnd + 1);
-      if (translatedEnd !== -1) texts.push(inflated(data.subarray(translatedEnd + 1)));
+      if (translatedEnd !== -1) {texts.push(inflated(data.subarray(translatedEnd + 1)));}
     }
     position += 12 + length;
   }
@@ -49,12 +49,12 @@ export function leakScanner(): LeakScanner {
   return {
     scan(files: readonly string[], secrets: readonly Secret[]): readonly Leak[] {
       const leaks: Leak[] = [];
-      if (secrets.length === 0) return leaks;
+      if (secrets.length === 0) {return leaks;}
       for (const file of files) {
         const texts = textsOf(readFileSync(file));
         for (const secret of secrets) {
           const forms = new Set<LeakForm>(texts.flatMap((text) => echoFormsIn(text, secret)));
-          for (const form of forms) leaks.push({ file, secret: secret.name, form });
+          for (const form of forms) {leaks.push({ file, secret: secret.name, form });}
         }
       }
       return leaks;

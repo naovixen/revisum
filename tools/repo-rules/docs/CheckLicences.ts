@@ -50,21 +50,21 @@ const fieldOf = (value: unknown, key: string): unknown =>
 
 // A JSON object whose values are all text, or an empty one when the field is missing.
 function textRecord(value: unknown, field: string): Readonly<Record<string, string>> {
-  if (value === undefined) return {};
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new Error(`licences.json: ${field} is not an object`);
+  if (value === undefined) {return {};}
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {throw new Error(`licences.json: ${field} is not an object`);}
   const entries = Object.entries(value);
-  for (const [key, text] of entries) if (typeof text !== 'string') throw new Error(`licences.json: ${field}.${key} is not text`);
+  for (const [key, text] of entries) {if (typeof text !== 'string') {throw new Error(`licences.json: ${field}.${key} is not text`);}}
   return Object.fromEntries(entries.filter((entry): entry is [string, string] => typeof entry[1] === 'string'));
 }
 
 export function decodeLicenceMap(input: unknown): LicenceMap {
   const pinned = fieldOf(input, 'pinnedThirdPartyFiles') ?? {};
-  if (typeof pinned !== 'object' || Array.isArray(pinned)) throw new Error('licences.json: pinnedThirdPartyFiles is not an object');
+  if (typeof pinned !== 'object' || Array.isArray(pinned)) {throw new Error('licences.json: pinnedThirdPartyFiles is not an object');}
   const pinnedThirdPartyFiles: Record<string, PinnedPackage> = {};
   for (const [name, entry] of Object.entries(pinned)) {
     const version = fieldOf(entry, 'version');
     const licence = fieldOf(entry, 'licence');
-    if (typeof version !== 'string' || typeof licence !== 'string') throw new Error(`licences.json: pinnedThirdPartyFiles.${name} needs a version and a licence`);
+    if (typeof version !== 'string' || typeof licence !== 'string') {throw new Error(`licences.json: pinnedThirdPartyFiles.${name} needs a version and a licence`);}
     pinnedThirdPartyFiles[name] = { version, licence, files: textRecord(fieldOf(entry, 'files'), `pinnedThirdPartyFiles.${name}.files`) };
   }
   return {
@@ -80,13 +80,13 @@ const isRole = (role: string): role is PackageRole => Object.hasOwn(ROLE_LICENCE
 
 function walkFiles(root: string, folder: string): string[] {
   const path = folder === '' ? root : join(root, folder);
-  if (!existsSync(path)) return [];
+  if (!existsSync(path)) {return [];}
   const files: string[] = [];
   for (const entry of readdirSync(path, { withFileTypes: true })) {
-    if (SKIPPED_FOLDERS.has(entry.name)) continue;
+    if (SKIPPED_FOLDERS.has(entry.name)) {continue;}
     const child = folder === '' ? entry.name : `${folder}/${entry.name}`;
-    if (entry.isDirectory()) files.push(...walkFiles(root, child));
-    else if (entry.isFile()) files.push(child);
+    if (entry.isDirectory()) {files.push(...walkFiles(root, child));}
+    else if (entry.isFile()) {files.push(child);}
   }
   return files;
 }
@@ -120,7 +120,7 @@ function checkPackageLicences(root: string, licenceMap: LicenceMap): string[] {
   const problems: string[] = [];
   const packages = readWorkspacePackages(root);
   for (const [licence, file] of Object.entries(licenceMap.licenceFiles)) {
-    if (!existsSync(join(root, file))) problems.push(`licence text ${file} for ${licence} is missing`);
+    if (!existsSync(join(root, file))) {problems.push(`licence text ${file} for ${licence} is missing`);}
   }
   for (const workspacePackage of packages) {
     const folder = workspacePackage.folder;
@@ -152,11 +152,11 @@ function checkSchemas(root: string, licenceMap: LicenceMap): string[] {
   const problems: string[] = [];
   for (const file of listFiles(root, '').filter((path) => path.endsWith('.schema.json'))) {
     const licence = licenceMap.schemas[file];
-    if (licence === undefined) problems.push(`${file} is a published JSON Schema that licences.json does not list; schemas carry ${SCHEMA_LICENCE}`);
-    else if (licence !== SCHEMA_LICENCE) problems.push(`${file} is a JSON Schema, which must carry ${SCHEMA_LICENCE}, not ${licence}`);
+    if (licence === undefined) {problems.push(`${file} is a published JSON Schema that licences.json does not list; schemas carry ${SCHEMA_LICENCE}`);}
+    else if (licence !== SCHEMA_LICENCE) {problems.push(`${file} is a JSON Schema, which must carry ${SCHEMA_LICENCE}, not ${licence}`);}
   }
   for (const file of Object.keys(licenceMap.schemas)) {
-    if (!existsSync(join(root, file))) problems.push(`licences.json lists the schema ${file}, which does not exist`);
+    if (!existsSync(join(root, file))) {problems.push(`licences.json lists the schema ${file}, which does not exist`);}
   }
   return problems;
 }
@@ -185,7 +185,7 @@ function checkPinnedFiles(root: string, modules: string, licenceMap: LicenceMap)
   for (const file of listFiles(root, 'packages')) {
     const name = file.split('/').at(-1) ?? file;
     const copied = /^axe.*\.js$/.test(name) ? name : pinnedIntegrities.get(integrityOf(readFileSync(join(root, file))));
-    if (copied !== undefined) problems.push(`${file} is a copy of ${copied}; read the pinned file from the installed package instead`);
+    if (copied !== undefined) {problems.push(`${file} is a copy of ${copied}; read the pinned file from the installed package instead`);}
   }
   return problems;
 }

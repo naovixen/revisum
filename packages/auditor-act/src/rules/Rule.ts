@@ -163,9 +163,9 @@ export function isStaticRule(rule: Rule): rule is StaticRule {
 
 // A rule's outcome for the whole page, from the outcomes of its targets.
 export function pageOutcome(targets: readonly TargetResult[]): Outcome {
-  if (targets.length === 0) return 'inapplicable';
-  if (targets.some((target) => target.outcome === Outcome.Failed)) return 'failed';
-  if (targets.some((target) => target.outcome === Outcome.CantTell)) return 'cantTell';
+  if (targets.length === 0) {return 'inapplicable';}
+  if (targets.some((target) => target.outcome === Outcome.Failed)) {return 'failed';}
+  if (targets.some((target) => target.outcome === Outcome.CantTell)) {return 'cantTell';}
   return 'passed';
 }
 
@@ -181,7 +181,7 @@ function isBoxOfFiniteSize(value: unknown): boolean {
 }
 
 export function isFinding(value: unknown): value is Finding {
-  if (typeof value !== 'object' || value === null) return false;
+  if (typeof value !== 'object' || value === null) {return false;}
   const finding = value as Record<string, unknown>;
   return typeof finding['page'] === 'string'
     && typeof finding['ruleId'] === 'string' && finding['ruleId'] !== ''

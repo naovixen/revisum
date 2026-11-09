@@ -32,12 +32,12 @@ export const secretSha256 = (secret: Secret): string => sha256(reveal(secret));
 // ---- Finding and redacting echoes ------------------------------------------------------------------
 
 function replaceRanges(text: string, ranges: readonly Range[]): string {
-  if (ranges.length === 0) return text;
+  if (ranges.length === 0) {return text;}
   const sorted = [...ranges].sort((left, right) => left.start - right.start);
   let kept = '';
   let position = 0;
   for (const range of sorted) {
-    if (range.end <= position) continue;
+    if (range.end <= position) {continue;}
     kept += text.slice(position, Math.max(range.start, position)) + SECRET_PLACEHOLDER;
     position = range.end;
   }
@@ -90,7 +90,7 @@ export function secretRedaction(secrets: readonly Secret[]): (text: string) => s
   const redactions = [...new Set(secrets.filter((secret) => redactionModeOf(secret) === RedactionMode.Value).map(reveal))]
     .sort((left, right) => right.length - left.length)
     .map(valueRedaction);
-  if (redactions.length === 0) return (text) => text;
+  if (redactions.length === 0) {return (text) => text;}
   return (text) => redactions.reduce((redacted, redact) => redact(redacted), text);
 }
 
@@ -114,7 +114,7 @@ const sameWords = (left: string, right: string): boolean => normalise(foldCase(l
 // nothing. A search that cannot be built or run has not shown the text is clean, so it reports a leak.
 export function echoFormsIn(text: string, secret: Secret): readonly LeakForm[] {
   const value = reveal(secret);
-  if (value.length < MINIMUM_SECRET_LENGTH) return [];
+  if (value.length < MINIMUM_SECRET_LENGTH) {return [];}
   try {
     return echoFormsOfValueIn(text, value);
   } catch {
@@ -126,14 +126,14 @@ function echoFormsOfValueIn(text: string, value: string): readonly LeakForm[] {
   const foldedText = foldCase(text);
   const foldedValue = foldCase(value);
   const forms = new Set<LeakForm>();
-  if (text.includes(value)) forms.add('raw');
+  if (text.includes(value)) {forms.add('raw');}
   let isRespaced = false;
   let hasItsWords = false;
   for (const echo of encodedEchoes(value)) {
     const found = echo.matchesIn(text);
     const isWritten = echo.form === LeakForm.Uri || echo.form === LeakForm.Json || echo.form === LeakForm.Html;
     const counts = isWritten ? found.some((match) => !sameWords(match, echo.writes)) : found.length > 0;
-    if (counts) forms.add(echo.form);
+    if (counts) {forms.add(echo.form);}
     const asWords = isWritten ? found.filter((match) => sameWords(match, echo.writes)) : [];
     hasItsWords ||= asWords.length > 0;
     isRespaced ||= asWords.some((match) => foldCase(match) !== foldCase(echo.writes));
@@ -148,7 +148,7 @@ function echoFormsOfValueIn(text: string, value: string): readonly LeakForm[] {
   }
   // Its words found while the whole value is not can only be one piece of a long value: a value cut short.
   const hasPartOfIt = hasItsWords || prefixRuns(foldedText, foldedValue).length > 0 || (needsPieces(value) && fragmentRuns(foldedValue)(foldedText).length > 0);
-  if (!wholeInAnyCase && hasPartOfIt) forms.add('prefix');
+  if (!wholeInAnyCase && hasPartOfIt) {forms.add('prefix');}
   return [...forms];
 }
 
@@ -166,7 +166,7 @@ const listIn = (record: Readonly<Record<string, unknown>>, key: string): readonl
 export function storageStateSecrets(storageState: Secret): readonly Secret[] {
   let parsed: unknown;
   try { parsed = JSON.parse(reveal(storageState)); } catch { return []; }
-  if (!isNonArrayObject(parsed)) return [];
+  if (!isNonArrayObject(parsed)) {return [];}
   const entries = [
     ...listIn(parsed, 'cookies'),
     ...listIn(parsed, 'origins').flatMap((origin) => (isNonArrayObject(origin) ? [...listIn(origin, 'localStorage'), ...listIn(origin, 'sessionStorage')] : [])),
@@ -255,7 +255,7 @@ function echoCandidates(secrets: readonly Secret[]): EchoCandidate[] {
   }
   const seen = new Set<string>();
   const distinct = candidates.filter((candidate) => {
-    if (candidate.value.length < MINIMUM_SECRET_LENGTH || seen.has(candidate.value)) return false;
+    if (candidate.value.length < MINIMUM_SECRET_LENGTH || seen.has(candidate.value)) {return false;}
     seen.add(candidate.value);
     return true;
   });
@@ -268,19 +268,19 @@ function describeSpelling(echo: string, value: string): { readonly characters: n
   let position = 0;
   let spelling = '';
   for (const character of value) {
-    if (position >= echo.length) break;
+    if (position >= echo.length) {break;}
     const rest = echo.slice(position);
     const escaped = percentEscapes(character);
     const upper = character.toUpperCase();
     const lower = character.toLowerCase();
     let written: { readonly letter: string; readonly text: string };
-    if (rest.startsWith(character)) written = { letter: '.', text: character };
-    else if (rest.startsWith(escaped)) written = { letter: 'e', text: escaped };
-    else if (rest.startsWith(escaped.toUpperCase())) written = { letter: 'E', text: escaped.toUpperCase() };
-    else if (character === ' ' && rest.startsWith('+')) written = { letter: '+', text: '+' };
-    else if (upper.length === character.length && rest.startsWith(upper)) written = { letter: 'u', text: upper };
-    else if (lower.length === character.length && rest.startsWith(lower)) written = { letter: 'l', text: lower };
-    else return null;
+    if (rest.startsWith(character)) {written = { letter: '.', text: character };}
+    else if (rest.startsWith(escaped)) {written = { letter: 'e', text: escaped };}
+    else if (rest.startsWith(escaped.toUpperCase())) {written = { letter: 'E', text: escaped.toUpperCase() };}
+    else if (character === ' ' && rest.startsWith('+')) {written = { letter: '+', text: '+' };}
+    else if (upper.length === character.length && rest.startsWith(upper)) {written = { letter: 'u', text: upper };}
+    else if (lower.length === character.length && rest.startsWith(lower)) {written = { letter: 'l', text: lower };}
+    else {return null;}
     spelling += written.letter;
     position += written.text.length;
   }
@@ -303,8 +303,8 @@ function spelled(value: string, characters: number, spelling: string | undefined
 
 // The form a character-by-character echo of `value` takes, from its spelling.
 function spellingForm(characters: number, spelling: string, value: string): LeakForm {
-  if (characters < [...value].length) return 'prefix';
-  if (/[eE+]/.test(spelling)) return 'uri';
+  if (characters < [...value].length) {return 'prefix';}
+  if (/[eE+]/.test(spelling)) {return 'uri';}
   return /[ul]/.test(spelling) ? 'case' : 'raw';
 }
 
@@ -342,16 +342,16 @@ function echoesOf(text: string, candidate: EchoCandidate): Found[] {
       for (const alignment of [0, 1, 2]) {
         const whole = wholeEncodedCharacters(candidate.value, alignment, alphabet);
         const at = match[0].indexOf(whole);
-        if (whole === '' || at === -1) continue;
+        if (whole === '' || at === -1) {continue;}
         found.push({ start: match.index + at, end: match.index + at + whole.length, echo: { ...named, form, alignment } });
         break;
       }
     }
-    if (found.length > 0) return found;
+    if (found.length > 0) {return found;}
   }
   const typed = [...text.matchAll(writtenPattern(candidate.value, uriWritings))]
     .map((match): Found => ({ start: match.index, end: match.index + match[0].length, echo: spellingEcho(match[0], candidate, false) }));
-  if (typed.length > 0) return typed;
+  if (typed.length > 0) {return typed;}
   // Put back as typed, not as it was written, so a replay of it gives another result and is no pass.
   for (const writings of [jsonWritings, htmlWritings]) {
     const form = writings === jsonWritings ? 'json' : 'html';
@@ -420,14 +420,14 @@ function cutEchoesOf(text: string, candidates: readonly EchoCandidate[]): CutTex
     for (let changed = true; changed;) {
       changed = false;
       pieces = pieces.flatMap((piece): Piece[] => {
-        if (!('kept' in piece)) return [piece];
+        if (!('kept' in piece)) {return [piece];}
         const found = echoesOf(piece.kept, candidate);
-        if (found.length === 0) return [piece];
+        if (found.length === 0) {return [piece];}
         changed = true;
         const split: Piece[] = [];
         let position = 0;
         for (const echo of found) {
-          if (echo.start < position) continue;
+          if (echo.start < position) {continue;}
           split.push({ kept: piece.kept.slice(position, echo.start) }, { echo: echo.echo });
           position = echo.end;
         }
@@ -439,8 +439,8 @@ function cutEchoesOf(text: string, candidates: readonly EchoCandidate[]): CutTex
   let kept = '';
   const echoes: SecretEcho[] = [];
   for (const piece of pieces) {
-    if ('kept' in piece) kept += piece.kept;
-    else echoes.push({ offset: kept.length, ...piece.echo });
+    if ('kept' in piece) {kept += piece.kept;}
+    else {echoes.push({ offset: kept.length, ...piece.echo });}
   }
   return { kept, echoes };
 }
@@ -448,7 +448,7 @@ function cutEchoesOf(text: string, candidates: readonly EchoCandidate[]): CutTex
 // The text one echo stood for, written again from `secret`'s value.
 function echoText(echo: SecretEcho, secret: Secret): string {
   const value = echo.scheme === undefined ? reveal(secret) : headerValue(reveal(secret), echo.scheme);
-  if (echo.form === LeakForm.Base64 || echo.form === LeakForm.Base64Url) return wholeEncodedCharacters(value, echo.alignment ?? 0, BASE64_ALPHABETS[echo.form]);
+  if (echo.form === LeakForm.Base64 || echo.form === LeakForm.Base64Url) {return wholeEncodedCharacters(value, echo.alignment ?? 0, BASE64_ALPHABETS[echo.form]);}
   return spelled(value, echo.characters ?? [...value].length, echo.approximate === true ? undefined : echo.spelling);
 }
 

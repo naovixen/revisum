@@ -88,9 +88,9 @@ function countCommits(root: string, cutOver: string): CommitCounts {
     const separator = entry.indexOf('\x1f');
     const commit = entry.slice(0, separator);
     const { trailers, problems } = readCommitTrailers(entry.slice(separator + 1), targets);
-    if (trailers.agent !== null) agentAuthored += 1;
-    for (const criterion of trailers.criteria) criteriaNamed.add(criterion);
-    if (trailers.specs.length > 0 || trailers.criteria.length > 0) specLinked += 1;
+    if (trailers.agent !== null) {agentAuthored += 1;}
+    for (const criterion of trailers.criteria) {criteriaNamed.add(criterion);}
+    if (trailers.specs.length > 0 || trailers.criteria.length > 0) {specLinked += 1;}
     if (problems.length > 0 && ![...known].some((exception) => commit.startsWith(exception))) {
       malformed.push(`${commit.slice(0, 12)}: ${problems.join('; ')}`);
     }
@@ -165,7 +165,7 @@ function main(words: readonly string[]): number {
   }
   const { metrics, malformed } = recordProjectMetrics(process.cwd(), cutOver);
   console.log(summary(metrics));
-  for (const problem of malformed) console.error(`malformed commit trailers in ${problem}`);
+  for (const problem of malformed) {console.error(`malformed commit trailers in ${problem}`);}
   if (malformed.length > 0) {
     console.error(`project metrics failed: ${malformed.length} commit(s) after the cut-over have malformed trailers`);
     return 1;
@@ -174,4 +174,4 @@ function main(words: readonly string[]): number {
   return 0;
 }
 
-if (import.meta.main) process.exitCode = main(process.argv.slice(2));
+if (import.meta.main) {process.exitCode = main(process.argv.slice(2));}

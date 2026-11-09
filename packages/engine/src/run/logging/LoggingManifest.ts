@@ -83,10 +83,10 @@ export function manifestLogger(sink: RunEventSink, redactor: Redactor, runId: st
     log(record) {
       const kept: Record<string, string | number> = {};
       for (const [key, value] of Object.entries(record as Record<string, unknown>)) {
-        if (!FIELDS.has(key) || key === 'runId' || key === 'sequence') throw new LoggingManifestViolation(`field not in LOGGING_MANIFEST: ${key}`);
-        if (typeof value === 'string') kept[key] = key === 'sha256' && HEX_DIGEST.test(value) ? value : redactor.text(value);
-        else if (typeof value === 'number') kept[key] = value;
-        else throw new LoggingManifestViolation(`field ${key} must be a string or number`);
+        if (!FIELDS.has(key) || key === 'runId' || key === 'sequence') {throw new LoggingManifestViolation(`field not in LOGGING_MANIFEST: ${key}`);}
+        if (typeof value === 'string') {kept[key] = key === 'sha256' && HEX_DIGEST.test(value) ? value : redactor.text(value);}
+        else if (typeof value === 'number') {kept[key] = value;}
+        else {throw new LoggingManifestViolation(`field ${key} must be a string or number`);}
       }
       sink.append(Object.freeze({ ...kept, runId, sequence: sequence++ }) as LoggedEvent);
     },

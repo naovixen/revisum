@@ -33,12 +33,12 @@ const usableReference = (reference: string): boolean =>
 
 // The provenance to record for what a draft declares, or undefined when it may not declare it.
 function declaredProvenance(declared: unknown): PlanProvenance | undefined {
-  if (declared === undefined) return HAND_WRITTEN;
-  if (!isRecord(declared) || Object.keys(declared).some((key) => !PROVENANCE_FIELDS.includes(key))) return undefined;
+  if (declared === undefined) {return HAND_WRITTEN;}
+  if (!isRecord(declared) || Object.keys(declared).some((key) => !PROVENANCE_FIELDS.includes(key))) {return undefined;}
   const source = DECLARABLE_PLAN_SOURCES.find((candidate) => candidate === declared['source']);
-  if (source === undefined || declared['basis'] !== 'declared') return undefined;
+  if (source === undefined || declared['basis'] !== 'declared') {return undefined;}
   const reference = declared['reference'];
-  if (reference === undefined) return { source, basis: ProvenanceBasis.Declared };
+  if (reference === undefined) {return { source, basis: ProvenanceBasis.Declared };}
   return typeof reference === 'string' && usableReference(reference) ? { source, basis: ProvenanceBasis.Declared, reference } : undefined;
 }
 
@@ -98,11 +98,11 @@ function admitWithProvenance(
     return failure(errors);
   };
   const input = draftInput(draft);
-  if (!input.ok) return reject(input.error);
+  if (!input.ok) {return reject(input.error);}
   const parsed = parsePlan(input.value.json);
-  if (!parsed.ok) return reject(placedPlanErrors(parsed.error, input.value.positions));
+  if (!parsed.ok) {return reject(placedPlanErrors(parsed.error, input.value.positions));}
   const recorded = events.append({ kind: AuditEventKind.PlanSubmitted, subjectHash: planHash(parsed.value), planProvenance: provenance }, actor);
   // A submission the audit sink did not record is not admitted.
-  if (!recorded.ok) return failure([{ stage: 'audit', code: recorded.error.code, position: null }]);
+  if (!recorded.ok) {return failure([{ stage: 'audit', code: recorded.error.code, position: null }]);}
   return success(parsed.value);
 }

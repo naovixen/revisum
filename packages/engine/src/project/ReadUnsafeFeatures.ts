@@ -58,11 +58,11 @@ const MAXIMUM_UNNAMED_CONTROLS = 256;
 
 // The unsafeFeatures section, or undefined when the project has none, which enables no feature.
 export function readUnsafeFeatures(input: unknown, context: UnsafeFeaturesContext): Parsed<UnsafeFeaturesDeclaration | undefined> {
-  if (input === undefined) return undefined;
+  if (input === undefined) {return undefined;}
   const { issues } = context;
   const path = '$.unsafeFeatures';
   const fields = readRecord(input, path, issues, SECTION_FIELDS, []);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const switches = [
     readSwitch(fields, 'cssLocators', path, issues),
     readSwitch(fields, 'xpathLocators', path, issues),
@@ -73,7 +73,7 @@ export function readUnsafeFeatures(input: unknown, context: UnsafeFeaturesContex
     ? readDatabaseCommands(fields['databaseCommands'], `${path}.databaseCommands`, context) : undefined;
   const unnamedControlsAllowed = Object.hasOwn(fields, 'unnamedControlsAllowed')
     ? readSelectorList(fields['unnamedControlsAllowed'], `${path}.unnamedControlsAllowed`, issues) : undefined;
-  if (!allValid(switches) || pageScripts === INVALID || databaseCommands === INVALID || unnamedControlsAllowed === INVALID) return INVALID;
+  if (!allValid(switches) || pageScripts === INVALID || databaseCommands === INVALID || unnamedControlsAllowed === INVALID) {return INVALID;}
   const [cssLocators, xpathLocators, domChecks] = switches;
   // A switch set to false and an absent one both leave the feature off, so only true is kept.
   return {
@@ -89,7 +89,7 @@ export function readUnsafeFeatures(input: unknown, context: UnsafeFeaturesContex
 // The features a section enables, in the order UNSAFE_FEATURES lists them: the one answer to
 // "is this feature on?" that the plan parser reads.
 export function enabledUnsafeFeatures(declaration: UnsafeFeaturesDeclaration | undefined): readonly UnsafeFeature[] {
-  if (declaration === undefined) return [];
+  if (declaration === undefined) {return [];}
   const enabled: { readonly [Feature in UnsafeFeature]: boolean } = {
     'css-locator': declaration.cssLocators === true,
     'xpath-locator': declaration.xpathLocators === true,
@@ -115,9 +115,9 @@ const readOptionalLimit = (fields: Readonly<Record<string, unknown>>, key: strin
 // A declaration's parameters, none of them a secret.
 function readScriptParameters(input: unknown, path: string, issues: Issues): Parsed<Readonly<Record<ParameterName, ScriptParameterType>>> {
   const parameters = readParameters(input, path, issues);
-  if (parameters === INVALID) return INVALID;
+  if (parameters === INVALID) {return INVALID;}
   const entries = Object.entries<ParameterType>(parameters).map(([name, type]): Parsed<readonly [string, ScriptParameterType]> => {
-    if (type.kind !== ParameterKind.Secret) return [name, type];
+    if (type.kind !== ParameterKind.Secret) {return [name, type];}
     issues.push({ code: PlanErrorCode.UnknownValue, path: `${path}.${name}.kind` });
     return INVALID;
   });
@@ -128,7 +128,7 @@ function readScriptParameters(input: unknown, path: string, issues: Issues): Par
 
 function readPageScripts(input: unknown, path: string, issues: Issues): Parsed<NonNullable<UnsafeFeaturesDeclaration['pageScripts']>> {
   const fields = readRecord(input, path, issues, PAGE_SCRIPTS_FIELDS, ['scripts']);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const allowInline = readSwitch(fields, 'allowInline', path, issues);
   const scripts = readDeclarationSection<'ScriptName', PageScriptDeclaration>(
     fields['scripts'], `${path}.scripts`, issues, MAXIMUM_SCRIPTS, (declaration, at) => readPageScript(declaration, at, issues),
@@ -138,7 +138,7 @@ function readPageScripts(input: unknown, path: string, issues: Issues): Parsed<N
 
 function readPageScript(input: unknown, path: string, issues: Issues): Parsed<PageScriptDeclaration> {
   const fields = readRecord(input, path, issues, SCRIPT_FIELDS, REQUIRED_SCRIPT_FIELDS);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const resultFields = Object.hasOwn(fields, 'fields') ? readFieldPointers(fields['fields'], `${path}.fields`, issues) : undefined;
   const timeoutMilliseconds = readOptionalLimit(fields, 'timeoutMilliseconds', path, issues, MAXIMUM_SCRIPT_TIMEOUT_MILLISECONDS);
   const maximumResultBytes = readOptionalLimit(fields, 'maximumResultBytes', path, issues, MAXIMUM_SCRIPT_RESULT_BYTES);
@@ -148,7 +148,7 @@ function readPageScript(input: unknown, path: string, issues: Issues): Parsed<Pa
     readOneOf(fields['effect'], `${path}.effect`, issues, CALL_EFFECTS),
     readSwitch(fields, 'allowInProposals', path, issues),
   ] as const;
-  if (!allValid(parts) || resultFields === INVALID || timeoutMilliseconds === INVALID || maximumResultBytes === INVALID) return INVALID;
+  if (!allValid(parts) || resultFields === INVALID || timeoutMilliseconds === INVALID || maximumResultBytes === INVALID) {return INVALID;}
   const [file, parameters, effect, allowInProposals] = parts;
   // Optional parts are left out when absent.
   return {
@@ -160,7 +160,7 @@ function readPageScript(input: unknown, path: string, issues: Issues): Parsed<Pa
 
 function readScriptFile(input: unknown, path: string, issues: Issues): Parsed<SafeText> {
   const file = readUnscannedText(input, path, issues, MAXIMUM_SCRIPT_FILE_LENGTH);
-  if (file === INVALID) return INVALID;
+  if (file === INVALID) {return INVALID;}
   const segments = file.slice(SCRIPT_FOLDER.length).split('/');
   if (!SCRIPT_FILE.test(file) || segments.some((segment) => segment === '' || segment === '.' || segment === '..')) {
     issues.push({ code: PlanErrorCode.PathNotAllowed, path });
@@ -175,7 +175,7 @@ function readDatabaseCommands(
   input: unknown, path: string, context: UnsafeFeaturesContext,
 ): Parsed<NonNullable<UnsafeFeaturesDeclaration['databaseCommands']>> {
   const fields = readRecord(input, path, context.issues, ['commands']);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const commands = readDeclarationSection<'CommandName', DatabaseCommandDeclaration>(
     fields['commands'], `${path}.commands`, context.issues, MAXIMUM_COMMANDS, (declaration, at) => readCommand(declaration, at, context),
   );
@@ -185,7 +185,7 @@ function readDatabaseCommands(
 function readCommand(input: unknown, path: string, context: UnsafeFeaturesContext): Parsed<DatabaseCommandDeclaration> {
   const { issues } = context;
   const fields = readRecord(input, path, issues, COMMAND_FIELDS, REQUIRED_COMMAND_FIELDS);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const output = readOneOf(fields['output'], `${path}.output`, issues, COMMAND_OUTPUTS);
   // Only JSON output has fields to read.
   const hasFields = Object.hasOwn(fields, 'fields');
@@ -207,7 +207,7 @@ function readCommand(input: unknown, path: string, context: UnsafeFeaturesContex
     readSwitch(fields, 'allowInProposals', path, issues),
   ] as const;
   if (!allValid(parts) || output === INVALID || outputFields === INVALID || environment === INVALID || successExitCodes === INVALID
-    || timeoutMilliseconds === INVALID || maximumOutputBytes === INVALID || parameters === INVALID || argv === INVALID) return INVALID;
+    || timeoutMilliseconds === INVALID || maximumOutputBytes === INVALID || parameters === INVALID || argv === INVALID) {return INVALID;}
   const [service, image, effect, allowInProposals] = parts;
   // Optional parts are left out when absent.
   return {
@@ -234,18 +234,18 @@ function readArgumentVector(
   input: unknown, path: string, issues: Issues, parameters: Readonly<Record<ParameterName, ScriptParameterType>>,
 ): Parsed<readonly CommandArgument[]> {
   const raw = readList(input, path, issues, MAXIMUM_ARGUMENTS);
-  if (raw === INVALID) return INVALID;
+  if (raw === INVALID) {return INVALID;}
   const argv = raw.map((entry, index): Parsed<CommandArgument> => {
     const at = `${path}[${index}]`;
     if (typeof entry === 'object' && entry !== null && Object.hasOwn(entry, '$parameter')) {
       const fields = readRecord(entry, at, issues, ['$parameter']);
-      if (fields === INVALID) return INVALID;
+      if (fields === INVALID) {return INVALID;}
       const name = Object.keys(parameters).find((parameter) => parameter === fields['$parameter']);
       if (name === undefined || index === 0) { issues.push({ code: PlanErrorCode.UnknownValue, path: at }); return INVALID; }
       return { $parameter: brand<string, 'ParameterName'>(name) };
     }
     const fields = readRecord(entry, at, issues, ['literal']);
-    if (fields === INVALID) return INVALID;
+    if (fields === INVALID) {return INVALID;}
     const literal = readUnscannedText(fields['literal'], `${at}.literal`, issues, MAXIMUM_ARGUMENT_LENGTH);
     return literal === INVALID ? INVALID : { literal };
   });
@@ -254,9 +254,9 @@ function readArgumentVector(
 
 function readExitCodes(input: unknown, path: string, issues: Issues): Parsed<readonly number[]> {
   const raw = readList(input, path, issues, MAXIMUM_EXIT_CODES);
-  if (raw === INVALID) return INVALID;
+  if (raw === INVALID) {return INVALID;}
   const codes = raw.map((code, index) => readInteger(code, `${path}[${index}]`, issues, 0, LARGEST_EXIT_CODE));
-  if (!allValid(codes)) return INVALID;
+  if (!allValid(codes)) {return INVALID;}
   if (new Set(codes).size !== codes.length) { issues.push({ code: PlanErrorCode.Duplicate, path }); return INVALID; }
   return codes;
 }
@@ -266,14 +266,14 @@ function readExitCodes(input: unknown, path: string, issues: Issues): Parsed<rea
 // Exact css selectors or XPath expressions, under the rules a plan's selector follows, each once.
 function readSelectorList(input: unknown, path: string, issues: Issues): Parsed<readonly SafeText[]> {
   const raw = readList(input, path, issues, MAXIMUM_UNNAMED_CONTROLS, 0);
-  if (raw === INVALID) return INVALID;
+  if (raw === INVALID) {return INVALID;}
   const selectors = raw.map((value, index): Parsed<SafeText> => {
     const at = `${path}[${index}]`;
     const selector = readUnscannedText(value, at, issues, MAXIMUM_SELECTOR_LENGTH);
     if (selector !== INVALID && SELECTOR_FORBIDDEN_CHARACTERS.test(selector)) { issues.push({ code: PlanErrorCode.UnsafeText, path: at }); return INVALID; }
     return selector;
   });
-  if (!allValid(selectors)) return INVALID;
+  if (!allValid(selectors)) {return INVALID;}
   if (new Set(selectors).size !== selectors.length) { issues.push({ code: PlanErrorCode.Duplicate, path }); return INVALID; }
   return selectors;
 }

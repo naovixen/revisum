@@ -76,10 +76,10 @@ async function serveFixtures(folder: string): Promise<{ readonly server: Server;
 // system without /proc, only this process's own.
 function treeResidentBytes(): number {
   const own = process.memoryUsage.rss();
-  if (!existsSync('/proc/self/stat')) return own;
+  if (!existsSync('/proc/self/stat')) {return own;}
   const parents = new Map<number, number>();
   for (const name of readdirSync('/proc')) {
-    if (!/^\d+$/.test(name)) continue;
+    if (!/^\d+$/.test(name)) {continue;}
     try {
       // The parent id is the second field after the command, which sits in parentheses.
       const stat = readFileSync(`/proc/${name}/stat`, 'utf8');
@@ -92,11 +92,11 @@ function treeResidentBytes(): number {
   const tree = new Set([process.pid]);
   for (let grown = true; grown;) {
     grown = false;
-    for (const [id, parent] of parents) if (!tree.has(id) && tree.has(parent)) { tree.add(id); grown = true; }
+    for (const [id, parent] of parents) {if (!tree.has(id) && tree.has(parent)) { tree.add(id); grown = true; }}
   }
   let total = own;
   for (const id of tree) {
-    if (id === process.pid) continue;
+    if (id === process.pid) {continue;}
     try {
       const resident = /^VmRSS:\s+(\d+) kB$/m.exec(readFileSync(`/proc/${id}/status`, 'utf8'))?.[1];
       total += resident === undefined ? 0 : Number(resident) * 1024;
@@ -128,17 +128,17 @@ export async function benchmarkRuns(options: BenchmarkRunsOptions): Promise<Benc
     const ports = buildAdapters.benchmarkPorts({ executablePath: options.executablePath });
     // The gate clears the plan under the trusted project, and the run runs under the project it cleared.
     const loaded = await loadTrustedProject('project.json', protectedBranchHolding(projectFile), { files: [], events: ports.audit });
-    if (!loaded.ok) throw new Error(`the benchmark project was refused: ${JSON.stringify(loaded.error)}`);
+    if (!loaded.ok) {throw new Error(`the benchmark project was refused: ${JSON.stringify(loaded.error)}`);}
     const project = loaded.value.project;
     const parsed = planParser(project)(SIGNUP_PLAN);
-    if (!parsed.ok) throw new Error(`the benchmark plan was rejected: ${JSON.stringify(parsed.error)}`);
+    if (!parsed.ok) {throw new Error(`the benchmark plan was rejected: ${JSON.stringify(parsed.error)}`);}
     const baseUrl = parseBaseUrl(origin);
-    if (!baseUrl.ok) throw new Error(`the fixture server's origin is not a base URL: ${baseUrl.error}`);
+    if (!baseUrl.ok) {throw new Error(`the fixture server's origin is not a base URL: ${baseUrl.error}`);}
     // The plan names the one target it runs on, typed as the parser read it.
     const [targetId] = parsed.value.targets;
-    if (targetId === undefined) throw new Error('the benchmark plan names no target');
+    if (targetId === undefined) {throw new Error('the benchmark plan names no target');}
     const decision = policyGate({ project, events: ports.audit }).clear(parsed.value, targetId);
-    if (decision.kind === 'deny') throw new Error(`the policy gate denied the benchmark plan: ${decision.rule}`);
+    if (decision.kind === 'deny') {throw new Error(`the policy gate denied the benchmark plan: ${decision.rule}`);}
     if (decision.kind === 'not-declared') {
       throw new Error(`the benchmark project does not declare the target ${decision.targetId}`);
     }
@@ -149,7 +149,7 @@ export async function benchmarkRuns(options: BenchmarkRunsOptions): Promise<Benc
       const events: LoggedEvent[] = [];
       const sink: RunEventSink = {
         append(event) {
-          if (timing.firstStep === null && event.kind === EventKind.StepStart) timing.firstStep = performance.now();
+          if (timing.firstStep === null && event.kind === EventKind.StepStart) {timing.firstStep = performance.now();}
           events.push(event);
         },
         read: () => [...events],
@@ -161,12 +161,12 @@ export async function benchmarkRuns(options: BenchmarkRunsOptions): Promise<Benc
         const result = await ports.runService(sink).run(decision.run, {
           baseUrl: baseUrl.value, seed: 42, fixedTimeMilliseconds: Date.UTC(2026, 0, 15, 10, 30), fixtures, host: { platform: platform(), arch: arch() },
         });
-        if (result.state !== TerminalState.Passed) throw new Error(`benchmark run ${index + 1} ended ${result.state}`);
+        if (result.state !== TerminalState.Passed) {throw new Error(`benchmark run ${index + 1} ended ${result.state}`);}
       } finally {
         clearInterval(sampler);
       }
       peak = Math.max(peak, treeResidentBytes());
-      if (timing.firstStep === null) throw new Error(`benchmark run ${index + 1} started no step`);
+      if (timing.firstStep === null) {throw new Error(`benchmark run ${index + 1} started no step`);}
       samples.push({ setupMilliseconds: Math.round(timing.firstStep - started), peakMemoryMegabytes: Math.round(peak / MEGABYTE) });
     }
     return { platform: `${platform()}-${arch()}`, runs: samples };

@@ -45,7 +45,7 @@ export function readProxyDecision(line: string): ProxyDecision | null {
   }
   const origin = ownField(parsed, 'origin');
   const decision = ownField(parsed, 'decision');
-  if (typeof origin !== 'string' || origin === '' || (decision !== 'allowed' && decision !== 'blocked')) return null;
+  if (typeof origin !== 'string' || origin === '' || (decision !== 'allowed' && decision !== 'blocked')) {return null;}
   return { origin, decision };
 }
 
@@ -59,7 +59,7 @@ export function readAppliedRewrite(line: string): AppliedRewrite | null {
   }
   const origin = parseOrigin(ownField(parsed, 'origin'));
   const name = ownField(parsed, 'name');
-  if (!origin.ok || typeof name !== 'string' || name === '') return null;
+  if (!origin.ok || typeof name !== 'string' || name === '') {return null;}
   return { origin: origin.value, name };
 }
 

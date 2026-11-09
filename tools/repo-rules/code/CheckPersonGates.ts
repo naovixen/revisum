@@ -24,7 +24,7 @@ const isEqualityAfter = (tokens: readonly Token[], index: number): boolean =>
 
 // `case 'person-verified':` is a gate on its own unless a `case 'person-declared':` sits next to it.
 function isLoneCase(tokens: readonly Token[], index: number): boolean {
-  if (!isIdentifier(tokens[index - 1], 'case')) return false;
+  if (!isIdentifier(tokens[index - 1], 'case')) {return false;}
   const declaredAfter = isIdentifier(tokens[index + 2], 'case') && isString(tokens[index + 3], DECLARED_PERSON);
   const declaredBefore = isPunctuator(tokens[index - 2], ':') && isString(tokens[index - 3], DECLARED_PERSON);
   return !declaredAfter && !declaredBefore;
@@ -81,7 +81,7 @@ export function checkPersonGates(root: string): string[] {
       if (opensList(tokens, index) && leavesOutDeclaredPerson(tokens, index)) {
         problems.push(`${path}:${token.line} lists '${VERIFIED_PERSON}' without '${DECLARED_PERSON}'; test membership of PERSON_ACTOR_TYPES so a declared person counts too`);
       }
-      if (!isString(token, VERIFIED_PERSON)) return;
+      if (!isString(token, VERIFIED_PERSON)) {return;}
       if (isEqualityBefore(tokens, index) || isEqualityAfter(tokens, index) || isLoneCase(tokens, index)) {
         problems.push(`${path}:${token.line} compares an actor type with '${VERIFIED_PERSON}' alone; test membership of PERSON_ACTOR_TYPES so a declared person counts too`);
       }
@@ -90,4 +90,4 @@ export function checkPersonGates(root: string): string[] {
   return problems;
 }
 
-if (import.meta.main) process.exitCode = reportProblems('person gate check', checkPersonGates(process.cwd()));
+if (import.meta.main) {process.exitCode = reportProblems('person gate check', checkPersonGates(process.cwd()));}

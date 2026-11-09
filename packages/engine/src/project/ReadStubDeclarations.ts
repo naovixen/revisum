@@ -96,14 +96,14 @@ function readAllowInProposals(fields: Readonly<Record<string, unknown>>, path: s
 // An origin the project allows, from `permitted`; any other well-formed origin is origin_not_allowed.
 function readPermittedOrigin(input: unknown, path: string, issues: Issues, permitted: readonly Origin[]): Parsed<Origin> {
   const origin = readOrigin(input, path, issues);
-  if (origin === INVALID) return INVALID;
+  if (origin === INVALID) {return INVALID;}
   if (!permitted.includes(origin)) { issues.push({ code: PlanErrorCode.OriginNotAllowed, path }); return INVALID; }
   return origin;
 }
 
 function readMatcherPath(input: unknown, path: string, issues: Issues): Parsed<string> {
   const text = readUnscannedText(input, path, issues, MAXIMUM_MATCHER_PATH_LENGTH);
-  if (text === INVALID) return INVALID;
+  if (text === INVALID) {return INVALID;}
   if (!MATCHER_PATH.test(text)) { issues.push({ code: PlanErrorCode.UnknownValue, path }); return INVALID; }
   return text;
 }
@@ -113,7 +113,7 @@ function readMatcherPath(input: unknown, path: string, issues: Issues): Parsed<s
 function readMatcher(input: unknown, path: string, context: NetworkDeclarationContext): Parsed<RequestMatcher> {
   const { issues } = context;
   const fields = readRecord(input, path, issues, MATCHER_FIELDS);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const parts = [
     readPermittedOrigin(fields['origin'], `${path}.origin`, issues, [...context.origins, ...context.serviceOrigins]),
     readOneOf(fields['method'], `${path}.method`, issues, HTTP_METHODS),
@@ -128,17 +128,17 @@ function readMatcher(input: unknown, path: string, context: NetworkDeclarationCo
 function readStub(input: unknown, path: string, context: NetworkDeclarationContext): Parsed<StubDeclaration> {
   const { issues } = context;
   const fields = readRecord(input, path, issues, STUB_FIELDS, ['request', 'parameters', 'responses']);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const request = readMatcher(fields['request'], `${path}.request`, context);
   const allowInProposals = readAllowInProposals(fields, path, issues);
   // The bodies name parameters, so they are read only once the parameters are known.
   const parameters = readParameters(fields['parameters'], `${path}.parameters`, issues);
-  if (parameters === INVALID) return INVALID;
+  if (parameters === INVALID) {return INVALID;}
   const responsesPath = `${path}.responses`;
   const rawResponses = readList(fields['responses'], responsesPath, issues, MAXIMUM_STUB_RESPONSES);
-  if (rawResponses === INVALID) return INVALID;
+  if (rawResponses === INVALID) {return INVALID;}
   const responses = rawResponses.map((response, index) => readStubResponse(response, `${responsesPath}[${index}]`, context, parameters));
-  if (request === INVALID || allowInProposals === INVALID || !allValid(responses)) return INVALID;
+  if (request === INVALID || allowInProposals === INVALID || !allValid(responses)) {return INVALID;}
   return { request, parameters, responses, allowInProposals };
 }
 
@@ -147,14 +147,14 @@ function readStubResponse(
 ): Parsed<StubResponse> {
   const { issues } = context;
   const fields = readRecord(input, path, issues, STUB_RESPONSE_FIELDS, ['status', 'mediaType', 'body']);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const parts = [
     readInteger(fields['status'], `${path}.status`, issues, STUB_STATUS.lowest, STUB_STATUS.highest),
     readOneOf(fields['mediaType'], `${path}.mediaType`, issues, STUB_MEDIA_TYPES),
     readStubBody(fields['body'], `${path}.body`, context, parameters),
   ] as const;
   const headers = Object.hasOwn(fields, 'headers') ? readStubHeaders(fields['headers'], `${path}.headers`, issues) : undefined;
-  if (!allValid(parts) || headers === INVALID) return INVALID;
+  if (!allValid(parts) || headers === INVALID) {return INVALID;}
   // Headers are left out when absent.
   return { status: parts[0], mediaType: parts[1], ...(headers === undefined ? {} : { headers }), body: parts[2] };
 }
@@ -162,7 +162,7 @@ function readStubResponse(
 // Header values are safe text, which holds no line break, so no header can be smuggled in.
 function readStubHeaders(input: unknown, path: string, issues: Issues): Parsed<Readonly<Record<string, SafeText>>> {
   const fields = peekRecord(input, path, issues);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const seen = new Set<string>();
   const entries = Object.entries(fields).map(([name, value]): Parsed<readonly [string, SafeText]> => {
     const at = `${path}.${name}`;
@@ -186,16 +186,16 @@ function readStubBody(
   input: unknown, path: string, context: NetworkDeclarationContext, parameters: Readonly<Record<ParameterName, ParameterType>>,
 ): Parsed<StubResponseBody> {
   const { issues } = context;
-  if (input === null) return null;
+  if (input === null) {return null;}
   const head = peekRecord(input, path, issues);
-  if (head === INVALID) return INVALID;
+  if (head === INVALID) {return INVALID;}
   const kind = STUB_BODY_KINDS.find((candidate) => Object.hasOwn(head, candidate));
   if (kind === undefined) {
     // No body kind at all: every key is one the format does not have, or there is none.
-    if (readRecord(input, path, issues, STUB_BODY_KINDS, []) !== INVALID) issues.push({ code: PlanErrorCode.Empty, path });
+    if (readRecord(input, path, issues, STUB_BODY_KINDS, []) !== INVALID) {issues.push({ code: PlanErrorCode.Empty, path });}
     return INVALID;
   }
-  if (readRecord(input, path, issues, [kind]) === INVALID) return INVALID;
+  if (readRecord(input, path, issues, [kind]) === INVALID) {return INVALID;}
   const at = `${path}.${kind}`;
   switch (kind) {
     case 'fixture': {
@@ -222,13 +222,13 @@ function readStubBody(
 function readObservedRequest(input: unknown, path: string, context: NetworkDeclarationContext): Parsed<ObservedRequestDeclaration> {
   const { issues } = context;
   const fields = readRecord(input, path, issues, OBSERVED_REQUEST_FIELDS, ['request']);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const request = readMatcher(fields['request'], `${path}.request`, context);
   const responseFields = Object.hasOwn(fields, 'fields') ? readFieldPointers(fields['fields'], `${path}.fields`, issues) : undefined;
   const maximumResponseBytes = Object.hasOwn(fields, 'maximumResponseBytes')
     ? readInteger(fields['maximumResponseBytes'], `${path}.maximumResponseBytes`, issues, 1, MAXIMUM_OBSERVED_RESPONSE_BYTES)
     : DEFAULT_OBSERVED_RESPONSE_BYTES;
-  if (request === INVALID || responseFields === INVALID || maximumResponseBytes === INVALID) return INVALID;
+  if (request === INVALID || responseFields === INVALID || maximumResponseBytes === INVALID) {return INVALID;}
   // Fields are left out when absent: the requests are then only counted.
   return { request, ...(responseFields === undefined ? {} : { fields: responseFields }), maximumResponseBytes };
 }
@@ -240,7 +240,7 @@ function readObservedRequest(input: unknown, path: string, context: NetworkDecla
 function readStorageEntry(input: unknown, path: string, context: NetworkDeclarationContext): Parsed<StorageEntryDeclaration> {
   const { issues } = context;
   const fields = readRecord(input, path, issues, STORAGE_ENTRY_FIELDS, ['area', 'origin', 'key', 'access']);
-  if (fields === INVALID) return INVALID;
+  if (fields === INVALID) {return INVALID;}
   const parts = [
     readOneOf(fields['area'], `${path}.area`, issues, STORAGE_AREAS),
     readPermittedOrigin(fields['origin'], `${path}.origin`, issues, context.origins),
@@ -248,18 +248,18 @@ function readStorageEntry(input: unknown, path: string, context: NetworkDeclarat
     readOneOf(fields['access'], `${path}.access`, issues, STORAGE_ACCESS),
     readAllowInProposals(fields, path, issues),
   ] as const;
-  if (!allValid(parts)) return INVALID;
+  if (!allValid(parts)) {return INVALID;}
   const [area, origin, key, access, allowInProposals] = parts;
   if (access === StorageAccess.Read) {
     const written = ['value', 'parameters'].filter((field) => Object.hasOwn(fields, field));
-    for (const field of written) issues.push({ code: PlanErrorCode.UnknownField, path: `${path}.${field}` });
+    for (const field of written) {issues.push({ code: PlanErrorCode.UnknownField, path: `${path}.${field}` });}
     return written.length > 0 ? INVALID : { area, origin, key, access, allowInProposals };
   }
   if (!Object.hasOwn(fields, 'value')) { issues.push({ code: PlanErrorCode.MissingField, path: `${path}.value` }); return INVALID; }
   const parameters = Object.hasOwn(fields, 'parameters') ? readParameters(fields['parameters'], `${path}.parameters`, issues) : undefined;
-  if (parameters === INVALID) return INVALID;
+  if (parameters === INVALID) {return INVALID;}
   const value: Parsed<JsonTemplate> = readJsonTemplate(fields['value'], `${path}.value`, issues, parameters ?? {});
-  if (value === INVALID) return INVALID;
+  if (value === INVALID) {return INVALID;}
   // Parameters are left out when absent.
   return { area, origin, key, access, value, ...(parameters === undefined ? {} : { parameters }), allowInProposals };
 }

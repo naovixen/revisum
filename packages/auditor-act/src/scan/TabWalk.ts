@@ -23,7 +23,7 @@ export interface WalkOptions { focusVisibility: boolean; occlusion: boolean; ste
 
 export async function tabWalk(page: PageDriver, snapshot: PageSnapshot, options: WalkOptions): Promise<TabWalk> {
   const indexByBackend = new Map<number, number>();
-  for (const node of snapshot.nodes) if (node.nodeType === 1 && !indexByBackend.has(node.backendId)) indexByBackend.set(node.backendId, node.index);
+  for (const node of snapshot.nodes) {if (node.nodeType === 1 && !indexByBackend.has(node.backendId)) {indexByBackend.set(node.backendId, node.index);}}
   const expected = snapshot.nodes.filter((node) => inSequentialFocus(snapshot, node)).length;
   const stepLimit = options.stepLimit ?? Math.min(150, Math.max(12, expected * 2 + 6));
   const walk: TabWalk = {
@@ -43,9 +43,9 @@ export async function tabWalk(page: PageDriver, snapshot: PageSnapshot, options:
       seenBackend.set(active.backendId, index);
     }
     walk.visits.push(index);
-    if (walk.sequence.includes(index)) continue;
+    if (walk.sequence.includes(index)) {continue;}
     walk.sequence.push(index);
-    if (active.box !== null) walk.boxes.set(index, active.box);
+    if (active.box !== null) {walk.boxes.set(index, active.box);}
     await page.evaluate(`(${holdFocusedElement.toString()})()`);
     if (options.occlusion) {
       walk.obscured.set(index, decodeOcclusion(await page.evaluate(`(${measureOcclusion.toString()})()`)));
@@ -63,7 +63,7 @@ export async function tabWalk(page: PageDriver, snapshot: PageSnapshot, options:
 
 // The repeating tail of the visit log when the walk never left the page: the trapped elements.
 export function trapSet(walk: TabWalk): number[] {
-  if (walk.endedAtDocument || walk.visits.length === 0) return [];
+  if (walk.endedAtDocument || walk.visits.length === 0) {return [];}
   const tail = walk.visits.slice(-Math.max(4, Math.floor(walk.visits.length / 2)));
   return [...new Set(tail)];
 }

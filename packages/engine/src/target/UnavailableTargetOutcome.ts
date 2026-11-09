@@ -5,6 +5,6 @@ import type { Target, UnavailableTargetOutcome } from '@revisum/contracts';
 import { isRequiredTarget } from './TargetFidelity.ts';
 
 export function unavailableTargetOutcome(target: Target): UnavailableTargetOutcome {
-  if (isRequiredTarget(target)) return { exitCode: 3 };
+  if (isRequiredTarget(target)) {return { exitCode: 3 };}
   return { exitCode: 0, skipped: true, warning: `the optional target ${target.id} was unavailable, so it was skipped and not tested` };
 }

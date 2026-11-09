@@ -32,8 +32,8 @@ function listSourceFiles(folder: string): string[] {
   const files: string[] = [];
   for (const entry of readdirSync(folder, { withFileTypes: true })) {
     const path = join(folder, entry.name);
-    if (entry.isDirectory()) files.push(...listSourceFiles(path));
-    else if (/\.(ts|mts|cts|js|mjs|cjs)$/.test(entry.name)) files.push(path);
+    if (entry.isDirectory()) {files.push(...listSourceFiles(path));}
+    else if (/\.(ts|mts|cts|js|mjs|cjs)$/.test(entry.name)) {files.push(path);}
   }
   return files;
 }
@@ -132,4 +132,4 @@ export function checkImports(root: string): string[] {
   return problems;
 }
 
-if (import.meta.main) process.exitCode = reportProblems('import check', checkImports(process.cwd()));
+if (import.meta.main) {process.exitCode = reportProblems('import check', checkImports(process.cwd()));}

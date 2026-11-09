@@ -40,9 +40,9 @@ const tooLarge = (path: string): Result<never, ZipProblem> => failure({ code: Su
 function endOfDirectory(bytes: Buffer): number | null {
   const earliest = Math.max(0, bytes.length - END_OF_DIRECTORY_BYTES - LARGEST_COMMENT_BYTES);
   for (let offset = bytes.length - END_OF_DIRECTORY_BYTES; offset >= earliest; offset--) {
-    if (bytes.readUInt32LE(offset) !== END_OF_DIRECTORY_SIGNATURE) continue;
+    if (bytes.readUInt32LE(offset) !== END_OF_DIRECTORY_SIGNATURE) {continue;}
     // The record's comment must end exactly at the archive's end.
-    if (offset + END_OF_DIRECTORY_BYTES + bytes.readUInt16LE(offset + 20) === bytes.length) return offset;
+    if (offset + END_OF_DIRECTORY_BYTES + bytes.readUInt16LE(offset + 20) === bytes.length) {return offset;}
   }
   return null;
 }
@@ -57,19 +57,19 @@ function entryName(bytes: Uint8Array): string | null {
 }
 
 export function readZip(archive: Uint8Array, limits: ZipLimits): Result<readonly ZipEntryData[], ZipProblem> {
-  if (archive.length > limits.maximumTotalBytes) return tooLarge('$');
+  if (archive.length > limits.maximumTotalBytes) {return tooLarge('$');}
   const bytes = Buffer.from(archive.buffer, archive.byteOffset, archive.byteLength);
-  if (bytes.length < END_OF_DIRECTORY_BYTES) return invalid('$');
+  if (bytes.length < END_OF_DIRECTORY_BYTES) {return invalid('$');}
   const end = endOfDirectory(bytes);
-  if (end === null) return invalid('$');
+  if (end === null) {return invalid('$');}
   const entryCount = bytes.readUInt16LE(end + 10);
   const directoryBytes = bytes.readUInt32LE(end + 12);
   const directoryStart = bytes.readUInt32LE(end + 16);
   // One disk only, and no zip64 markers: trace archives never need either.
-  if (bytes.readUInt16LE(end + 4) !== 0 || bytes.readUInt16LE(end + 6) !== 0 || bytes.readUInt16LE(end + 8) !== entryCount) return invalid('$');
-  if (entryCount === 0xffff || directoryStart === 0xffffffff) return invalid('$');
-  if (entryCount > limits.maximumEntries) return tooLarge('$');
-  if (directoryStart + directoryBytes > end) return invalid('$');
+  if (bytes.readUInt16LE(end + 4) !== 0 || bytes.readUInt16LE(end + 6) !== 0 || bytes.readUInt16LE(end + 8) !== entryCount) {return invalid('$');}
+  if (entryCount === 0xffff || directoryStart === 0xffffffff) {return invalid('$');}
+  if (entryCount > limits.maximumEntries) {return tooLarge('$');}
+  if (directoryStart + directoryBytes > end) {return invalid('$');}
 
   const entries: ZipEntryData[] = [];
   const names = new Set<string>();
@@ -77,8 +77,8 @@ export function readZip(archive: Uint8Array, limits: ZipLimits): Result<readonly
   let offset = directoryStart;
   for (let index = 0; index < entryCount; index++) {
     const path = `$.entries[${index}]`;
-    if (offset + CENTRAL_HEADER_BYTES > directoryStart + directoryBytes) return invalid(path);
-    if (bytes.readUInt32LE(offset) !== CENTRAL_HEADER_SIGNATURE) return invalid(path);
+    if (offset + CENTRAL_HEADER_BYTES > directoryStart + directoryBytes) {return invalid(path);}
+    if (bytes.readUInt32LE(offset) !== CENTRAL_HEADER_SIGNATURE) {return invalid(path);}
     const flags = bytes.readUInt16LE(offset + 8);
     const method = bytes.readUInt16LE(offset + 10);
     const checksum = bytes.readUInt32LE(offset + 16);
@@ -90,17 +90,17 @@ export function readZip(archive: Uint8Array, limits: ZipLimits): Result<readonly
     const localStart = bytes.readUInt32LE(offset + 42);
     const nameStart = offset + CENTRAL_HEADER_BYTES;
     offset = nameStart + nameBytes + extraBytes + commentBytes;
-    if (offset > directoryStart + directoryBytes) return invalid(path);
-    if ((flags & ENCRYPTED) !== 0 || (method !== STORED && method !== DEFLATED)) return invalid(path);
+    if (offset > directoryStart + directoryBytes) {return invalid(path);}
+    if ((flags & ENCRYPTED) !== 0 || (method !== STORED && method !== DEFLATED)) {return invalid(path);}
 
     const name = entryName(bytes.subarray(nameStart, nameStart + nameBytes));
-    if (name === null || !staysInside(name) || names.has(name)) return invalid(path);
+    if (name === null || !staysInside(name) || names.has(name)) {return invalid(path);}
     names.add(name);
 
     // The data lies after the entry's local header and before the directory.
-    if (localStart + LOCAL_HEADER_BYTES > directoryStart || bytes.readUInt32LE(localStart) !== LOCAL_HEADER_SIGNATURE) return invalid(path);
+    if (localStart + LOCAL_HEADER_BYTES > directoryStart || bytes.readUInt32LE(localStart) !== LOCAL_HEADER_SIGNATURE) {return invalid(path);}
     const dataStart = localStart + LOCAL_HEADER_BYTES + bytes.readUInt16LE(localStart + 26) + bytes.readUInt16LE(localStart + 28);
-    if (dataStart + compressedBytes > directoryStart) return invalid(path);
+    if (dataStart + compressedBytes > directoryStart) {return invalid(path);}
     const compressed = bytes.subarray(dataStart, dataStart + compressedBytes);
 
     // The most this entry may inflate to, whatever its headers claim.
@@ -116,8 +116,8 @@ export function readZip(archive: Uint8Array, limits: ZipLimits): Result<readonly
         return code === 'ERR_BUFFER_TOO_LARGE' ? tooLarge(path) : invalid(path);
       }
     }
-    if (data.length > allowed) return tooLarge(path);
-    if (data.length !== claimedBytes || crc32(data) !== checksum) return invalid(path);
+    if (data.length > allowed) {return tooLarge(path);}
+    if (data.length !== claimedBytes || crc32(data) !== checksum) {return invalid(path);}
     budget -= data.length;
     entries.push({ name, data: new Uint8Array(data) });
   }

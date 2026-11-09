@@ -38,7 +38,7 @@ export function readGlossaryTables(glossary: string): { readonly table: string; 
   let current: { table: string; header: string[]; rows: string[][] } | undefined;
   for (const line of glossary.replace(/\r\n/g, '\n').split('\n')) {
     const heading = /^##\s+(.*)$/.exec(line);
-    if (heading !== null) section = (heading[1] ?? '').trim();
+    if (heading !== null) {section = (heading[1] ?? '').trim();}
     if (!line.trim().startsWith('|')) {
       current = undefined;
       continue;
@@ -82,12 +82,12 @@ type Declarations = {
 
 function listCodeFiles(root: string, folder: string): string[] {
   const path = join(root, folder);
-  if (!existsSync(path)) return [];
+  if (!existsSync(path)) {return [];}
   const files: string[] = [];
   for (const entry of readdirSync(path, { withFileTypes: true })) {
     const child = `${folder}/${entry.name}`;
-    if (entry.isDirectory() && entry.name !== 'node_modules' && entry.name !== 'dist') files.push(...listCodeFiles(root, child));
-    else if (entry.isFile() && /\.(ts|mts|js|mjs)$/.test(entry.name) && !entry.name.endsWith('.d.ts')) files.push(child);
+    if (entry.isDirectory() && entry.name !== 'node_modules' && entry.name !== 'dist') {files.push(...listCodeFiles(root, child));}
+    else if (entry.isFile() && /\.(ts|mts|js|mjs)$/.test(entry.name) && !entry.name.endsWith('.d.ts')) {files.push(child);}
   }
   return files;
 }
@@ -99,24 +99,24 @@ const isPunctuator = (token: Token | undefined, text: string): boolean => token?
 function exportedNames(tokens: readonly Token[]): string[] {
   const names: string[] = [];
   tokens.forEach((token, index) => {
-    if (token.kind !== TokenKind.Identifier || token.text !== 'export') return;
+    if (token.kind !== TokenKind.Identifier || token.text !== 'export') {return;}
     let next = index + 1;
-    while (MODIFIERS.has(tokens[next]?.text ?? '')) next += 1;
+    while (MODIFIERS.has(tokens[next]?.text ?? '')) {next += 1;}
     const keyword = tokens[next];
     if (isPunctuator(keyword, '*')) {
-      if (tokens[next + 1]?.text === 'as' && tokens[next + 2]?.kind === TokenKind.Identifier) names.push(tokens[next + 2]?.text ?? '');
+      if (tokens[next + 1]?.text === 'as' && tokens[next + 2]?.kind === TokenKind.Identifier) {names.push(tokens[next + 2]?.text ?? '');}
       return;
     }
-    if (keyword?.text === 'type' && isPunctuator(tokens[next + 1], '{')) next += 1;
+    if (keyword?.text === 'type' && isPunctuator(tokens[next + 1], '{')) {next += 1;}
     if (isPunctuator(tokens[next], '{')) {
       names.push(...exportList(tokens, next).map((item) => item.exported));
       return;
     }
-    if (keyword === undefined || keyword.kind !== TokenKind.Identifier) return;
+    if (keyword === undefined || keyword.kind !== TokenKind.Identifier) {return;}
     let nameIndex = next + 1;
-    if (isPunctuator(tokens[nameIndex], '*')) nameIndex += 1;
+    if (isPunctuator(tokens[nameIndex], '*')) {nameIndex += 1;}
     const name = tokens[nameIndex];
-    if ((VALUE_KEYWORDS.has(keyword.text) || keyword.text === 'type' || keyword.text === 'interface') && name?.kind === TokenKind.Identifier) names.push(name.text);
+    if ((VALUE_KEYWORDS.has(keyword.text) || keyword.text === 'type' || keyword.text === 'interface') && name?.kind === TokenKind.Identifier) {names.push(name.text);}
   });
   return names;
 }
@@ -142,7 +142,7 @@ function exportList(tokens: readonly Token[], open: number): ExportItem[] {
     }
     items.push({ local, exported, typeOnly });
     index += 1;
-    if (isPunctuator(tokens[index], ',')) index += 1;
+    if (isPunctuator(tokens[index], ',')) {index += 1;}
   }
   return items;
 }
@@ -158,16 +158,16 @@ function readDeclarations(root: string): Declarations {
   const toolFiles = listCodeFiles(root, 'tools').filter((file) => !file.startsWith('tools/eslint/'));
   for (const file of [...packageFiles, ...toolFiles]) {
     const tokens = codeTokens(root, file);
-    for (const name of exportedNames(tokens)) exported.add(name);
-    if (!file.startsWith('packages/')) continue;
+    for (const name of exportedNames(tokens)) {exported.add(name);}
+    if (!file.startsWith('packages/')) {continue;}
     tokens.forEach((token, index) => {
-      if (token.kind === TokenKind.String) strings.add(token.text);
+      if (token.kind === TokenKind.String) {strings.add(token.text);}
       const next = tokens[index + 1];
       const isKey = isPunctuator(next, ':') || (isPunctuator(next, '?') && isPunctuator(tokens[index + 2], ':'));
       // A method of an interface, type or object literal: `decide(…)` at the start of a member.
       const previous = tokens[index - 1];
       const isMethod = isPunctuator(next, '(') && (isPunctuator(previous, '{') || isPunctuator(previous, ';') || isPunctuator(previous, ',') || previous?.text === 'readonly');
-      if (token.kind === TokenKind.Identifier && (isKey || isMethod)) properties.add(token.text);
+      if (token.kind === TokenKind.Identifier && (isKey || isMethod)) {properties.add(token.text);}
     });
   }
   return { exported, strings, properties };
@@ -181,14 +181,14 @@ function unresolved(root: string, declarations: Declarations, codeName: string):
   const declaredWord = (word: string): boolean =>
     declarations.exported.has(word) || declarations.strings.has(word) || declarations.properties.has(word);
   if (codeName.includes('/') || (PATH_EXTENSION.test(codeName) && !codeName.startsWith('.'))) {
-    if (/[*?]/.test(codeName) || existsSync(join(root, codeName)) || declarations.strings.has(codeName)) return undefined;
+    if (/[*?]/.test(codeName) || existsSync(join(root, codeName)) || declarations.strings.has(codeName)) {return undefined;}
     return `${codeName} is no file in this repository and no string a package declares`;
   }
   if (IDENTIFIER_PATH.test(codeName)) {
     const missing = codeName.split('.').find((word) => !declaredWord(word));
     return missing === undefined ? undefined : `${codeName} is no exported declaration, string or property name in packages/*/src or tools/`;
   }
-  if (WORD.test(codeName)) return declaredWord(codeName) ? undefined : `${codeName} is no string a package declares`;
+  if (WORD.test(codeName)) {return declaredWord(codeName) ? undefined : `${codeName} is no string a package declares`;}
   return undefined;
 }
 
@@ -197,18 +197,18 @@ function unresolved(root: string, declarations: Declarations, codeName: string):
 // The file an import specifier names, from the file that imports it.
 function moduleFile(root: string, from: string, specifier: string): string | undefined {
   const workspace = /^@revisum\/([\w-]+)$/.exec(specifier);
-  if (workspace !== null) return `packages/${workspace[1] ?? ''}/src/index.ts`;
-  if (!specifier.startsWith('.')) return undefined;
+  if (workspace !== null) {return `packages/${workspace[1] ?? ''}/src/index.ts`;}
+  if (!specifier.startsWith('.')) {return undefined;}
   return join(dirname(from), specifier).split('\\').join('/');
 }
 
 // Every type and interface a module exports, following re-exports.
 function exportedTypes(root: string, file: string, seen = new Map<string, Set<string>>()): Set<string> {
   const known = seen.get(file);
-  if (known !== undefined) return known;
+  if (known !== undefined) {return known;}
   const types = new Set<string>();
   seen.set(file, types);
-  if (!existsSync(join(root, file))) return types;
+  if (!existsSync(join(root, file))) {return types;}
   const tokens = codeTokens(root, file);
   const localTypes = new Set<string>();
   tokens.forEach((token, index) => {
@@ -219,31 +219,31 @@ function exportedTypes(root: string, file: string, seen = new Map<string, Set<st
     }
   });
   tokens.forEach((token, index) => {
-    if (token.kind !== TokenKind.Identifier || token.text !== 'export') return;
+    if (token.kind !== TokenKind.Identifier || token.text !== 'export') {return;}
     let next = index + 1;
-    while (MODIFIERS.has(tokens[next]?.text ?? '')) next += 1;
+    while (MODIFIERS.has(tokens[next]?.text ?? '')) {next += 1;}
     const keyword = tokens[next];
     if (isPunctuator(keyword, '*')) {
       // `export * as name` exports a namespace object, not its types by name.
-      if (tokens[next + 1]?.text === 'as') return;
+      if (tokens[next + 1]?.text === 'as') {return;}
       const specifier = tokens[next + 2];
       const target = specifier?.kind === TokenKind.String ? moduleFile(root, file, specifier.text) : undefined;
-      if (target !== undefined) for (const type of exportedTypes(root, target, seen)) types.add(type);
+      if (target !== undefined) {for (const type of exportedTypes(root, target, seen)) {types.add(type);}}
       return;
     }
     if ((keyword?.text === 'type' || keyword?.text === 'interface') && tokens[next + 1]?.kind === TokenKind.Identifier) {
       types.add(tokens[next + 1]?.text ?? '');
       return;
     }
-    if (keyword?.text === 'type' && isPunctuator(tokens[next + 1], '{')) next += 1;
-    if (!isPunctuator(tokens[next], '{')) return;
+    if (keyword?.text === 'type' && isPunctuator(tokens[next + 1], '{')) {next += 1;}
+    if (!isPunctuator(tokens[next], '{')) {return;}
     const items = exportList(tokens, next);
     let close = next;
-    while (close < tokens.length && !isPunctuator(tokens[close], '}')) close += 1;
+    while (close < tokens.length && !isPunctuator(tokens[close], '}')) {close += 1;}
     const specifier = tokens[close + 1]?.text === 'from' ? tokens[close + 2] : undefined;
     const target = specifier?.kind === TokenKind.String ? moduleFile(root, file, specifier.text) : undefined;
     const sourceTypes = target === undefined ? localTypes : exportedTypes(root, target, seen);
-    for (const item of items) if (item.typeOnly || sourceTypes.has(item.local)) types.add(item.exported);
+    for (const item of items) {if (item.typeOnly || sourceTypes.has(item.local)) {types.add(item.exported);}}
   });
   return types;
 }
@@ -256,36 +256,36 @@ function standardNamesProblems(glossary: string): string[] {
   const problems: string[] = [];
   for (const [acronym, fullName] of Object.entries(NAMING_LINT.standardNames)) {
     const given = listed.get(acronym);
-    if (given === undefined) problems.push(`the standard name ${acronym} (${fullName}) is missing from the Standard names table`);
-    else if (given !== fullName) problems.push(`the standard name ${acronym} is "${given}" in the glossary, but "${fullName}" in tools/repo-rules/naming/NamingLint.ts`);
+    if (given === undefined) {problems.push(`the standard name ${acronym} (${fullName}) is missing from the Standard names table`);}
+    else if (given !== fullName) {problems.push(`the standard name ${acronym} is "${given}" in the glossary, but "${fullName}" in tools/repo-rules/naming/NamingLint.ts`);}
   }
   for (const acronym of listed.keys()) {
-    if (!Object.hasOwn(NAMING_LINT.standardNames, acronym)) problems.push(`the Standard names table lists ${acronym}, which tools/repo-rules/naming/NamingLint.ts does not`);
+    if (!Object.hasOwn(NAMING_LINT.standardNames, acronym)) {problems.push(`the Standard names table lists ${acronym}, which tools/repo-rules/naming/NamingLint.ts does not`);}
   }
   return problems;
 }
 
 export function checkGlossary(root: string): string[] {
   const path = join(root, GLOSSARY_PATH);
-  if (!existsSync(path)) return [`${GLOSSARY_PATH} is missing`];
+  if (!existsSync(path)) {return [`${GLOSSARY_PATH} is missing`];}
   const glossary = readFileSync(path, 'utf8');
   const rows = glossaryRows(glossary);
   const declarations = readDeclarations(root);
   const problems: string[] = [];
   for (const row of rows) {
-    if (isPlanned(row)) continue;
+    if (isPlanned(row)) {continue;}
     for (const codeName of row.codeNames) {
       const why = unresolved(root, declarations, codeName);
-      if (why !== undefined) problems.push(`${GLOSSARY_PATH}, row "${row.cells[0] ?? ''}": ${why}`);
+      if (why !== undefined) {problems.push(`${GLOSSARY_PATH}, row "${row.cells[0] ?? ''}": ${why}`);}
     }
   }
   const listed = new Set(rows.flatMap((row) => row.codeNames));
   const publicTypes = [...exportedTypes(root, ENGINE_ENTRY)].sort();
   for (const type of publicTypes) {
-    if (!listed.has(type)) problems.push(`${GLOSSARY_PATH}: ${type}, a type the engine exports, is not a code name in the Domain terms table`);
+    if (!listed.has(type)) {problems.push(`${GLOSSARY_PATH}: ${type}, a type the engine exports, is not a code name in the Domain terms table`);}
   }
   problems.push(...standardNamesProblems(glossary).map((problem) => `${GLOSSARY_PATH}: ${problem}`));
   return problems;
 }
 
-if (import.meta.main) process.exitCode = reportProblems('glossary check', checkGlossary(process.cwd()));
+if (import.meta.main) {process.exitCode = reportProblems('glossary check', checkGlossary(process.cwd()));}

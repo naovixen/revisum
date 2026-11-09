@@ -36,7 +36,7 @@ type PlannerReplyError = { readonly code: 'reply-not-json' | 'no-text' };
 
 // The reply's JSON, from the body bytes the planner adapter answered with.
 function replyJson(reply: unknown): unknown {
-  if (!(reply instanceof Uint8Array)) return undefined;
+  if (!(reply instanceof Uint8Array)) {return undefined;}
   try {
     return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(reply));
   } catch {
@@ -49,28 +49,28 @@ function replyJson(reply: unknown): unknown {
 // as it is, for parseAiText to refuse.
 function anthropicText(json: Readonly<Record<string, unknown>>): unknown {
   const content = json['content'];
-  if (!Array.isArray(content)) return undefined;
+  if (!Array.isArray(content)) {return undefined;}
   const texts: unknown[] = content.filter((block) => isNonArrayObject(block) && block['type'] === 'text').map((block) => (isNonArrayObject(block) ? block['text'] : undefined));
-  if (texts.length === 0) return undefined;
-  if (texts.length === 1) return texts[0];
+  if (texts.length === 0) {return undefined;}
+  if (texts.length === 1) {return texts[0];}
   return texts.every((text) => typeof text === 'string') ? texts.join('') : texts;
 }
 
 // OpenAI-compatible: the content of the first choice's message. A tool call leaves it null.
 function openAiText(json: Readonly<Record<string, unknown>>): unknown {
   const choices = json['choices'];
-  if (!Array.isArray(choices)) return undefined;
+  if (!Array.isArray(choices)) {return undefined;}
   const first: unknown = choices[0];
-  if (!isNonArrayObject(first)) return undefined;
+  if (!isNonArrayObject(first)) {return undefined;}
   const message = first['message'];
-  if (!isNonArrayObject(message)) return undefined;
+  if (!isNonArrayObject(message)) {return undefined;}
   const content = message['content'];
   return content === null ? undefined : content;
 }
 
 export function plannerReplyText(wire: PlannerWire, reply: unknown): Result<unknown, PlannerReplyError> {
   const json = replyJson(reply);
-  if (!isNonArrayObject(json)) return failure({ code: 'reply-not-json' });
+  if (!isNonArrayObject(json)) {return failure({ code: 'reply-not-json' });}
   const text = wire === PlannerWire.AnthropicMessages ? anthropicText(json) : openAiText(json);
   return text === undefined ? failure({ code: 'no-text' }) : success(text);
 }

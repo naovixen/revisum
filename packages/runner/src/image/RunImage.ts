@@ -41,16 +41,16 @@ export function readImageDigest(text: string): ImageDigest | null {
 
 // The record file's content, or null when it is missing or not what this module writes.
 function readRecord(path: string): RunImage | null {
-  if (!existsSync(path)) return null;
+  if (!existsSync(path)) {return null;}
   let parsed: unknown;
   try {
     parsed = JSON.parse(readFileSync(path, 'utf8'));
   } catch {
     return null;
   }
-  if (typeof parsed !== 'object' || parsed === null) return null;
+  if (typeof parsed !== 'object' || parsed === null) {return null;}
   const { id, baseImage, dockerfileSha256 } = parsed as Readonly<Record<string, unknown>>;
-  if (typeof id !== 'string' || typeof baseImage !== 'string' || typeof dockerfileSha256 !== 'string') return null;
+  if (typeof id !== 'string' || typeof baseImage !== 'string' || typeof dockerfileSha256 !== 'string') {return null;}
   const digest = readImageDigest(id);
   return digest === null ? null : { id: digest, baseImage, dockerfileSha256 };
 }
@@ -58,7 +58,7 @@ function readRecord(path: string): RunImage | null {
 export async function prepareRunImage(options: { readonly repositoryRoot: string }): Promise<Result<RunImage, RunImageError>> {
   const root = options.repositoryRoot;
   const pinned = PINNED_BASE_IMAGE.exec(readFileSync(join(root, DEV_CONTAINER_FILE), 'utf8'))?.[1];
-  if (pinned === undefined) return failure({ code: 'base-image-unpinned', detail: `${DEV_CONTAINER_FILE} names no image pinned by digest` });
+  if (pinned === undefined) {return failure({ code: 'base-image-unpinned', detail: `${DEV_CONTAINER_FILE} names no image pinned by digest` });}
   const dockerfile = join(root, IMAGE_FOLDER, 'Dockerfile');
   const dockerfileSha256 = createHash('sha256').update(readFileSync(dockerfile)).digest('hex');
   const recordPath = join(root, RUN_IMAGE_RECORD);
@@ -71,14 +71,14 @@ export async function prepareRunImage(options: { readonly repositoryRoot: string
   }
 
   const version = await runDocker(['version', '--format', '{{.Server.Version}}']);
-  if (version.status !== 0) return failure({ code: 'docker-unavailable', detail: version.stderr.trim().slice(0, 500) });
+  if (version.status !== 0) {return failure({ code: 'docker-unavailable', detail: version.stderr.trim().slice(0, 500) });}
   const built = await runDocker([
     'build', '--tag', RUN_IMAGE_TAG, '--build-arg', `BASE_IMAGE=${pinned}`, '--file', dockerfile, join(root, IMAGE_FOLDER),
   ], BUILD_TIMEOUT_MILLISECONDS);
-  if (built.status !== 0) return failure({ code: 'build-failed', detail: built.stderr.trim().slice(-2000) });
+  if (built.status !== 0) {return failure({ code: 'build-failed', detail: built.stderr.trim().slice(-2000) });}
   const rebuilt = await runDocker(['image', 'inspect', '--format', '{{.Id}}', RUN_IMAGE_TAG]);
   const id = readImageDigest(rebuilt.stdout.trim());
-  if (rebuilt.status !== 0 || id === null) return failure({ code: 'build-failed', detail: `the built image has no id: ${rebuilt.stderr.trim()}` });
+  if (rebuilt.status !== 0 || id === null) {return failure({ code: 'build-failed', detail: `the built image has no id: ${rebuilt.stderr.trim()}` });}
   const image: RunImage = { id, baseImage: pinned, dockerfileSha256 };
   writeFileSync(recordPath, `${JSON.stringify(image, null, 2)}\n`);
   return success(image);

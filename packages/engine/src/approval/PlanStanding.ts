@@ -30,7 +30,7 @@ export function planStanding(plan: Plan, store: ApprovalStore): PlanStanding {
 // approval, read back from JSON say, has the same fields and says nothing about who checked what.
 // The policy gate and run() both use this.
 export function ownStanding(plan: Plan, standing: PlanStanding | undefined): PlanStanding {
-  if (standing?.mode !== PlanStandingMode.Approved || !mintedApprovals.has(standing.approval)) return PROPOSAL;
+  if (standing?.mode !== PlanStandingMode.Approved || !mintedApprovals.has(standing.approval)) {return PROPOSAL;}
   const subject = standing.approval.subject;
   return subject.kind === ApprovalSubjectKind.Plan && subject.hash === planHash(plan) ? standing : PROPOSAL;
 }

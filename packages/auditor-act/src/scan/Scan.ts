@@ -22,9 +22,9 @@ const roundToHundredths = (value: number): number => Math.round(value * 100) / 1
 function toFindings(page: string, snapshot: PageSnapshot, rule: Rule, targets: TargetResult[], walk: TabWalk | null): Finding[] {
   const findings: Finding[] = [];
   for (const target of targets) {
-    if (target.outcome === Outcome.Passed) continue;
+    if (target.outcome === Outcome.Passed) {continue;}
     const node = snapshot.nodes[target.node];
-    if (!node) continue;
+    if (!node) {continue;}
     const box = walk?.boxes.get(target.node) ?? boxOf(snapshot, node);
     findings.push({
       page, ruleId: rule.meta.id, kind: rule.meta.kind, wcag: [...rule.meta.successCriteria], severity: rule.meta.severity,
@@ -60,7 +60,7 @@ export async function scan(driver: PageDriver, url: string, options: ScanOptions
       ? await tabWalk(driver, snapshot, { focusVisibility: ids.includes('oj04fd'), occlusion: ids.includes('keyboard-focus-obscured') })
       : EMPTY_WALK();
     for (const rule of interactive) {
-      if (isStaticRule(rule)) continue;
+      if (isStaticRule(rule)) {continue;}
       const targets = await rule.run(driver, snapshot, walk);
       runs.push({ ruleId: rule.meta.id, outcome: pageOutcome(targets), targets });
       findings.push(...toFindings(options.page, snapshot, rule, targets, walk));

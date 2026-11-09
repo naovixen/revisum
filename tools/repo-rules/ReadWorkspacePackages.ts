@@ -29,7 +29,7 @@ export function readWorkspacePackages(root: string): WorkspacePackage[] {
 }
 
 export function reportProblems(checkName: string, problems: readonly string[]): number {
-  for (const problem of problems) console.error(`${checkName}: ${problem}`);
+  for (const problem of problems) {console.error(`${checkName}: ${problem}`);}
   console.log(problems.length === 0 ? `${checkName} passed` : `${checkName} failed: ${problems.length} problem(s)`);
   return problems.length === 0 ? 0 : 1;
 }

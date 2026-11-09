@@ -18,10 +18,10 @@ const REQUIRED_PACKAGE_FILES = ['src/index.ts', 'package.json', 'tsconfig.json',
 function listFiles(root: string, folder = ''): string[] {
   const files: string[] = [];
   for (const entry of readdirSync(join(root, folder), { withFileTypes: true })) {
-    if (SKIPPED_FOLDERS.has(entry.name)) continue;
+    if (SKIPPED_FOLDERS.has(entry.name)) {continue;}
     const path = folder === '' ? entry.name : `${folder}/${entry.name}`;
-    if (entry.isDirectory()) files.push(...listFiles(root, path));
-    else if (entry.isFile()) files.push(path);
+    if (entry.isDirectory()) {files.push(...listFiles(root, path));}
+    else if (entry.isFile()) {files.push(path);}
   }
   return files;
 }
@@ -45,4 +45,4 @@ export function checkLayout(root: string): string[] {
   return problems;
 }
 
-if (import.meta.main) process.exitCode = reportProblems('layout check', checkLayout(process.cwd()));
+if (import.meta.main) {process.exitCode = reportProblems('layout check', checkLayout(process.cwd()));}

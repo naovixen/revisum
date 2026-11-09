@@ -183,7 +183,7 @@ function locatorSchema(kind: LocatorKind): JsonSchema {
   const properties: Record<string, JsonSchema> = { by: { const: kind } };
   for (const field of [...LOCATOR_FIELDS[kind], ...OPTIONAL_LOCATOR_FIELDS[kind]]) {
     const schema = LOCATOR_FIELD_SCHEMAS[field];
-    if (schema !== undefined) properties[field] = schema;
+    if (schema !== undefined) {properties[field] = schema;}
   }
   return closedObject(properties, LOCATOR_FIELDS[kind]);
 }

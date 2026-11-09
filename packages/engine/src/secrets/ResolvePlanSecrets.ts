@@ -39,7 +39,7 @@ type ResolveName = (name: SecretName) => Result<Secret, SecretName>;
 function callSecretNames(plan: Plan, calls: Readonly<Record<CallName, CallDeclaration>>): SecretName[] {
   const steps = [...plan.steps, ...(plan.cleanup ?? [])];
   return steps.flatMap((step) => {
-    if (step.type !== StepType.Call && step.type !== StepType.ExpectBackend) return [];
+    if (step.type !== StepType.Call && step.type !== StepType.ExpectBackend) {return [];}
     const declaration = Object.entries(calls).find(([name]) => name === step.call)?.[1];
     const headers = Object.values(declaration?.headers ?? {}).flatMap((header) => ('secretName' in header ? [header.secretName] : []));
     const passed = Object.values(step.arguments).flatMap((argument) => (typeof argument === 'object' && 'secretName' in argument ? [argument.secretName] : []));
@@ -96,7 +96,7 @@ function runStepOf(step: Step, resolveName: ResolveName): Result<RunStep, Secret
 // too, in plan order.
 function stubAndStorageSecretNames(steps: readonly Step[]): SecretName[] {
   return stepsWithin(steps).flatMap((step) => {
-    if (step.type !== StepType.Stub && step.type !== StepType.SetStorage) return [];
+    if (step.type !== StepType.Stub && step.type !== StepType.SetStorage) {return [];}
     return Object.values(step.arguments ?? {}).flatMap((argument) => (typeof argument === 'object' && 'secretName' in argument ? [argument.secretName] : []));
   });
 }
@@ -106,7 +106,7 @@ function stubAndStorageSecretNames(steps: readonly Step[]): SecretName[] {
 function commandSecretNames(plan: Plan, commands: Readonly<Record<CommandName, DatabaseCommandDeclaration>>): SecretName[] {
   const steps = [...plan.steps, ...(plan.cleanup ?? [])];
   return steps.flatMap((step) => {
-    if (step.type !== StepType.Database && step.type !== StepType.ExpectDatabase) return [];
+    if (step.type !== StepType.Database && step.type !== StepType.ExpectDatabase) {return [];}
     const declaration = Object.entries(commands).find(([name]) => name === step.command)?.[1];
     return Object.values(declaration?.environment ?? {}).flatMap((value) => ('secretName' in value ? [value.secretName] : []));
   });
@@ -121,9 +121,9 @@ export function resolvePlanSecrets(
   const resolveAll = (names: readonly SecretName[]): Result<Map<SecretName, Secret>, SecretName> => {
     const resolved = new Map<SecretName, Secret>();
     for (const name of names) {
-      if (resolved.has(name)) continue;
+      if (resolved.has(name)) {continue;}
       const secret = store?.resolve(name) ?? null;
-      if (secret === null) return failure(name);
+      if (secret === null) {return failure(name);}
       resolved.set(name, secret);
     }
     return success(resolved);
@@ -142,13 +142,13 @@ export function resolvePlanSecrets(
     return steps;
   }
   const storageState = plan.storageState === undefined ? null : store?.resolve(plan.storageState.secretName) ?? null;
-  if (plan.storageState !== undefined && storageState === null) return failure(plan.storageState.secretName);
+  if (plan.storageState !== undefined && storageState === null) {return failure(plan.storageState.secretName);}
   const services = resolveAll(callSecretNames(plan, calls));
-  if (!services.ok) return services;
+  if (!services.ok) {return services;}
   const stubsAndStorage = resolveAll(stubAndStorageSecretNames(plan.steps));
-  if (!stubsAndStorage.ok) return stubsAndStorage;
+  if (!stubsAndStorage.ok) {return stubsAndStorage;}
   const commandSecrets = resolveAll(commandSecretNames(plan, commands));
-  if (!commandSecrets.ok) return commandSecrets;
+  if (!commandSecrets.ok) {return commandSecrets;}
   return success({
     secrets: { fills, storageState, services: services.value, stubsAndStorage: stubsAndStorage.value, commands: commandSecrets.value },
     steps: steps.value,
@@ -178,7 +178,7 @@ export const secretEchoRemoval = (secrets: ResolvedSecrets): ((text: string) => 
 // storage state is redacted as a whole and by each cookie and stored value inside it.
 export function withSecretRedaction(redactor: Redactor, secrets: ResolvedSecrets): Redactor {
   const watched = watchedSecrets(secrets);
-  if (watched.length === 0) return redactor;
+  if (watched.length === 0) {return redactor;}
   const redactSecrets = secretRedaction(watched);
   return { selectors: redactor.selectors, text: (value) => redactor.text(redactSecrets(value)) };
 }
@@ -191,7 +191,7 @@ export function withDeclaredSecretRedaction(redactor: Redactor, secretNames: rea
   const declared = new Map<SecretName, Secret>();
   for (const name of secretNames) {
     const secret = store.resolve(name);
-    if (secret !== null) declared.set(name, secret);
+    if (secret !== null) {declared.set(name, secret);}
   }
   return withSecretRedaction(redactor, { ...NO_SECRETS, fills: declared });
 }

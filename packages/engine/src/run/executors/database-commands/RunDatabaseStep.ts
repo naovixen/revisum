@@ -101,13 +101,13 @@ function parameterValue(
 ): Result<ArgumentValue, DatabaseStepCode> {
   const type = Object.entries(declaration.parameters).find(([parameter]) => parameter === name)?.[1];
   const argument = Object.entries(given).find(([parameter]) => parameter === name)?.[1];
-  if (type === undefined || argument === undefined) return failure('parameter-invalid');
+  if (type === undefined || argument === undefined) {return failure('parameter-invalid');}
   let value: ArgumentValue;
   if (typeof argument === 'object') {
     const text = resolveText(argument, context.values, context.project.limits.maximumTextLength);
-    if (!text.ok) return text;
+    if (!text.ok) {return text;}
     const fitted = runValueArgument(type, text.value);
-    if (fitted === undefined) return failure('parameter-invalid');
+    if (fitted === undefined) {return failure('parameter-invalid');}
     value = fitted;
   } else {
     value = argument;
@@ -124,13 +124,13 @@ function commandArguments(given: ScriptArguments, declaration: DatabaseCommandDe
   for (const argument of declaration.argv) {
     if ('literal' in argument) {
       argv.push(argument.literal);
-      if (argument.literal === END_OF_OPTIONS) optionsEnded = true;
+      if (argument.literal === END_OF_OPTIONS) {optionsEnded = true;}
       continue;
     }
     const value = parameterValue(argument.$parameter, given, declaration, context);
-    if (!value.ok) return value;
+    if (!value.ok) {return value;}
     const text = argumentText(value.value);
-    if (text.startsWith('-') && !optionsEnded) return failure('parameter-invalid');
+    if (text.startsWith('-') && !optionsEnded) {return failure('parameter-invalid');}
     argv.push(text);
   }
   return success(argv);
@@ -145,7 +145,7 @@ function commandEnvironment(declaration: DatabaseCommandDeclaration, secrets: Se
       continue;
     }
     const secret = secrets.resolve(value.secretName);
-    if (secret === null) return failure('secret-missing');
+    if (secret === null) {return failure('secret-missing');}
     variables.push({ name, value: secret });
   }
   return success(variables);
@@ -155,9 +155,9 @@ function commandEnvironment(declaration: DatabaseCommandDeclaration, secrets: Se
 function commandRequest(found: Declared, given: ScriptArguments, context: DatabaseCommandContext): Result<DatabaseCommandRequest, DatabaseStepCode> {
   const { declaration } = found;
   const argv = commandArguments(given, declaration, context);
-  if (!argv.ok) return argv;
+  if (!argv.ok) {return argv;}
   const environment = commandEnvironment(declaration, context.secrets);
-  if (!environment.ok) return environment;
+  if (!environment.ok) {return environment;}
   return success({
     image: declaration.image,
     argv: argv.value,
@@ -178,7 +178,7 @@ function outputJson(bytes: Uint8Array): Result<unknown, 'command-output-invalid'
   } catch {
     return failure('command-output-invalid');
   }
-  if (nestingDepth(text, MAXIMUM_SCRIPT_RESULT_DEPTH) > MAXIMUM_SCRIPT_RESULT_DEPTH) return failure('command-output-invalid');
+  if (nestingDepth(text, MAXIMUM_SCRIPT_RESULT_DEPTH) > MAXIMUM_SCRIPT_RESULT_DEPTH) {return failure('command-output-invalid');}
   try {
     return success(JSON.parse(text));
   } catch {
@@ -191,11 +191,11 @@ function outputJson(bytes: Uint8Array): Result<unknown, 'command-output-invalid'
 function judgedReply(
   reply: Result<WorkloadOutcome, WorkloadErrorCode>, declaration: DatabaseCommandDeclaration, maximumOutputBytes: number,
 ): Result<unknown, DatabaseStepCode> {
-  if (!reply.ok) return reply;
+  if (!reply.ok) {return reply;}
   const outcome = reply.value;
-  if (outcome.kind === WorkloadOutcomeKind.TimedOut) return failure('command-timeout');
-  if (!declaration.successExitCodes.includes(outcome.exitCode)) return failure('command-failed');
-  if (outcome.stdout.truncated || outcome.stdout.bytes.length > maximumOutputBytes) return failure('command-output-invalid');
+  if (outcome.kind === WorkloadOutcomeKind.TimedOut) {return failure('command-timeout');}
+  if (!declaration.successExitCodes.includes(outcome.exitCode)) {return failure('command-failed');}
+  if (outcome.stdout.truncated || outcome.stdout.bytes.length > maximumOutputBytes) {return failure('command-output-invalid');}
   return declaration.output === CommandOutput.Json ? outputJson(outcome.stdout.bytes) : success(null);
 }
 
@@ -243,9 +243,9 @@ function textsToRemember(
   const entries: (readonly [ValueName, string])[] = [];
   for (const [name, field] of rememberedFieldEntries(step.remember)) {
     const found = outputField(document, declaration, field);
-    if (!found.ok) return found;
+    if (!found.ok) {return found;}
     const text = fieldText(found.value);
-    if (text === undefined) return failure('field-missing');
+    if (text === undefined) {return failure('field-missing');}
     entries.push([name, text]);
   }
   return success(entries);
@@ -254,16 +254,16 @@ function textsToRemember(
 // A database step: its command runs once, never repeated.
 export async function runDatabaseStep(step: DatabaseStep, stepIndex: number, context: DatabaseCommandContext): Promise<DatabaseStepOutcome> {
   const found = declared(step.command, context.project);
-  if (found === undefined) return failedWith('egress-blocked');
+  if (found === undefined) {return failedWith('egress-blocked');}
   const request = commandRequest(found, step.arguments, context);
-  if (!request.ok) return failedWith(request.error, record(found, null, 0));
+  if (!request.ok) {return failedWith(request.error, record(found, null, 0));}
   const once = await runOnce(request.value, found.declaration, stepIndex, step.type, context);
   const databaseCommand = record(found, once, 1);
-  if (!once.result.ok) return failedWith(once.result.error, databaseCommand);
+  if (!once.result.ok) {return failedWith(once.result.error, databaseCommand);}
   const texts = textsToRemember(step, once.result.value, found.declaration);
-  if (!texts.ok) return failedWith(texts.error, databaseCommand);
+  if (!texts.ok) {return failedWith(texts.error, databaseCommand);}
   const remembered = context.remembered.rememberAll(texts.value, stepIndex);
-  if (!remembered.ok) return failedWith(remembered.error, databaseCommand);
+  if (!remembered.ok) {return failedWith(remembered.error, databaseCommand);}
   return { outcome: StepOutcome.Passed, databaseCommand, ...recordsOfRemembered(remembered.value) };
 }
 
@@ -271,12 +271,12 @@ export async function runDatabaseStep(step: DatabaseStep, stepIndex: number, con
 // runs out. A request that cannot be built would fail the same way every time, so it fails at once.
 export async function runDatabaseCheck(step: ExpectDatabaseStep, stepIndex: number, context: DatabaseCommandContext): Promise<DatabaseStepOutcome> {
   const found = declared(step.command, context.project);
-  if (found === undefined) return failedWith('egress-blocked');
+  if (found === undefined) {return failedWith('egress-blocked');}
   const expected = 'value' in step.assert && typeof step.assert.value !== 'number'
     ? resolveText(step.assert.value, context.values, context.project.limits.maximumTextLength) : success(null);
-  if (!expected.ok) return failedWith(expected.error);
+  if (!expected.ok) {return failedWith(expected.error);}
   const request = commandRequest(found, step.arguments, context);
-  if (!request.ok) return failedWith(request.error, record(found, null, 0));
+  if (!request.ok) {return failedWith(request.error, record(found, null, 0));}
   const rule = {
     timeoutMilliseconds: context.project.limits.backendCheckTimeoutMilliseconds,
     intervalMilliseconds: COMMAND_CHECK_INTERVAL_MILLISECONDS,
@@ -286,9 +286,9 @@ export async function runDatabaseCheck(step: ExpectDatabaseStep, stepIndex: numb
     const once = await runOnce(request.value, found.declaration, stepIndex, step.type, context);
     const databaseCommand = record(found, once, attempts);
     // A command that failed, timed out or printed nothing readable would do the same again.
-    if (!once.result.ok) return { outcome: failedWith(once.result.error, databaseCommand), isDone: true };
+    if (!once.result.ok) {return { outcome: failedWith(once.result.error, databaseCommand), isDone: true };}
     const field = outputField(once.result.value, found.declaration, step.field);
-    if (checkBackendField(step.assert, field.ok ? { value: field.value } : undefined, expected.value)) return { outcome: { outcome: StepOutcome.Passed, databaseCommand }, isDone: true };
+    if (checkBackendField(step.assert, field.ok ? { value: field.value } : undefined, expected.value)) {return { outcome: { outcome: StepOutcome.Passed, databaseCommand }, isDone: true };}
     const code = !field.ok && step.assert.kind !== BackendAssertionKind.Present && step.assert.kind !== BackendAssertionKind.Absent ? 'field-missing' : 'assertion-failed';
     // The parser lets only a read command stand in a check; a write one is never run twice all the same.
     return { outcome: failedWith(code, databaseCommand), isDone: found.declaration.effect === CallEffect.Write };

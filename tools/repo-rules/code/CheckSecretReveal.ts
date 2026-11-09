@@ -35,8 +35,8 @@ export const REVEAL_ALLOWED_MODULES: readonly string[] = [
 function closingBrace(tokens: readonly Token[], open: number): number {
   let depth = 0;
   for (let index = open; index < tokens.length; index++) {
-    if (isPunctuator(tokens[index], '{')) depth += 1;
-    else if (isPunctuator(tokens[index], '}')) { depth -= 1; if (depth === 0) return index; }
+    if (isPunctuator(tokens[index], '{')) {depth += 1;}
+    else if (isPunctuator(tokens[index], '}')) { depth -= 1; if (depth === 0) {return index;} }
   }
   return tokens.length;
 }
@@ -92,8 +92,8 @@ function revealKeysInPattern(tokens: readonly Token[], open: number, end: number
   let depth = 0;
   for (let inside = open; inside < end; inside++) {
     const token = tokens[inside];
-    if (isPunctuator(token, '{') || isPunctuator(token, '[') || isPunctuator(token, '(')) depth += 1;
-    else if (isPunctuator(token, '}') || isPunctuator(token, ']') || isPunctuator(token, ')')) depth -= 1;
+    if (isPunctuator(token, '{') || isPunctuator(token, '[') || isPunctuator(token, '(')) {depth += 1;}
+    else if (isPunctuator(token, '}') || isPunctuator(token, ']') || isPunctuator(token, ')')) {depth -= 1;}
     else if (depth === 1 && isIdentifier(token, REVEAL) && (isPunctuator(tokens[inside - 1], '{') || isPunctuator(tokens[inside - 1], ','))) {
       lines.push(token?.line ?? 0);
     }
@@ -145,9 +145,9 @@ function revealUses(tokens: readonly Token[]): number[] {
   const namespaces = new Set<string>();
   tokens.forEach((token, index) => {
     // `const name = await import(…)` makes a namespace as `import * as name` does.
-    if (token.kind === TokenKind.Identifier && isAssignment(tokens, index + 1) && startsDynamicImport(tokens, index + 2)) namespaces.add(token.text);
-    if (!isIdentifier(token, 'import') && !isIdentifier(token, 'export')) return;
-    if (isPunctuator(tokens[index - 1], '.')) return;
+    if (token.kind === TokenKind.Identifier && isAssignment(tokens, index + 1) && startsDynamicImport(tokens, index + 2)) {namespaces.add(token.text);}
+    if (!isIdentifier(token, 'import') && !isIdentifier(token, 'export')) {return;}
+    if (isPunctuator(tokens[index - 1], '.')) {return;}
     if (isIdentifier(token, 'import') && isPunctuator(tokens[index + 1], '(')) {
       const use = dynamicImportUse(tokens, index);
       lines.push(...use.lines);
@@ -157,19 +157,19 @@ function revealUses(tokens: readonly Token[]): number[] {
       return;
     }
     let next = index + 1;
-    if (isIdentifier(tokens[next], 'type')) next += 1;
+    if (isIdentifier(tokens[next], 'type')) {next += 1;}
     // `import * as name from …`
     if (isPunctuator(tokens[next], '*') && isIdentifier(tokens[next + 1], 'as') && tokens[next + 2]?.kind === TokenKind.Identifier) {
       namespaces.add(tokens[next + 2]?.text ?? '');
       return;
     }
     // `import name, { … } from …`
-    if (tokens[next]?.kind === TokenKind.Identifier && isPunctuator(tokens[next + 1], ',')) next += 2;
-    if (!isPunctuator(tokens[next], '{')) return;
+    if (tokens[next]?.kind === TokenKind.Identifier && isPunctuator(tokens[next + 1], ',')) {next += 2;}
+    if (!isPunctuator(tokens[next], '{')) {return;}
     const end = closingBrace(tokens, next);
     for (let inside = next + 1; inside < end; inside++) {
       // The name being imported or exported, not a local alias given with `as`.
-      if (isIdentifier(tokens[inside], REVEAL) && !isIdentifier(tokens[inside - 1], 'as')) lines.push(tokens[inside]?.line ?? token.line);
+      if (isIdentifier(tokens[inside], REVEAL) && !isIdentifier(tokens[inside - 1], 'as')) {lines.push(tokens[inside]?.line ?? token.line);}
     }
   });
   tokens.forEach((token, index) => {
@@ -177,12 +177,12 @@ function revealUses(tokens: readonly Token[]): number[] {
       lines.push(token.line);
     }
     // `{ … } = namespace` or `{ … } = await import(…)`: the pattern names what it takes.
-    if (!isPunctuator(token, '{')) return;
+    if (!isPunctuator(token, '{')) {return;}
     const end = closingBrace(tokens, index);
-    if (!isAssignment(tokens, end + 1)) return;
+    if (!isAssignment(tokens, end + 1)) {return;}
     const source = tokens[end + 2];
     const fromNamespace = source?.kind === TokenKind.Identifier && namespaces.has(source.text) && !isPunctuator(tokens[end + 3], '.');
-    if (fromNamespace || startsDynamicImport(tokens, end + 2)) lines.push(...revealKeysInPattern(tokens, index, end));
+    if (fromNamespace || startsDynamicImport(tokens, end + 2)) {lines.push(...revealKeysInPattern(tokens, index, end));}
   });
   return lines;
 }
@@ -190,7 +190,7 @@ function revealUses(tokens: readonly Token[]): number[] {
 export function checkSecretReveal(root: string): string[] {
   const problems: string[] = [];
   for (const path of listSourceFiles(root)) {
-    if (path === DEFINING_MODULE || REVEAL_ALLOWED_MODULES.includes(path)) continue;
+    if (path === DEFINING_MODULE || REVEAL_ALLOWED_MODULES.includes(path)) {continue;}
     for (const line of revealUses(codeTokens(readFileSync(join(root, path), 'utf8')))) {
       problems.push(`${path}:${line} imports ${REVEAL}, which reads a secret's value; only the modules in REVEAL_ALLOWED_MODULES (tools/repo-rules/code/CheckSecretReveal.ts) may`);
     }
@@ -198,4 +198,4 @@ export function checkSecretReveal(root: string): string[] {
   return problems;
 }
 
-if (import.meta.main) process.exitCode = reportProblems('secret reveal check', checkSecretReveal(process.cwd()));
+if (import.meta.main) {process.exitCode = reportProblems('secret reveal check', checkSecretReveal(process.cwd()));}

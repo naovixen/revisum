@@ -42,11 +42,11 @@ export function plannerAdapter(endpoint: PlannerEndpoint, connection: PlannerCon
   const headers: ServiceRequestHeader[] = [];
   if (endpoint.apiKey !== undefined) {
     const secret = connection.secrets.resolve(endpoint.apiKey.secretName);
-    if (secret === null) return failure('secret-missing');
+    if (secret === null) {return failure('secret-missing');}
     const keyHeader = KEY_HEADERS[endpoint.wire];
     headers.push({ name: keyHeader.name, value: headerSecret(secret, keyHeader.scheme) });
   }
-  if (endpoint.wire === PlannerWire.AnthropicMessages) headers.push({ name: 'anthropic-version', value: ANTHROPIC_API_VERSION });
+  if (endpoint.wire === PlannerWire.AnthropicMessages) {headers.push({ name: 'anthropic-version', value: ANTHROPIC_API_VERSION });}
   headers.push({ name: 'content-type', value: JSON_MEDIA_TYPE });
   const { origin, pathAndQuery } = endpoint;
   return success({
@@ -56,12 +56,12 @@ export function plannerAdapter(endpoint: PlannerEndpoint, connection: PlannerCon
         origin, method: HttpMethod.Post, pathAndQuery, headers, body: { jsonParts: [body] },
         timeoutMilliseconds: PLANNER_TIMEOUT_MILLISECONDS, maximumResponseBytes: MAXIMUM_PLANNER_REPLY_BYTES,
       });
-      if (!answered.ok) return failure(answered.error);
+      if (!answered.ok) {return failure(answered.error);}
       // The caller reads one byte past the cap and leaves whoever set it to refuse a body that long.
       if (answered.value.body.length > MAXIMUM_PLANNER_REPLY_BYTES) {
         return failure('response-too-large');
       }
-      if (answered.value.status < 200 || answered.value.status > 299) return failure('planner-status');
+      if (answered.value.status < 200 || answered.value.status > 299) {return failure('planner-status');}
       // The reply as received, for the engine to decode.
       return success(answered.value.body);
     },

@@ -35,7 +35,7 @@ const NO_SUCH_FILE = /no such file/i;
 // unknown is never taken for 'blocked'.
 export async function probeRunNetwork(engine: ContainerEngine, containerId: string, network: string): Promise<'reached' | 'blocked'> {
   const gateway = await engine.networkGatewayAddress(network);
-  if (!gateway.ok) return 'reached';
+  if (!gateway.ok) {return 'reached';}
   const gatewayTargets: readonly ProbeTarget[] = gateway.value === null ? [] : [{ host: gateway.value, port: GATEWAY_PROBE_PORT, refusalCountsAsReached: true }];
   return engine.probeEgress(containerId, [...OUTSIDE_PROBE_TARGETS, ...gatewayTargets]);
 }
@@ -57,7 +57,7 @@ export const isGitFolderName = (name: string): boolean => name.toLowerCase() ===
 // A repository-relative folder, refused when it leads out of the repository or into .git.
 export function repositoryFolder(input: string): string | null {
   const path = normalize(input);
-  if (path === '' || path === '.' || isAbsolute(path) || path.split(/[\\/]/).some((part) => part === '..' || isGitFolderName(part))) return null;
+  if (path === '' || path === '.' || isAbsolute(path) || path.split(/[\\/]/).some((part) => part === '..' || isGitFolderName(part))) {return null;}
   return path.split(sep).join('/');
 }
 
@@ -131,8 +131,8 @@ export const serviceProxyUrl = (proxyName: string): string => `http://${proxyNam
 // with the same status.
 async function linesOf(engine: ContainerEngine, containerId: string, file: string): Promise<readonly string[] | null> {
   const read = await readInContainer(engine, containerId, ['cat', file]);
-  if (!read.ok) return null;
-  if (read.value.exitCode === 0) return read.value.stdout.split('\n');
+  if (!read.ok) {return null;}
+  if (read.value.exitCode === 0) {return read.value.stdout.split('\n');}
   return NO_SUCH_FILE.test(read.value.stderr) ? [] : null;
 }
 

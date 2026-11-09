@@ -31,16 +31,16 @@ async function builtSchema(root: string): Promise<{ readonly schema: unknown; re
 export function newestChangelogEntry(changelog: string): string | undefined {
   const lines = changelog.split(/\r?\n/);
   const start = lines.findIndex((line) => /^##\s+\d+\.\d+/.test(line));
-  if (start === -1) return undefined;
+  if (start === -1) {return undefined;}
   const end = lines.findIndex((line, index) => index > start && /^##\s/.test(line));
   return lines.slice(start, end === -1 ? undefined : end).join('\n');
 }
 
 function checkChangelog(root: string, schemaText: string): string[] {
   const path = join(root, CHANGELOG_PATH);
-  if (!existsSync(path)) return [`${CHANGELOG_PATH} is missing`];
+  if (!existsSync(path)) {return [`${CHANGELOG_PATH} is missing`];}
   const entry = newestChangelogEntry(readFileSync(path, 'utf8'));
-  if (entry === undefined) return [`${CHANGELOG_PATH} has no "## <version>" entry`];
+  if (entry === undefined) {return [`${CHANGELOG_PATH} has no "## <version>" entry`];}
   const hash = sha256(schemaText);
   return entry.includes(hash)
     ? []
@@ -53,13 +53,13 @@ function checkGoldenPlans(root: string, schema: unknown): string[] {
 
 function checkGoldenFolder(root: string, goldenFolder: string, schema: unknown): string[] {
   const folder = join(root, goldenFolder);
-  if (!existsSync(folder)) return [`${goldenFolder} is missing`];
+  if (!existsSync(folder)) {return [`${goldenFolder} is missing`];}
   const problems: string[] = [];
   for (const name of readdirSync(folder).filter((file) => file.endsWith('.json')).sort()) {
     const file = `${goldenFolder}/${name}`;
     let plan: unknown;
     try { plan = JSON.parse(readFileSync(join(folder, name), 'utf8')); } catch { problems.push(`${file} is not valid JSON`); continue; }
-    for (const problem of validateAgainstSchema(schema, plan)) problems.push(`${file} does not validate against ${SCHEMA_PATH}: ${problem}`);
+    for (const problem of validateAgainstSchema(schema, plan)) {problems.push(`${file} does not validate against ${SCHEMA_PATH}: ${problem}`);}
   }
   return problems;
 }
@@ -73,7 +73,7 @@ export async function checkPlanSchema(root: string): Promise<string[]> {
     problems.push(`${SCHEMA_PATH} is missing; create it with ${REGENERATE}`);
   } else {
     const committed = readFileSync(schemaFile, 'utf8');
-    if (committed !== built.text) problems.push(`${SCHEMA_PATH} is not what planJsonSchema() builds; regenerate it with ${REGENERATE} and add a changelog entry`);
+    if (committed !== built.text) {problems.push(`${SCHEMA_PATH} is not what planJsonSchema() builds; regenerate it with ${REGENERATE} and add a changelog entry`);}
     problems.push(...checkChangelog(root, committed));
   }
   try {
@@ -95,4 +95,4 @@ async function main(root: string, flags: readonly string[]): Promise<number> {
   return reportProblems('plan schema check', await checkPlanSchema(root));
 }
 
-if (import.meta.main) process.exitCode = await main(process.cwd(), process.argv.slice(2));
+if (import.meta.main) {process.exitCode = await main(process.cwd(), process.argv.slice(2));}

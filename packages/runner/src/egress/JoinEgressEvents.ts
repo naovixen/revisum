@@ -25,7 +25,7 @@ export function joinEgressEvents(
 ): readonly EgressEvent[] {
   const waiting = new Map<string, BrowserRequestRecord[]>();
   for (const record of records) {
-    if (record.channel === BrowserChannel.Popup) continue;
+    if (record.channel === BrowserChannel.Popup) {continue;}
     const key = hostAndPort(record.origin);
     waiting.set(key, [...(waiting.get(key) ?? []), record]);
   }
@@ -34,17 +34,17 @@ export function joinEgressEvents(
   const paired = new Set<BrowserRequestRecord>();
   const events: EgressEvent[] = decisions.map((decided) => {
     const record = waiting.get(hostAndPort(decided.origin))?.shift();
-    if (record === undefined) return { origin: decided.origin, channel: EgressChannel.Unattributed, decision: decided.decision };
+    if (record === undefined) {return { origin: decided.origin, channel: EgressChannel.Unattributed, decision: decided.decision };}
     paired.add(record);
     return { origin: record.origin, channel: record.channel, decision: decided.decision };
   });
   const decisionFor = (record: BrowserRequestRecord): EgressDecision => {
-    if (record.channel === BrowserChannel.Popup) return record.undeclared === true ? 'blocked' : 'held';
+    if (record.channel === BrowserChannel.Popup) {return record.undeclared === true ? 'blocked' : 'held';}
     const key = hostAndPort(record.origin);
     return latest.get(key) ?? (direct.has(key) ? 'allowed' : 'blocked');
   };
   for (const record of records) {
-    if (!paired.has(record)) events.push({ origin: record.origin, channel: record.channel, decision: decisionFor(record) });
+    if (!paired.has(record)) {events.push({ origin: record.origin, channel: record.channel, decision: decisionFor(record) });}
   }
   return events;
 }

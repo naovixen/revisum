@@ -17,7 +17,7 @@ export function generate(input: ValidReport, assets: ReportAssets, history: Hist
   const dataUris = new Map<string, string>();
   for (const image of input.images) {
     const bytes = assets.png.get(image.id);
-    if (bytes === undefined) throw new Error(`missing screenshot bytes for ${image.id}`);
+    if (bytes === undefined) {throw new Error(`missing screenshot bytes for ${image.id}`);}
     const size = pngSize(bytes);
     if (sha256(bytes) !== image.sha256 || size === null || size.width !== image.width || size.height !== image.height) {
       throw new Error(`screenshot ${image.id} does not match its model entry`);

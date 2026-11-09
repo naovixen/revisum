@@ -76,7 +76,7 @@ function topSection(report: ReportInput, view: ReportView, images: EmbeddedImage
 }
 
 function findingsTable(view: ReportView): string {
-  if (view.numbered.length === 0) return '<p>No findings.</p>';
+  if (view.numbered.length === 0) {return '<p>No findings.</p>';}
   const rows = view.numbered.map((entry) => `<tr><th scope="row" class="n"><a href="#f-${entry.number}">${entry.number}</a></th><td>${severityPill(entry.finding)}</td>`
     + `<td>${entry.finding.status === Verdict.Failed ? 'Failed' : 'Needs review'}</td><td>${escapeHtml(entry.finding.caption)}</td><td>${criterionLinks(entry.finding)}</td>`
     + `<td>${escapeHtml(entry.finding.rule)}</td><td>${escapeHtml(criterionText(entry.finding.criterion))}</td></tr>`);
@@ -88,7 +88,7 @@ function gallery(report: ReportInput, view: ReportView, images: EmbeddedImages):
   const figures = view.figures.map((imageFigure) => {
     const image = report.images.find((candidate) => candidate.id === imageFigure.imageId);
     const uri = images.dataUris.get(imageFigure.imageId);
-    if (image === undefined || uri === undefined) return '';
+    if (image === undefined || uri === undefined) {return '';}
     const hasFindings = imageFigure.callouts.length + imageFigure.pageLevel.length > 0;
     const caption = `${image.alt}${imageFigure.callouts.length > 0 ? '. Cropped to the problem area.' : ''}`;
     return `<div>${figure(`g-${image.id}`, image, imageFigure, uri, true, `img-${image.id}`, caption)}`
@@ -98,7 +98,7 @@ function gallery(report: ReportInput, view: ReportView, images: EmbeddedImages):
 }
 
 function reviewQueue(view: ReportView): string {
-  if (view.review.length === 0) return '<p>Nothing to review: no item needs a person.</p>';
+  if (view.review.length === 0) {return '<p>Nothing to review: no item needs a person.</p>';}
   const rows = view.review.map((entry) => `<tr><th scope="row" class="n">${entry.number}</th><td>${severityPill(entry.finding)}</td><td>${escapeHtml(entry.finding.caption)}</td>`
     + `<td>${criterionLinks(entry.finding)}</td><td>${escapeHtml(entry.finding.reason ?? '')}</td><td>${escapeHtml(entry.finding.action ?? '')}</td></tr>`);
   return `${captionedTable('review', `${view.review.length} item${view.review.length === 1 ? '' : 's'} for a person`)}<thead><tr><th scope="col">#</th>`
@@ -156,7 +156,7 @@ function metricsPanel(history: History): string {
   const levels = levelSeries(history);
   const latest = metrics[metrics.length - 1];
   const level = (levels[levels.length - 1] ?? 0) as Level;
-  if (latest === undefined) return '<p>No history.</p>';
+  if (latest === undefined) {return '<p>No history.</p>';}
   const earlier = metrics[metrics.length - 2];
   const tile = (name: string, value: string, previous: string | null): string =>
     `<div class="tile"><span>${escapeHtml(name)}</span><b>${value}</b>${previous === null ? '' : `<span class="muted">previous: ${previous}</span>`}</div>`;
@@ -165,7 +165,7 @@ function metricsPanel(history: History): string {
     `<li${step === level ? ' aria-current="step"' : ''}>Level ${step}: ${escapeHtml(LEVEL_NAMES[step])}${step === level ? ' (current)' : ''}</li>`).join('');
   const rows = history.periods.map((period, index) => {
     const periodMetrics = metrics[index];
-    if (periodMetrics === undefined) return '';
+    if (periodMetrics === undefined) {return '';}
     return `<tr><th scope="row">${escapeHtml(period.id)}</th><td>${period.escaped.P1}</td><td>${period.escaped.P2}</td><td>${period.escaped.P3}</td><td>${period.escaped.P4}</td>`
       + `<td>${formatPercent(periodMetrics.verifiedWithoutReviewShare)}</td><td>${formatPercent(periodMetrics.flakyRunRate)}</td>`
       + `<td>${formatPercent(periodMetrics.tracedCriteriaShare)}</td><td>${levels[index] ?? 0}</td></tr>`;

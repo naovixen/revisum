@@ -88,7 +88,7 @@ function hashOfPlanAsWritten(bytes: Uint8Array, decoded: unknown, trusted: Trust
 // hash is over the plan as the parser returns it, a file that reads as that plan.
 function holdsSubject(subject: ApprovalSubject, bytes: Uint8Array, trusted: TrustedProject): boolean {
   const decoded = parseJson(bytes);
-  if (subject.kind === ApprovalSubjectKind.HoldoutPlan) return holdoutPlanHashes(decoded).includes(subject.hash);
+  if (subject.kind === ApprovalSubjectKind.HoldoutPlan) {return holdoutPlanHashes(decoded).includes(subject.hash);}
   if (sha256(bytes) === subject.hash || (decoded !== undefined && sha256(canonicalJson(decoded)) === subject.hash)) {
     return true;
   }
@@ -130,15 +130,15 @@ export function approvalVerifier(options: ApprovalVerifierOptions): ApprovalVeri
   // A protected-branch file, decoded as JSON. Missing is null; unavailable refuses.
   async function protectedJson(versionControl: VersionControlPort, path: string, actor: DerivedActor): Promise<Checked<unknown>> {
     const read = await versionControl.protectedFile(repositoryPath(path));
-    if (read.ok) return passed(parseJson(read.value.bytes));
+    if (read.ok) {return passed(parseJson(read.value.bytes));}
     return read.error === VersionControlFailure.Unavailable ? refusedBy('version-control-unavailable', actor) : passed(null);
   }
 
   async function codeOwnerRules(versionControl: VersionControlPort, actor: DerivedActor): Promise<Checked<readonly CodeOwnerRule[]>> {
     for (const path of CODE_OWNERS_PATHS) {
       const read = await versionControl.protectedFile(path);
-      if (read.ok) return passed(parseCodeOwners(new TextDecoder().decode(read.value.bytes)));
-      if (read.error === VersionControlFailure.Unavailable) return refusedBy('version-control-unavailable', actor);
+      if (read.ok) {return passed(parseCodeOwners(new TextDecoder().decode(read.value.bytes)));}
+      if (read.error === VersionControlFailure.Unavailable) {return refusedBy('version-control-unavailable', actor);}
     }
     // No code-owners file: nobody is a code owner.
     return passed([]);
@@ -149,11 +149,11 @@ export function approvalVerifier(options: ApprovalVerifierOptions): ApprovalVeri
   ): Promise<Checked<Approved>> {
     const unknownReviewer = deriveActor(sourceActorId('code-owner review'), 'unverified');
     const reviews = await versionControl.reviews(proof.pullRequest);
-    if (!reviews.ok) return refusedBy('version-control-unavailable', unknownReviewer);
+    if (!reviews.ok) {return refusedBy('version-control-unavailable', unknownReviewer);}
     const review = reviews.value.find((candidate) => candidate.id === proof.reviewId);
-    if (review === undefined || review.state !== VersionControlReviewState.Approved) return refusedBy('subject-mismatch', unknownReviewer);
+    if (review === undefined || review.state !== VersionControlReviewState.Approved) {return refusedBy('subject-mismatch', unknownReviewer);}
     const reviewer = accountActor(review.reviewer);
-    if (review.reviewer.type !== AccountType.User) return refusedBy('bot-or-app', reviewer);
+    if (review.reviewer.type !== AccountType.User) {return refusedBy('bot-or-app', reviewer);}
     if (latestVerdict(reviews.value, review).state !== VersionControlReviewState.Approved) {
       return refusedBy('subject-mismatch', reviewer);
     }
@@ -163,27 +163,27 @@ export function approvalVerifier(options: ApprovalVerifierOptions): ApprovalVeri
     }
 
     const rules = await codeOwnerRules(versionControl, reviewer);
-    if (!rules.ok) return rules;
-    if (!isCodeOwner(rules.value, path, review.reviewer.login)) return refusedBy('not-code-owner', reviewer);
+    if (!rules.ok) {return rules;}
+    if (!isCodeOwner(rules.value, path, review.reviewer.login)) {return refusedBy('not-code-owner', reviewer);}
 
     const pullRequest = await versionControl.pullRequest(proof.pullRequest);
     const changedFiles = await versionControl.changedFiles(proof.pullRequest);
-    if (!pullRequest.ok || !changedFiles.ok) return refusedBy('version-control-unavailable', reviewer);
+    if (!pullRequest.ok || !changedFiles.ok) {return refusedBy('version-control-unavailable', reviewer);}
     const changed = changedFiles.value.find((file) => repositoryPath(file.path) === path);
-    if (changed === undefined) return refusedBy('subject-mismatch', reviewer);
+    if (changed === undefined) {return refusedBy('subject-mismatch', reviewer);}
     const sameLogin = (login: string): boolean => login.toLowerCase() === review.reviewer.login.toLowerCase();
-    if (sameLogin(pullRequest.value.author) || changed.authors.some(sameLogin)) return refusedBy('self-approval', reviewer);
+    if (sameLogin(pullRequest.value.author) || changed.authors.some(sameLogin)) {return refusedBy('self-approval', reviewer);}
 
     // What counts is GitHub's last commit touching the subject, never the commit the proof names.
     const lastCommit = await versionControl.lastCommitTouching(path, proof.pullRequest);
-    if (!lastCommit.ok) return refusedBy('version-control-unavailable', reviewer);
-    if (review.commit !== lastCommit.value) return refusedBy('stale-commit', reviewer);
+    if (!lastCommit.ok) {return refusedBy('version-control-unavailable', reviewer);}
+    if (review.commit !== lastCommit.value) {return refusedBy('stale-commit', reviewer);}
 
     // The review covered the file at the subject's path in the reviewed commit, not the hash the
     // caller offers with it, so the hash must match those bytes. The protected branch is never
     // consulted: it may still hold the version the change replaces.
     const reviewed = await reviewedBytes(subject, path, review.commit, trusted, versionControl, reviewer);
-    if (!reviewed.ok) return reviewed;
+    if (!reviewed.ok) {return reviewed;}
     return passed({ login: review.reviewer.login, strength: ApprovalStrength.Verified, at: review.submittedAt });
   }
 
@@ -193,9 +193,9 @@ export function approvalVerifier(options: ApprovalVerifierOptions): ApprovalVeri
     subject: ApprovalSubject, path: string, commit: string, trusted: TrustedProject, versionControl: VersionControlPort, actor: DerivedActor,
   ): Promise<Checked<true>> {
     // A port that cannot read a file at a commit cannot show what the reviewer saw.
-    if (versionControl.fileAtCommit === undefined) return refusedBy('version-control-unavailable', actor);
+    if (versionControl.fileAtCommit === undefined) {return refusedBy('version-control-unavailable', actor);}
     const read = await versionControl.fileAtCommit(path, commit);
-    if (!read.ok) return refusedBy(read.error === VersionControlFailure.Unavailable ? 'version-control-unavailable' : 'subject-mismatch', actor);
+    if (!read.ok) {return refusedBy(read.error === VersionControlFailure.Unavailable ? 'version-control-unavailable' : 'subject-mismatch', actor);}
     return holdsSubject(subject, read.value.bytes, trusted) ? passed(true) : refusedBy('subject-mismatch', actor);
   }
 
@@ -204,28 +204,28 @@ export function approvalVerifier(options: ApprovalVerifierOptions): ApprovalVeri
   ): Promise<Checked<Approved>> {
     const claimed = loginActor(proof.mergedBy);
     const approversJson = await protectedJson(versionControl, APPROVERS_FILE, claimed);
-    if (!approversJson.ok) return approversJson;
+    if (!approversJson.ok) {return approversJson;}
     const lockdown = parseApproversFile(approversJson.value)?.agentLockdown ?? null;
     if (lockdown === null || !REQUIRED_DENIED_ACTIONS.every((action) => lockdown.deniedActions.includes(action))) {
       return refusedBy('lockdown-not-declared', claimed);
     }
     const denyRulesJson = await protectedJson(versionControl, lockdown.agentDenyRulesPath, claimed);
-    if (!denyRulesJson.ok) return denyRulesJson;
+    if (!denyRulesJson.ok) {return denyRulesJson;}
     const denyRules = parseDenyRules(denyRulesJson.value);
-    if (denyRules === null || !deniesRequiredActions(denyRules)) return refusedBy('lockdown-not-declared', claimed);
+    if (denyRules === null || !deniesRequiredActions(denyRules)) {return refusedBy('lockdown-not-declared', claimed);}
 
-    if (proof.protectedBranch !== versionControl.protectedBranch) return refusedBy('not-protected-branch', claimed);
+    if (proof.protectedBranch !== versionControl.protectedBranch) {return refusedBy('not-protected-branch', claimed);}
     const landed = await versionControl.landedBy(proof.commit, versionControl.protectedBranch);
-    if (!landed.ok) return refusedBy('version-control-unavailable', claimed);
-    if (landed.value === null) return refusedBy('not-protected-branch', claimed);
+    if (!landed.ok) {return refusedBy('version-control-unavailable', claimed);}
+    if (landed.value === null) {return refusedBy('not-protected-branch', claimed);}
     const lander = accountActor(landed.value);
     const isMaintainer = landed.value.login.toLowerCase() === lockdown.maintainer.toLowerCase();
     // GitHub's answer decides who landed the commit; a proof naming someone else is not believed.
     const proofAgrees = landed.value.login.toLowerCase() === proof.mergedBy.toLowerCase();
-    if (landed.value.type !== AccountType.User || !isMaintainer || !proofAgrees) return refusedBy('not-maintainer', lander);
+    if (landed.value.type !== AccountType.User || !isMaintainer || !proofAgrees) {return refusedBy('not-maintainer', lander);}
 
     const onBranch = await subjectOnProtectedBranch(subject, proof.commit, trusted, versionControl, lander);
-    if (!onBranch.ok) return onBranch;
+    if (!onBranch.ok) {return onBranch;}
     return passed({ login: landed.value.login, strength: ApprovalStrength.Declared, at: landed.value.at });
   }
 
@@ -240,7 +240,7 @@ export function approvalVerifier(options: ApprovalVerifierOptions): ApprovalVeri
       return refusedBy('subject-mismatch', actor);
     }
     const read = await versionControl.protectedFile(path);
-    if (!read.ok) return refusedBy(read.error === VersionControlFailure.Unavailable ? 'version-control-unavailable' : 'not-protected-branch', actor);
+    if (!read.ok) {return refusedBy(read.error === VersionControlFailure.Unavailable ? 'version-control-unavailable' : 'not-protected-branch', actor);}
     if (!holdsSubject(subject, read.value.bytes, trusted)) {
       return refusedBy('not-protected-branch', actor);
     }
@@ -252,10 +252,10 @@ export function approvalVerifier(options: ApprovalVerifierOptions): ApprovalVeri
   ): Promise<Checked<Approved>> {
     const signer = loginActor(`key:${proof.keyId}`);
     const approversJson = await protectedJson(versionControl, APPROVERS_FILE, signer);
-    if (!approversJson.ok) return approversJson;
+    if (!approversJson.ok) {return approversJson;}
     const approvers: ApproversFile | null = parseApproversFile(approversJson.value);
-    if (approvers === null || !approvers.signingKeys.some((key) => key.keyId === proof.keyId)) return refusedBy('unknown-key', signer);
-    if (!proof.flags.userPresent) return refusedBy('no-user-presence', signer);
+    if (approvers === null || !approvers.signingKeys.some((key) => key.keyId === proof.keyId)) {return refusedBy('unknown-key', signer);}
+    if (!proof.flags.userPresent) {return refusedBy('no-user-presence', signer);}
     // Checking the signature itself waits for customer demand, so no signature can be shown good yet.
     return refusedBy('bad-signature', signer);
   }
@@ -279,7 +279,7 @@ export function approvalVerifier(options: ApprovalVerifierOptions): ApprovalVeri
         return refuse({ code: ApprovalErrorCode.NotProtectedBranch, actor: deriveActor(sourceActorId('approval proof'), 'unverified') });
       }
       const checked = await checkProof(subject, proof, trusted, versionControl);
-      if (!checked.ok) return refuse(checked.refusal);
+      if (!checked.ok) {return refuse(checked.refusal);}
 
       const { login, strength, at } = checked.value;
       const approver = pseudonymousActorId(login, actorKey);
@@ -292,7 +292,7 @@ export function approvalVerifier(options: ApprovalVerifierOptions): ApprovalVeri
       });
       const recorded = events.append({ kind: AuditEventKind.PlanApproved, subjectHash: subject.hash, proofKind: proof.kind }, actor);
       // An approval the audit sink did not record does not exist: it is absent, never assumed.
-      if (!recorded.ok) return failure('version-control-unavailable');
+      if (!recorded.ok) {return failure('version-control-unavailable');}
       mintedApprovals.record(approval);
       return success({ approval, actor });
     },

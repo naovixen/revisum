@@ -69,14 +69,14 @@ function linkedCriteria(test: SuiteReportTest, redactor: Redactor): { readonly c
   const criterionIds: CriterionId[] = [];
   const invalid: number[] = [];
   test.annotations.forEach((annotation, index) => {
-    if (annotation.type !== CRITERION_ANNOTATION) return;
+    if (annotation.type !== CRITERION_ANNOTATION) {return;}
     const description = annotation.description;
     const criterionId = description === undefined || redactor.text(description) !== description ? undefined : criterionIdFrom(description);
     if (criterionId === undefined) {
       invalid.push(index);
       return;
     }
-    if (!criterionIds.includes(criterionId)) criterionIds.push(criterionId);
+    if (!criterionIds.includes(criterionId)) {criterionIds.push(criterionId);}
   });
   return { criterionIds, invalid };
 }
@@ -115,8 +115,8 @@ function evidenceState(
   outcomes: readonly SuiteTestOutcome[], exitCodeMismatch: boolean, outcomeCode: EvidenceOutcomeCode | undefined,
 ): SuiteRanResult['state'] {
   const isStopped = outcomeCode === EvidenceOutcomeCode.SuiteTimeout || outcomeCode === EvidenceOutcomeCode.EgressUnread;
-  if (isStopped || exitCodeMismatch || outcomes.includes('interrupted')) return TerminalState.Errored;
-  if (outcomeCode === EvidenceOutcomeCode.Vacuous) return TerminalState.Failed;
+  if (isStopped || exitCodeMismatch || outcomes.includes('interrupted')) {return TerminalState.Errored;}
+  if (outcomeCode === EvidenceOutcomeCode.Vacuous) {return TerminalState.Failed;}
   return outcomes.some((outcome) => FINDING_OUTCOMES.includes(outcome)) ? TerminalState.Failed : TerminalState.Passed;
 }
 
@@ -160,15 +160,15 @@ export function evidenceResult(
   for (const [testIndex, test] of report.tests.entries()) {
     const id = suiteTestId(test);
     const { criterionIds, invalid } = linkedCriteria(test, redactor);
-    for (const annotationIndex of invalid) reviewItems.push({ code: RunReviewItemCode.SpecAmbiguous, testId: id, annotationIndex });
-    if (test.outcome === SuiteTestOutcome.ExpectedFailure) reviewItems.push({ code: RunReviewItemCode.ExpectedFailure, testId: id });
+    for (const annotationIndex of invalid) {reviewItems.push({ code: RunReviewItemCode.SpecAmbiguous, testId: id, annotationIndex });}
+    if (test.outcome === SuiteTestOutcome.ExpectedFailure) {reviewItems.push({ code: RunReviewItemCode.ExpectedFailure, testId: id });}
     const isFinding = FINDING_OUTCOMES.includes(test.outcome);
     const actions = isFinding ? traceActions(test, traces) : [];
     if (actions.length > MAXIMUM_FINDING_STEPS) {
       decodeErrors.push({ code: SuiteDecodeErrorCode.TooLarge, path: `$.tests[${testIndex}].steps` });
     }
     const finding = isFinding ? failFinding(test, id, criterionIds, actions, redactor) : undefined;
-    if (finding !== undefined) findings.push(finding);
+    if (finding !== undefined) {findings.push(finding);}
     tests.push({
       id, file: keptText(test.file, redactor), titlePath: test.titlePath.map((title) => keptText(title, redactor)),
       project: keptText(test.project, redactor), outcome: test.outcome, pass, criterionIds,

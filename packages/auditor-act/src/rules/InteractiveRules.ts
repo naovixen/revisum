@@ -18,7 +18,7 @@ const result = (index: number, outcome: TargetResult['outcome'], message = ''): 
 async function focusEscapes(page: PageDriver, shift: boolean, limit: number): Promise<boolean> {
   for (let i = 0; i < limit; i++) {
     await page.pressKey('Tab', shift);
-    if ((await page.activeElement()) === null) return true;
+    if ((await page.activeElement()) === null) {return true;}
   }
   return false;
 }
@@ -29,12 +29,12 @@ export const keyboardTrapRule: InteractiveRule = {
   needsWalk: true,
   async run(page, snapshot, walk) {
     const targets = snapshot.nodes.filter((node) => focusable(snapshot, node));
-    if (targets.length === 0 && walk.sequence.length === 0) return [];
+    if (targets.length === 0 && walk.sequence.length === 0) {return [];}
     const limit = Math.max(12, walk.sequence.length * 2 + 6);
     const results = new Map<number, TargetResult>();
     const trapped = trapSet(walk);
     // The forward walk left the page, so every element it visited cycles back to the browser.
-    for (const index of walk.sequence) if (!trapped.includes(index)) results.set(index, result(index, 'passed'));
+    for (const index of walk.sequence) {if (!trapped.includes(index)) {results.set(index, result(index, 'passed'));}}
     if (trapped.length > 0) {
       // Standard keyboard navigation (ACT glossary) includes Tab, Shift+Tab and Escape: try Shift+Tab, then Escape and Tab.
       let escaped = await focusEscapes(page, true, limit);
@@ -49,7 +49,7 @@ export const keyboardTrapRule: InteractiveRule = {
     // Focusable elements the walk never reached (tabindex=-1, or behind a trap): focus each directly, then try both directions.
     let budget = 20;
     for (const node of targets) {
-      if (results.has(node.index)) continue;
+      if (results.has(node.index)) {continue;}
       if (budget-- <= 0) { results.set(node.index, result(node.index, 'cantTell', 'Not tested (budget)')); continue; }
       if (!(await page.focusBackend(node.backendId))) { results.set(node.index, result(node.index, 'passed', 'Cannot hold focus')); continue; }
       const escapes = (await focusEscapes(page, false, limit))
@@ -67,14 +67,14 @@ export const visibleFocusRule: InteractiveRule = {
   async run(_page, snapshot, walk) {
     const results: TargetResult[] = [];
     for (const index of walk.sequence) {
-      if (index < 0) continue;
+      if (index < 0) {continue;}
       const visible = walk.focusVisible.get(index);
-      if (visible === undefined) results.push(result(index, 'cantTell', 'Not measured'));
-      else results.push(visible ? result(index, 'passed') : result(index, 'failed', 'No pixel in the viewport changes when this element receives focus'));
+      if (visible === undefined) {results.push(result(index, 'cantTell', 'Not measured'));}
+      else {results.push(visible ? result(index, 'passed') : result(index, 'failed', 'No pixel in the viewport changes when this element receives focus'));}
     }
     if (!walk.endedAtDocument) {
       for (const node of snapshot.nodes) {
-        if (inSequentialFocus(snapshot, node) && !walk.sequence.includes(node.index)) results.push(result(node.index, 'cantTell', 'Not reached by the Tab walk'));
+        if (inSequentialFocus(snapshot, node) && !walk.sequence.includes(node.index)) {results.push(result(node.index, 'cantTell', 'Not reached by the Tab walk'));}
       }
     }
     return results;
@@ -88,12 +88,12 @@ export const focusNotObscuredProbe: InteractiveRule = {
   async run(_page, _snapshot, walk) {
     const results: TargetResult[] = [];
     for (const index of walk.sequence) {
-      if (index < 0) continue;
+      if (index < 0) {continue;}
       const occlusion = walk.obscured.get(index);
-      if (occlusion === undefined) continue;
-      if (!occlusion.inView) results.push(result(index, 'cantTell', 'Focused element is outside the viewport'));
-      else if (occlusion.hits === 0) results.push(result(index, 'failed', `Focused element is entirely covered by other content (0 of ${occlusion.total} sample points visible)`));
-      else results.push(result(index, 'passed'));
+      if (occlusion === undefined) {continue;}
+      if (!occlusion.inView) {results.push(result(index, 'cantTell', 'Focused element is outside the viewport'));}
+      else if (occlusion.hits === 0) {results.push(result(index, 'failed', `Focused element is entirely covered by other content (0 of ${occlusion.total} sample points visible)`));}
+      else {results.push(result(index, 'passed'));}
     }
     return results;
   },
@@ -106,7 +106,7 @@ function onSameRow(first: Box, second: Box): boolean {
   return overlap >= 0.5 * Math.min(first.height, second.height);
 }
 function reorderCause(snapshot: PageSnapshot, from: SnapshotNode, to: SnapshotNode): string | null {
-  if ((tabIndexOf(from) ?? 0) > 0 || (tabIndexOf(to) ?? 0) > 0) return 'positive tabindex';
+  if ((tabIndexOf(from) ?? 0) > 0 || (tabIndexOf(to) ?? 0) > 0) {return 'positive tabindex';}
   const fromChain = [from, ...ancestors(snapshot, from)];
   const toChain = [to, ...ancestors(snapshot, to)];
   const toSet = new Set(toChain);
@@ -116,8 +116,8 @@ function reorderCause(snapshot: PageSnapshot, from: SnapshotNode, to: SnapshotNo
     ...toChain.slice(0, common === undefined ? undefined : toChain.indexOf(common)),
   ];
   for (const node of chain) {
-    if ((node.style?.['order'] ?? '0') !== '0') return 'CSS order';
-    if ((node.style?.['flex-direction'] ?? '').endsWith('reverse') && /flex/.test(node.style?.['display'] ?? '')) return 'reversed flex direction';
+    if ((node.style?.['order'] ?? '0') !== '0') {return 'CSS order';}
+    if ((node.style?.['flex-direction'] ?? '').endsWith('reverse') && /flex/.test(node.style?.['display'] ?? '')) {return 'reversed flex direction';}
   }
   return null;
 }
@@ -127,7 +127,7 @@ export const focusOrderProbe: InteractiveRule = {
   async run(_page, snapshot, walk) {
     const results = new Map<number, TargetResult>();
     const sequence = walk.sequence.filter((index) => index >= 0);
-    for (const index of sequence) results.set(index, result(index, 'passed'));
+    for (const index of sequence) {results.set(index, result(index, 'passed'));}
     const rightToLeft = (snapshot.nodes.find((node) => node.name === 'html')?.attributes['dir'] ?? '').toLowerCase() === 'rtl';
     for (let k = 1; k < sequence.length; k++) {
       const fromIndex = sequence[k - 1] as number;
@@ -136,11 +136,11 @@ export const focusOrderProbe: InteractiveRule = {
       const toBox = walk.boxes.get(toIndex);
       const fromNode = nodeAt(snapshot, fromIndex);
       const toNode = nodeAt(snapshot, toIndex);
-      if (fromBox === undefined || toBox === undefined || fromNode === undefined || toNode === undefined || fromBox.width < 1 || fromBox.height < 1 || toBox.width < 1 || toBox.height < 1) continue;
+      if (fromBox === undefined || toBox === undefined || fromNode === undefined || toNode === undefined || fromBox.width < 1 || fromBox.height < 1 || toBox.width < 1 || toBox.height < 1) {continue;}
       const sameRow = onSameRow(fromBox, toBox);
       const isBackwardsInRow = rightToLeft ? toBox.x >= fromBox.x + fromBox.width - 1 : toBox.x + toBox.width <= fromBox.x + 1;
       const backwards = sameRow ? isBackwardsInRow : toBox.y + toBox.height <= fromBox.y + 1;
-      if (!backwards) continue;
+      if (!backwards) {continue;}
       const cause = reorderCause(snapshot, fromNode, toNode);
       const message = `Focus moves from "${fromNode.accessibility?.name ?? fromNode.name}" back to "${toNode.accessibility?.name ?? toNode.name}", which is visually ${sameRow ? 'before it on the same line' : 'above it'}`;
       results.set(toIndex, cause === null ? result(toIndex, 'cantTell', message) : result(toIndex, 'failed', `${message} (${cause})`));
@@ -161,16 +161,16 @@ export const keyboardReachProbe: InteractiveRule = {
     const visited = new Set(walk.sequence);
     for (const index of clickable) {
       const node = nodeAt(snapshot, index);
-      if (node === undefined || node.nodeType !== 1 || NEVER_CHECKED_FOR_REACH.has(node.name) || !isVisible(snapshot, node) || actuallyDisabled(snapshot, node)) continue;
-      if (node.name === 'a' && node.attributes['href'] === undefined && !clickable.has(index)) continue;
+      if (node === undefined || node.nodeType !== 1 || NEVER_CHECKED_FOR_REACH.has(node.name) || !isVisible(snapshot, node) || actuallyDisabled(snapshot, node)) {continue;}
+      if (node.name === 'a' && node.attributes['href'] === undefined && !clickable.has(index)) {continue;}
       const nodeAncestors = ancestors(snapshot, node);
-      if (nodeAncestors.some((ancestor) => ancestor.name === 'label' || ancestor.name === 'button' || ancestor.name === 'a' || ancestor.name === 'summary')) continue;
+      if (nodeAncestors.some((ancestor) => ancestor.name === 'label' || ancestor.name === 'button' || ancestor.name === 'a' || ancestor.name === 'summary')) {continue;}
       const reachable = (candidate: SnapshotNode): boolean => inSequentialFocus(snapshot, candidate) || visited.has(candidate.index);
       if (reachable(node) || nodeAncestors.some(reachable) || descendants(snapshot, node).some((descendant) => descendant.nodeType === 1 && reachable(descendant))) {
         results.push(result(index, 'passed'));
         continue;
       }
-      if (node.attributes['aria-hidden'] === 'true' || nodeAncestors.some((ancestor) => ancestor.attributes['aria-hidden'] === 'true')) continue;
+      if (node.attributes['aria-hidden'] === 'true' || nodeAncestors.some((ancestor) => ancestor.attributes['aria-hidden'] === 'true')) {continue;}
       results.push(result(index, 'failed', `Clickable <${node.name}> cannot be reached with the Tab key`));
     }
     return results;
@@ -194,7 +194,7 @@ export const targetSizeProbe: InteractiveRule = {
     const undersized = new Set<SnapshotNode>();
     for (const target of targets) {
       const bounds = target.bounds as Box;
-      if (bounds.width >= 24 && bounds.height >= 24) continue;
+      if (bounds.width >= 24 && bounds.height >= 24) {continue;}
       undersized.add(target);
     }
     for (const target of targets) {
@@ -212,7 +212,7 @@ export const targetSizeProbe: InteractiveRule = {
       const bounds = target.bounds as Box;
       const centre = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
       const clash = targets.find((other) => {
-        if (other === target) return false;
+        if (other === target) {return false;}
         const otherBounds = other.bounds as Box;
         if (undersized.has(other)) {
           const otherCentre = { x: otherBounds.x + otherBounds.width / 2, y: otherBounds.y + otherBounds.height / 2 };
@@ -222,8 +222,8 @@ export const targetSizeProbe: InteractiveRule = {
         const distanceY = Math.max(otherBounds.y - centre.y, 0, centre.y - (otherBounds.y + otherBounds.height));
         return Math.hypot(distanceX, distanceY) < 12;
       });
-      if (clash !== undefined) results.push(result(target.index, 'failed', `Target is ${Math.round(bounds.width)} x ${Math.round(bounds.height)} CSS px and too close to another target`));
-      else results.push(result(target.index, 'passed', 'spacing exception'));
+      if (clash !== undefined) {results.push(result(target.index, 'failed', `Target is ${Math.round(bounds.width)} x ${Math.round(bounds.height)} CSS px and too close to another target`));}
+      else {results.push(result(target.index, 'passed', 'spacing exception'));}
     }
     return results;
   },
@@ -249,22 +249,22 @@ export const reflowProbe: InteractiveRule = {
   needsWalk: false,
   async run(page, snapshot) {
     const root = snapshot.nodes.find((node) => node.nodeType === 1 && node.name === 'html' && node.document === 0);
-    if (root === undefined) return [];
+    if (root === undefined) {return [];}
     await page.setViewport(320, 256);
     try {
       await page.evaluate(`(${settleFrames.toString()})()`);
       const widths = decodeDocumentWidths(await page.evaluate(`(${documentWidths.toString()})()`));
-      if (widths.scrollWidth <= widths.clientWidth + 1) return [result(root.index, 'passed')];
+      if (widths.scrollWidth <= widths.clientWidth + 1) {return [result(root.index, 'passed')];}
       const narrow = await page.snapshot();
       const indexByBackend = new Map(snapshot.nodes.map((node) => [node.backendId, node.index]));
       const overflows = (node: SnapshotNode): boolean => node.bounds !== null && node.bounds.width > 0
         && node.bounds.x + node.bounds.width > widths.clientWidth + 1 && node.document === 0;
       const offenders = narrow.nodes.filter((node) => {
-        if (node.nodeType !== 1 || node.name === 'html' || node.name === 'body' || !overflows(node) || node.style?.['position'] === 'fixed') return false;
+        if (node.nodeType !== 1 || node.name === 'html' || node.name === 'body' || !overflows(node) || node.style?.['position'] === 'fixed') {return false;}
         const parent = parentElement(narrow, node);
         return !(parent !== undefined && overflows(parent) && !['html', 'body'].includes(parent.name));
       });
-      if (offenders.length === 0) return [result(root.index, 'cantTell', `Page is ${widths.scrollWidth} px wide at a 320 px viewport`)];
+      if (offenders.length === 0) {return [result(root.index, 'cantTell', `Page is ${widths.scrollWidth} px wide at a 320 px viewport`)];}
       return offenders.slice(0, 5).map((offender) => {
         const index = indexByBackend.get(offender.backendId) ?? root.index;
         const twoDimensional = TWO_DIMENSIONAL.has(offender.name) || ancestors(narrow, offender).some((ancestor) => TWO_DIMENSIONAL.has(ancestor.name));

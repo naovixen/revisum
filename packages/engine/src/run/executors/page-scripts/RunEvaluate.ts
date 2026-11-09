@@ -88,7 +88,7 @@ function scriptToRun(choice: ScriptChoice, context: PageScriptContext): Result<S
     });
   }
   const named = context.scripts.get(choice);
-  if (named === undefined) return failure('unsupported-step');
+  if (named === undefined) {return failure('unsupported-step');}
   const declaration = named.declaration;
   let source: string;
   try {
@@ -111,18 +111,18 @@ function scriptArguments(given: ScriptArguments, script: ScriptToRun, context: P
   const resolved: Record<string, ArgumentValue> = {};
   for (const [name, argument] of Object.entries(given)) {
     const type = Object.entries(script.parameters).find(([parameter]) => parameter === name)?.[1];
-    if (type === undefined) return failure('parameter-invalid');
+    if (type === undefined) {return failure('parameter-invalid');}
     let value: ArgumentValue;
     if (typeof argument === 'object') {
       const text = resolveText(argument, context.values, context.project.limits.maximumTextLength);
-      if (!text.ok) return text;
+      if (!text.ok) {return text;}
       const fitted = runValueArgument(type, text.value);
-      if (fitted === undefined) return failure('parameter-invalid');
+      if (fitted === undefined) {return failure('parameter-invalid');}
       value = fitted;
     } else {
       value = argument;
     }
-    if (argumentProblem(type, value) !== undefined) return failure('parameter-invalid');
+    if (argumentProblem(type, value) !== undefined) {return failure('parameter-invalid');}
     resolved[name] = value;
   }
   return success(resolved);
@@ -162,9 +162,9 @@ function textsToRemember(step: EvaluateStep, document: unknown, script: ScriptTo
   const entries: (readonly [ValueName, string])[] = [];
   for (const [name, field] of rememberedFieldEntries(step.remember)) {
     const found = resultField(document, script, field);
-    if (!found.ok) return found;
+    if (!found.ok) {return found;}
     const text = fieldText(found.value);
-    if (text === undefined) return failure('field-missing');
+    if (text === undefined) {return failure('field-missing');}
     entries.push([name, text]);
   }
   return success(entries);
@@ -172,32 +172,32 @@ function textsToRemember(step: EvaluateStep, document: unknown, script: ScriptTo
 
 export async function runEvaluate(step: EvaluateStep, stepIndex: number, session: DocumentSession, context: PageScriptContext): Promise<PageScriptOutcome> {
   const script = scriptToRun(step.script, context);
-  if (!script.ok) return failedWith(script.error);
+  if (!script.ok) {return failedWith(script.error);}
   const callArguments = scriptArguments(step.arguments, script.value, context);
-  if (!callArguments.ok) return failedWith(callArguments.error);
+  if (!callArguments.ok) {return failedWith(callArguments.error);}
   const once = await runOnce(session, script.value, callArguments.value, stepIndex, step.type, context);
   const pageScript: PageScriptRecord = { script: script.value.name, attempts: 1, resultSha256: once.resultSha256 };
-  if (!once.result.ok) return failedWith(once.result.error, pageScript);
+  if (!once.result.ok) {return failedWith(once.result.error, pageScript);}
   const texts = textsToRemember(step, once.result.value, script.value);
-  if (!texts.ok) return failedWith(texts.error, pageScript);
+  if (!texts.ok) {return failedWith(texts.error, pageScript);}
   const remembered = context.remembered.rememberAll(texts.value, stepIndex);
-  if (!remembered.ok) return failedWith(remembered.error, pageScript);
+  if (!remembered.ok) {return failedWith(remembered.error, pageScript);}
   return { outcome: StepOutcome.Passed, pageScript, ...recordsOfRemembered(remembered.value) };
 }
 
 // The text a check compares against, with a value reference resolved; null for a check of no text.
 function expectedText(assertion: BackendAssertion, context: PageScriptContext): Result<SafeText | null, StepCode> {
-  if (!('value' in assertion) || typeof assertion.value === 'number') return success(null);
+  if (!('value' in assertion) || typeof assertion.value === 'number') {return success(null);}
   return resolveText(assertion.value, context.values, context.project.limits.maximumTextLength);
 }
 
 export async function runScriptCheck(step: ExpectScriptStep, stepIndex: number, session: DocumentSession, context: PageScriptContext): Promise<PageScriptOutcome> {
   const script = scriptToRun(step.script, context);
-  if (!script.ok) return failedWith(script.error);
+  if (!script.ok) {return failedWith(script.error);}
   const callArguments = scriptArguments(step.arguments, script.value, context);
-  if (!callArguments.ok) return failedWith(callArguments.error);
+  if (!callArguments.ok) {return failedWith(callArguments.error);}
   const expected = expectedText(step.assert, context);
-  if (!expected.ok) return failedWith(expected.error);
+  if (!expected.ok) {return failedWith(expected.error);}
   const rule = {
     timeoutMilliseconds: context.project.limits.scriptCheckTimeoutMilliseconds,
     intervalMilliseconds: SCRIPT_CHECK_INTERVAL_MILLISECONDS,
@@ -207,9 +207,9 @@ export async function runScriptCheck(step: ExpectScriptStep, stepIndex: number, 
     const once = await runOnce(session, script.value, callArguments.value, stepIndex, step.type, context);
     const pageScript: PageScriptRecord = { script: script.value.name, attempts, resultSha256: once.resultSha256 };
     // A script that throws, hangs or gives no usable result would do the same again: it stops here.
-    if (!once.result.ok) return { outcome: failedWith(once.result.error, pageScript), isDone: true };
+    if (!once.result.ok) {return { outcome: failedWith(once.result.error, pageScript), isDone: true };}
     const field = resultField(once.result.value, script.value, step.field);
-    if (checkBackendField(step.assert, field.ok ? { value: field.value } : undefined, expected.value)) return { outcome: { outcome: StepOutcome.Passed, pageScript }, isDone: true };
+    if (checkBackendField(step.assert, field.ok ? { value: field.value } : undefined, expected.value)) {return { outcome: { outcome: StepOutcome.Passed, pageScript }, isDone: true };}
     const code = !field.ok && step.assert.kind !== BackendAssertionKind.Present && step.assert.kind !== BackendAssertionKind.Absent ? 'field-missing' : 'assertion-failed';
     // The parser lets only a read script stand in a check; a write one is never run twice all the same.
     return { outcome: failedWith(code, pageScript), isDone: script.value.effect === CallEffect.Write };

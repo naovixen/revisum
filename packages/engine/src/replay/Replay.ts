@@ -86,15 +86,15 @@ type ReplayedReplies = {
 function repliesFor(manifest: PlanRunManifest, input: unknown, ports: ReplayPorts): Result<ReplayedReplies, ReplayError> {
   const callsServices = manifest.nonHermeticInputs.includes(SERVICE_CALLS_INPUT);
   const runsCommands = manifest.nonHermeticInputs.includes(DATABASE_COMMANDS_INPUT);
-  if (!callsServices && !runsCommands) return success({});
+  if (!callsServices && !runsCommands) {return success({});}
   const firstKind: RecordedReplyKind = callsServices ? 'service-call' : 'database-command';
-  if (input === null || input === undefined) return failure({ code: ReplayErrorCode.ReplayMismatch, kind: firstKind, position: 0 });
+  if (input === null || input === undefined) {return failure({ code: ReplayErrorCode.ReplayMismatch, kind: firstKind, position: 0 });}
   const decoded = decodeRecording(input);
-  if (!decoded.ok) return decoded;
+  if (!decoded.ok) {return decoded;}
   const recording: RunRecording = decoded.value;
-  if (recording.manifestHash !== manifestHash(manifest)) return failure({ code: ReplayErrorCode.ReplayMismatch, path: '$.manifestHash' });
-  if (callsServices && recording.serviceCalls === undefined) return failure({ code: ReplayErrorCode.ReplayMismatch, kind: 'service-call', position: 0 });
-  if (runsCommands && recording.databaseCommands === undefined) return failure({ code: ReplayErrorCode.ReplayMismatch, kind: 'database-command', position: 0 });
+  if (recording.manifestHash !== manifestHash(manifest)) {return failure({ code: ReplayErrorCode.ReplayMismatch, path: '$.manifestHash' });}
+  if (callsServices && recording.serviceCalls === undefined) {return failure({ code: ReplayErrorCode.ReplayMismatch, kind: 'service-call', position: 0 });}
+  if (runsCommands && recording.databaseCommands === undefined) {return failure({ code: ReplayErrorCode.ReplayMismatch, kind: 'database-command', position: 0 });}
   return success({
     ...(recording.serviceCalls === undefined ? {} : { services: replayedServices(recording.serviceCalls, ports.secrets) }),
     ...(recording.databaseCommands === undefined ? {} : { databaseCommands: replayedDatabaseCommands(recording.databaseCommands, ports.secrets) }),
@@ -105,7 +105,7 @@ function repliesFor(manifest: PlanRunManifest, input: unknown, ports: ReplayPort
 async function fixtureMismatch(manifest: PlanRunManifest, reader: FixtureReader): Promise<string | null> {
   for (const fixture of manifest.fixtures) {
     const bytes = await reader.read(fixture.path);
-    if (bytes === null || sha256(bytes) !== fixture.sha256) return fixture.path;
+    if (bytes === null || sha256(bytes) !== fixture.sha256) {return fixture.path;}
   }
   return null;
 }
@@ -122,16 +122,16 @@ function differingFields(recorded: PlanRunManifest, replayed: PlanRunManifest): 
 
 export async function replay(request: ReplayRequest, ports: ReplayPorts): Promise<Result<ReplayOutcome, ReplayError>> {
   const decoded = decodeManifest(request.manifest);
-  if (!decoded.ok) return decoded;
+  if (!decoded.ok) {return decoded;}
   const claimed = replayManifest(decoded.value);
-  if (!claimed.ok) return claimed;
+  if (!claimed.ok) {return claimed;}
   const manifest = claimed.value;
   const replies = repliesFor(manifest, request.recording, ports);
-  if (!replies.ok) return replies;
-  if (planHash(request.cleared.plan) !== manifest.planHash) return failure({ code: ReplayErrorCode.ReplayMismatch, path: '$.planHash' });
-  if (manifest.target.id !== request.cleared.targetId) return failure({ code: ReplayErrorCode.ReplayMismatch, path: '$.target.id' });
+  if (!replies.ok) {return replies;}
+  if (planHash(request.cleared.plan) !== manifest.planHash) {return failure({ code: ReplayErrorCode.ReplayMismatch, path: '$.planHash' });}
+  if (manifest.target.id !== request.cleared.targetId) {return failure({ code: ReplayErrorCode.ReplayMismatch, path: '$.target.id' });}
   const fixture = await fixtureMismatch(manifest, ports.fixtures);
-  if (fixture !== null) return failure({ code: ReplayErrorCode.ReplayMismatch, fixture });
+  if (fixture !== null) {return failure({ code: ReplayErrorCode.ReplayMismatch, fixture });}
 
   // Only the ports a run takes are passed on: whatever else the caller's object holds, such as a
   // live caller, never reaches the run.
@@ -147,9 +147,9 @@ export async function replay(request: ReplayRequest, ports: ReplayPorts): Promis
   });
 
   const callMismatch = services?.mismatchAt() ?? null;
-  if (callMismatch !== null) return failure({ code: ReplayErrorCode.ReplayMismatch, kind: 'service-call', position: callMismatch });
+  if (callMismatch !== null) {return failure({ code: ReplayErrorCode.ReplayMismatch, kind: 'service-call', position: callMismatch });}
   const commandMismatch = databaseCommands?.mismatchAt() ?? null;
-  if (commandMismatch !== null) return failure({ code: ReplayErrorCode.ReplayMismatch, kind: 'database-command', position: commandMismatch });
+  if (commandMismatch !== null) {return failure({ code: ReplayErrorCode.ReplayMismatch, kind: 'database-command', position: commandMismatch });}
 
   // The result hash covers the manifest's hash, so a recorded result hash can only stand for the
   // manifest given when the replay's own manifest is that manifest too.

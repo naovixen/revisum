@@ -81,7 +81,7 @@ export function generateValue(
       case GeneratedValueKind.UniqueEmail: {
         // The project parser never leaves the list empty; it defaults to example.com.
         const domain = value.domain ?? project.generatedEmailDomains[0];
-        if (domain === undefined) throw new TypeError('the project declares no email domain for a generated email address');
+        if (domain === undefined) {throw new TypeError('the project declares no email domain for a generated email address');}
         return `${value.localPrefix}-${uniquePart(digest)}@${domain}`;
       }
       case GeneratedValueKind.UniqueNumber: return uniqueNumber(digest, value.digits);
@@ -95,7 +95,7 @@ export function generateValue(
   // generated value is SafeText only because it passed the rules for run-time text. Intl output
   // may hold directional marks, which plan text may not.
   const safe = runTimeText(text, MAXIMUM_GENERATED_LENGTH);
-  if (safe === undefined) throw new TypeError(`the generated value ${name} broke the safe-text rules`);
+  if (safe === undefined) {throw new TypeError(`the generated value ${name} broke the safe-text rules`);}
   return safe;
 }
 
@@ -112,7 +112,7 @@ export function generateRunValues(plan: Plan, seed: number, clockStartMillisecon
 // time zone, or the run's clock start when the plan sets no clock. The manifest keeps the run's
 // own clock start either way.
 export function resolvePlanClock(clock: PlanClock | undefined, clockStartMilliseconds: number, timezone: TimeZone): number {
-  if (clock === undefined) return clockStartMilliseconds;
+  if (clock === undefined) {return clockStartMilliseconds;}
   const [hour, minute] = clock.time.split(':').map(Number);
   return instantOf(relativeCalendarDay(clock.day, clockStartMilliseconds, timezone), hour ?? 0, minute ?? 0, timezone);
 }
@@ -127,11 +127,11 @@ type Resolved<Value> = Result<Value, StepErrorCode>;
 // check against it can prove nothing. A plan's own blank text stays, since a fill may mean it.
 export function resolveText(text: TextOrValue, values: RunValues, maximumLength: number): Resolved<SafeText> {
   const literal = literalText(text);
-  if (literal !== undefined) return success(literal);
+  if (literal !== undefined) {return success(literal);}
   const name = referencedValueName(text);
   const value = name === undefined ? undefined : values.get(name);
-  if (value === undefined || normalise(value) === '') return failure('value-empty');
-  if (value.length > maximumLength) return failure('value-too-long');
+  if (value === undefined || normalise(value) === '') {return failure('value-empty');}
+  if (value.length > maximumLength) {return failure('value-too-long');}
   return success(value);
 }
 
@@ -157,9 +157,9 @@ export function resolveLocator(locator: Locator, values: RunValues, project: Lim
     }
     case StructuralLocatorKind.Css: case StructuralLocatorKind.Xpath: {
       const hasText = locator.hasText === undefined ? undefined : resolveText(locator.hasText, values, project.limits.maximumTextLength);
-      if (hasText !== undefined && !hasText.ok) return hasText;
+      if (hasText !== undefined && !hasText.ok) {return hasText;}
       const inside = locator.inside === undefined ? undefined : resolveLocator(locator.inside, values, project);
-      if (inside !== undefined && !inside.ok) return inside;
+      if (inside !== undefined && !inside.ok) {return inside;}
       const optional = {
         ...(hasText === undefined ? {} : { hasText: hasText.value }), ...(inside === undefined ? {} : { inside: inside.value }),
         ...(locator.position === undefined ? {} : { position: locator.position }),
@@ -199,7 +199,7 @@ function resolveLines(lines: readonly TextOrValue[], values: RunValues, project:
   const resolved: SafeText[] = [];
   for (const line of lines) {
     const text = resolveText(line, values, project.limits.maximumTextLength);
-    if (!text.ok) return text;
+    if (!text.ok) {return text;}
     resolved.push(text.value);
   }
   const characters = resolved.reduce((total, line) => total + line.length, 0) + Math.max(resolved.length - 1, 0);
@@ -270,7 +270,7 @@ export const resolveLiteralActionStep = (
 // One path segment or query value, percent-encoded as a whole, so "/", "?", "#" and "%" inside a
 // value stay inside it. An empty value, "." or ".." would drop or climb a segment.
 function encodeSegment(text: SafeText): Resolved<string> {
-  if (text === '' || text === '.' || text === '..') return failure('value-unsafe');
+  if (text === '' || text === '.' || text === '..') {return failure('value-unsafe');}
   return success(encodeURIComponent(text));
 }
 
@@ -281,9 +281,9 @@ export function resolvePathTemplate(template: PathTemplate, values: RunValues, p
   const segments: string[] = [];
   for (const segment of template.segments) {
     const text = resolveText(segment, values, project.limits.maximumTextLength);
-    if (!text.ok) return text;
+    if (!text.ok) {return text;}
     const encoded = encodeSegment(text.value);
-    if (!encoded.ok) return encoded;
+    if (!encoded.ok) {return encoded;}
     segments.push(encoded.value);
   }
   const query: string[] = [];
@@ -291,7 +291,7 @@ export function resolvePathTemplate(template: PathTemplate, values: RunValues, p
   // one hash must go to one URL.
   for (const [key, value] of entriesInKeyOrder(template.query ?? {})) {
     const text = resolveText(value, values, project.limits.maximumTextLength);
-    if (!text.ok) return text;
+    if (!text.ok) {return text;}
     query.push(`${encodeURIComponent(key)}=${encodeURIComponent(text.value)}`);
   }
   return success(brand<string, 'AllowedUrl'>(`/${segments.join('/')}${query.length === 0 ? '' : `?${query.join('&')}`}`));

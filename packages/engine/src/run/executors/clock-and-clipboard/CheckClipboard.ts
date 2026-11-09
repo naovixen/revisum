@@ -60,7 +60,7 @@ type ClipboardRead =
 async function readClipboard(context: ClockAndClipboardContext): Promise<ClipboardRead> {
   const maximum = context.project.limits.maximumClipboardCharacters;
   const read: Result<string, DriverError> = await context.session.clipboard.readText(maximum);
-  if (!read.ok) return { kind: 'error', error: read.error };
+  if (!read.ok) {return { kind: 'error', error: read.error };}
   return read.value.length > maximum ? { kind: 'too-long' } : { kind: ClipboardReadKind.Text, text: read.value };
 }
 
@@ -82,7 +82,7 @@ function expectedText(assertion: ClipboardAssertion, values: RunValues, project:
     const lines: string[] = [];
     for (const line of value.lines) {
       const text = resolveText(line, values, project.limits.maximumTextLength);
-      if (!text.ok) return text;
+      if (!text.ok) {return text;}
       lines.push(text.value);
     }
     return { ok: true, value: lines.join('\n') };
@@ -101,13 +101,13 @@ function holds(assertion: ClipboardAssertion, text: string, expected: string): b
 
 export async function checkClipboard(step: ExpectClipboardStep, context: ClockAndClipboardContext): Promise<ClockAndClipboardOutcome> {
   const expected = expectedText(step.assert, context.values, context.project);
-  if (!expected.ok) return failedWith(expected.error);
+  if (!expected.ok) {return failedWith(expected.error);}
   const read = await readUntil(context, (seen) => seen.kind === 'too-long' || (seen.kind === 'text' && seen.text !== '' && holds(step.assert, seen.text, expected.value)));
   switch (read.kind) {
     case 'error': return failedWith(read.error.code);
     case 'too-long': return failedWith('value-too-long');
     case 'text':
-      if (read.text === '') return failedWith('assertion-failed', 'empty');
+      if (read.text === '') {return failedWith('assertion-failed', 'empty');}
       return holds(step.assert, read.text, expected.value) ? passed : failedWith('assertion-failed', 'differs');
   }
 }
@@ -119,9 +119,9 @@ export async function rememberFromClipboard(
   step: Extract<Step, { type: 'remember' }>, index: number, context: ClockAndClipboardContext,
 ): Promise<ClockAndClipboardOutcome> {
   const read = await readUntil(context, (seen) => seen.kind !== 'text' || seen.text !== '');
-  if (read.kind === 'error') return failedWith(read.error.code);
-  if (read.kind === 'too-long') return failedWith('value-too-long');
-  if (read.text === '') return failedWith('value-empty');
+  if (read.kind === 'error') {return failedWith(read.error.code);}
+  if (read.kind === 'too-long') {return failedWith('value-too-long');}
+  if (read.text === '') {return failedWith('value-empty');}
   const kept = context.remembered.remember(step.name, read.text, index);
   return kept.ok ? { outcome: StepOutcome.Passed, remembered: kept.value } : failedWith(kept.error);
 }

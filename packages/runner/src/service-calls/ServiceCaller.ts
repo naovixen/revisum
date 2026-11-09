@@ -74,7 +74,7 @@ export function serviceCaller(options: ServiceCallerOptions): ServiceCaller {
 // body's type and length when there is a body.
 function wireHeaders(request: ServiceRequest, target: URL, body: string | null): OutgoingHttpHeaders {
   const headers: OutgoingHttpHeaders = {};
-  for (const [name, value] of headerFields(request.headers)) headers[name.toLowerCase()] = value;
+  for (const [name, value] of headerFields(request.headers)) {headers[name.toLowerCase()] = value;}
   headers['host'] = target.host;
   if (body !== null) {
     headers['content-type'] ??= 'application/json';
@@ -91,10 +91,10 @@ function sendOnce(request: ServiceRequest, proxy: ProxyAddress, timeoutMilliseco
     const opened: (ClientRequest | Socket)[] = [];
     let settled = false;
     const finish = (result: CallResult): void => {
-      if (settled) return;
+      if (settled) {return;}
       settled = true;
       clearTimeout(timer);
-      for (const connection of opened) connection.destroy();
+      for (const connection of opened) {connection.destroy();}
       resolve(result);
     };
     const timer = setTimeout(() => finish(failure('call-timeout')), timeoutMilliseconds);

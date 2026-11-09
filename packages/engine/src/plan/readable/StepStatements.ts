@@ -42,11 +42,11 @@ const LINES = record([words('lines'), field('lines', list(TEXT))]);
 const HEADER_TEXT: Syntax = {
   read(line, index) {
     const start = skipSpaces(line, index);
-    if (line[start] === '"') return QUOTED.read(line, start);
+    if (line[start] === '"') {return QUOTED.read(line, start);}
     return { ok: true, value: line.slice(start), next: line.length, furthest: undefined };
   },
   write(value) {
-    if (typeof value !== 'string') return undefined;
+    if (typeof value !== 'string') {return undefined;}
     return value === '' || /^\s|\s$/u.test(value) || value.startsWith('"') ? QUOTED.write(value) : value;
   },
 };
@@ -58,7 +58,7 @@ const BOOLEAN = phrases([[true, 'true'], [false, 'false']]);
 // The English ordinal suffix of a whole number: 1st, 2nd, 3rd, 4th, 11th, 12th, 13th, 21st.
 function ordinalSuffix(position: number): string {
   const lastTwo = position % 100;
-  if (lastTwo >= 11 && lastTwo <= 13) return 'th';
+  if (lastTwo >= 11 && lastTwo <= 13) {return 'th';}
   return ['th', 'st', 'nd', 'rd'][position % 10] ?? 'th';
 }
 
@@ -67,16 +67,16 @@ const POSITION_WORD = oneOf(POSITION_WORDS);
 const POSITION: Syntax = {
   read(line, index) {
     const named = POSITION_WORD.read(line, index);
-    if (named.ok) return named;
+    if (named.ok) {return named;}
     const { word, start, end } = wordAt(line, index);
     const ordinal = /^([0-9]+)([A-Za-z]+)$/.exec(word);
-    if (ordinal === null) return { ok: false, failure: notThisStatement(start) };
+    if (ordinal === null) {return { ok: false, failure: notThisStatement(start) };}
     const position = Number(ordinal[1]);
-    if ((ordinal[2] ?? '').toLowerCase() !== ordinalSuffix(position)) return { ok: false, failure: { code: TextErrorCode.BadLocator, column: start + 1, reach: start } };
+    if ((ordinal[2] ?? '').toLowerCase() !== ordinalSuffix(position)) {return { ok: false, failure: { code: TextErrorCode.BadLocator, column: start + 1, reach: start } };}
     return { ok: true, value: position, next: end, furthest: undefined };
   },
   write(value) {
-    if (typeof value === 'string') return POSITION_WORD.write(value);
+    if (typeof value === 'string') {return POSITION_WORD.write(value);}
     return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? `${value}${ordinalSuffix(value)}` : undefined;
   },
 };
@@ -114,9 +114,9 @@ const holdsStructuralLocator = (locator: unknown): boolean =>
 const LOCATOR: Syntax = {
   read(line, index) {
     const reading = ANY_LOCATOR.read(line, index);
-    if (!reading.ok || holdsStructuralLocator(reading.value)) return reading;
+    if (!reading.ok || holdsStructuralLocator(reading.value)) {return reading;}
     const after = wordAt(line, reading.next);
-    if (after.word.toLowerCase() !== 'inside') return reading;
+    if (after.word.toLowerCase() !== 'inside') {return reading;}
     return { ok: false, failure: { code: TextErrorCode.BadLocator, column: after.start + 1, reach: after.start } };
   },
   write: (value) => ANY_LOCATOR.write(value),
@@ -137,19 +137,19 @@ const KEY_CHORD: RecordPart = {
     for (const [place, name] of names.entries()) {
       const isKey = place === names.length - 1;
       const found = (isKey ? KEYS : MODIFIERS).find((candidate: string) => candidate.toLowerCase() === name.toLowerCase());
-      if (found === undefined) return { ok: false, failure: { code: TextErrorCode.UnknownKeyName, column, reach: start } };
-      if (isKey) into['key'] = found;
-      else modifiers.push(found);
+      if (found === undefined) {return { ok: false, failure: { code: TextErrorCode.UnknownKeyName, column, reach: start } };}
+      if (isKey) {into['key'] = found;}
+      else {modifiers.push(found);}
       column += name.length + 1;
     }
-    if (modifiers.length > 0) into['modifiers'] = modifiers;
+    if (modifiers.length > 0) {into['modifiers'] = modifiers;}
     return { ok: true, value: null, next: end, furthest: undefined };
   },
   write(fields) {
     const key = KEYS.find((candidate) => candidate === fields['key']);
     const modifiers = fields['modifiers'] ?? [];
-    if (key === undefined || !Array.isArray(modifiers)) return undefined;
-    if (Object.hasOwn(fields, 'modifiers') && modifiers.length === 0) return undefined;
+    if (key === undefined || !Array.isArray(modifiers)) {return undefined;}
+    if (Object.hasOwn(fields, 'modifiers') && modifiers.length === 0) {return undefined;}
     const held = modifiers.map((modifier) => MODIFIERS.find((candidate) => candidate === modifier));
     return held.every((modifier) => modifier !== undefined) ? [...held, key].join('+') : undefined;
   },
@@ -183,19 +183,19 @@ function signedDays(days: number, direction: unknown): number {
 const DAY: Syntax = {
   read(line, index) {
     const anchorAlone = ANCHOR.read(line, index);
-    if (anchorAlone.ok) return { ...anchorAlone, value: { [FROM_FIELD]: anchorAlone.value, addDays: 0 } };
+    if (anchorAlone.ok) {return { ...anchorAlone, value: { [FROM_FIELD]: anchorAlone.value, addDays: 0 } };}
     const shifted = SHIFTED_DAY.read(line, index);
-    if (!shifted.ok) return { ok: false, failure: better(anchorAlone.failure, shifted.failure) ?? shifted.failure };
+    if (!shifted.ok) {return { ok: false, failure: better(anchorAlone.failure, shifted.failure) ?? shifted.failure };}
     const parts = isRecord(shifted.value) ? shifted.value : {};
     const days = typeof parts['days'] === 'number' ? parts['days'] : 0;
     const addDays = signedDays(days, parts['direction']);
     return { ...shifted, value: { [FROM_FIELD]: parts['anchor'], addDays } };
   },
   write(value) {
-    if (!isRecord(value) || Object.keys(value).length !== 2) return undefined;
+    if (!isRecord(value) || Object.keys(value).length !== 2) {return undefined;}
     const addDays = value['addDays'];
-    if (typeof addDays !== 'number' || !Number.isSafeInteger(addDays)) return undefined;
-    if (addDays === 0) return ANCHOR.write(value[FROM_FIELD]);
+    if (typeof addDays !== 'number' || !Number.isSafeInteger(addDays)) {return undefined;}
+    if (addDays === 0) {return ANCHOR.write(value[FROM_FIELD]);}
     return SHIFTED_DAY.write({ days: Math.abs(addDays), direction: addDays > 0 ? 'after' : 'before', anchor: value[FROM_FIELD] });
   },
 };
