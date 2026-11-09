@@ -1,7 +1,7 @@
 // The agent lock-down route, the owner's own: a subject is approved when it reaches the protected
 // default branch through a push or merge by the maintainer that protected-branch approvers.json
 // names, with the lock-down declared there and the agent's deny-rules file on the protected branch
-// denying push, merge and pull-request approval, in Bash or PowerShell. Core cannot see the
+// denying push, merge and pull-request approval, in both Bash and PowerShell. Core cannot see the
 // agent's environment, so the approval is always declared, never verified, and labelled
 // "declared, not verified". It suffices for every subject, and a project with one person and no
 // code-owners file can pass every gate this way.
@@ -114,16 +114,6 @@ approvesWith(
 );
 
 approvesWith(
-    "deny rules written only in their PowerShell form count as denials",
-    withoutDenyRules(/^Bash\(/),
-);
-
-approvesWith(
-    "deny rules written only in their Bash form count as denials",
-    withoutDenyRules(/^PowerShell\(/),
-);
-
-approvesWith(
     "a gh pr merge denial alone counts as denying merge",
     withoutDenyRules(/git (-C \* )?merge/),
 );
@@ -220,6 +210,16 @@ const REFUSALS: readonly Refusal[] = [
         title: "a deny-rules file with no pull-request approval denial is refused as lockdown-not-declared",
         code: "lockdown-not-declared",
         edit: withoutDenyRules(/pr review/),
+    },
+    {
+        title: "deny rules written only in their PowerShell form leave Bash open and are refused as lockdown-not-declared",
+        code: "lockdown-not-declared",
+        edit: withoutDenyRules(/^Bash\(/),
+    },
+    {
+        title: "deny rules written only in their Bash form leave PowerShell open and are refused as lockdown-not-declared",
+        code: "lockdown-not-declared",
+        edit: withoutDenyRules(/^PowerShell\(/),
     },
     {
         title: "a lock-down whose denied actions leave out merge is refused as lockdown-not-declared",

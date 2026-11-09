@@ -47,7 +47,12 @@
           "Bash(git push *)",
           "Bash(git merge *)",
           "Bash(gh pr merge *)",
-          "Bash(gh pr review *)"
+          "Bash(gh pr review *)",
+          "PowerShell(git commit *)",
+          "PowerShell(git push *)",
+          "PowerShell(git merge *)",
+          "PowerShell(gh pr merge *)",
+          "PowerShell(gh pr review *)"
         ]
       }
     },

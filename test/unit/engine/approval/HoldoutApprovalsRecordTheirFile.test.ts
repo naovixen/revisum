@@ -1,6 +1,7 @@
 // A holdout plan is judged on holdouts.json whatever path the caller gives, so that is the file its
 // approval is about. Recording the caller's path would let the approval read as being about a file
-// nobody checked.
+// nobody checked. Any other subject is judged at its path with "." and ".." resolved, so that
+// normalised path is what its approval records, however the caller wrote it.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import type { ApprovalProof, ApprovalSubject } from "@revisum/engine";
@@ -9,6 +10,7 @@ import {
     HOLDOUTS_PATH,
     HOLDOUT_PLAN_HASH,
     PLAN_PATH,
+    SUBJECT_PATHS,
     withRepository,
     type FixtureRepository,
     type TestRepository,
@@ -93,6 +95,64 @@ describe("Using the approval verifier", () => {
             });
         });
     }
+
+    for (const callerPath of [
+        "./plans/signup.json",
+        "plans/./signup.json",
+        "plans/drafts/../signup.json",
+    ]) {
+        describe(`given a plan's approval whose caller writes its path as ${callerPath}`, () => {
+            describe("when the lock-down proof is verified", () => {
+                test("then it should record the normalised path it judged", async () => {
+                    await withRepository("solo", async (repository) => {
+                        assert.equal(
+                            await verifiedPath(
+                                repository,
+                                { ...repository.subject("plan"), path: callerPath },
+                                repository.lockdownProof(),
+                            ),
+                            PLAN_PATH,
+                        );
+                    });
+                });
+            });
+
+            describe("when a code owner's review is verified", () => {
+                test("then it should record the normalised path it judged", async () => {
+                    await withRepository("team", async (repository) => {
+                        assert.equal(
+                            await verifiedPath(
+                                repository,
+                                { ...repository.subject("plan"), path: callerPath },
+                                repository.codeOwnerProof("review-grace"),
+                            ),
+                            PLAN_PATH,
+                        );
+                    });
+                });
+            });
+        });
+    }
+
+    describe("given a trusted file's approval whose caller writes its path with a leading ./", () => {
+        describe("when the lock-down proof is verified", () => {
+            test("then it should record the normalised path it judged", async () => {
+                await withRepository("solo", async (repository) => {
+                    assert.equal(
+                        await verifiedPath(
+                            repository,
+                            {
+                                ...repository.subject("trusted-file"),
+                                path: `./${SUBJECT_PATHS["trusted-file"]}`,
+                            },
+                            repository.lockdownProof(),
+                        ),
+                        SUBJECT_PATHS["trusted-file"],
+                    );
+                });
+            });
+        });
+    });
 
     describe("given a plan's approval", () => {
         describe("when the lock-down proof is verified", () => {

@@ -2,11 +2,12 @@
 // whole families of commands, not one example command each. A rule set that denies only
 // "git push origin main" leaves "git push", "git push --force" and every other remote and branch
 // open, so it must not count as a lock-down. The repository's own deny rules, and the fixture
-// repositories' rules, deny the whole families and still count.
+// repositories' rules, deny the whole families and still count. An agent with both shells can use
+// either, so each family has to be denied whole in Bash and in PowerShell alike.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { test } from "node:test";
+import { describe, test } from "node:test";
 import { deniesRequiredActions, parseDenyRules } from "@revisum/engine";
 import { REPOSITORY_ROOT } from "../../../support/repository/RepositoryRoot.ts";
 import {
@@ -16,49 +17,61 @@ import {
     withRepository,
 } from "../approval/examples/MemoryApprovalStore.ts";
 
-// Rules that deny each family whole.
-const WHOLE_PUSH = ["Bash(git push)", "Bash(git push *)"];
-const WHOLE_MERGE = ["Bash(git merge *)", "Bash(gh pr merge *)"];
-const WHOLE_APPROVAL = ["Bash(gh pr review *)"];
+const inBothShells = (...commands: readonly string[]): string[] =>
+    commands.flatMap((command) => [`Bash(${command})`, `PowerShell(${command})`]);
+const inBashOnly = (...commands: readonly string[]): string[] =>
+    commands.map((command) => `Bash(${command})`);
+const inPowerShellOnly = (...commands: readonly string[]): string[] =>
+    commands.map((command) => `PowerShell(${command})`);
+
+// The commands that deny each family whole.
+const PUSH_COMMANDS = ["git push", "git push *"];
+const MERGE_COMMANDS = ["git merge *", "gh pr merge *"];
+const APPROVAL_COMMANDS = ["gh pr review *"];
+
+// Rules that deny each family whole, in both shells.
+const WHOLE_PUSH = inBothShells(...PUSH_COMMANDS);
+const WHOLE_MERGE = inBothShells(...MERGE_COMMANDS);
+const WHOLE_APPROVAL = inBothShells(...APPROVAL_COMMANDS);
 
 // Rule sets that each leave part of at least one family open; the title says which part.
 const PARTIAL_RULE_SETS: readonly { readonly title: string; readonly rules: readonly string[] }[] =
     [
         {
             title: "one example command per action (git push origin main, gh pr merge 1, gh pr review 1 --approve)",
-            rules: [
-                "Bash(git push origin main)",
-                "Bash(gh pr merge 1)",
-                "Bash(gh pr review 1 --approve)",
-            ],
+            rules: inBothShells(
+                "git push origin main",
+                "gh pr merge 1",
+                "gh pr review 1 --approve",
+            ),
         },
         {
             title: "push to origin main only, leaving git push, --force and other remotes open",
-            rules: ["Bash(git push origin main)", ...WHOLE_MERGE, ...WHOLE_APPROVAL],
+            rules: [...inBothShells("git push origin main"), ...WHOLE_MERGE, ...WHOLE_APPROVAL],
         },
         {
             title: "push to origin only, leaving git push --force and other remotes open",
-            rules: ["Bash(git push origin *)", ...WHOLE_MERGE, ...WHOLE_APPROVAL],
+            rules: [...inBothShells("git push origin *"), ...WHOLE_MERGE, ...WHOLE_APPROVAL],
         },
         {
             title: "bare git push only, leaving every push with arguments open",
-            rules: ["Bash(git push)", ...WHOLE_MERGE, ...WHOLE_APPROVAL],
+            rules: [...inBothShells("git push"), ...WHOLE_MERGE, ...WHOLE_APPROVAL],
         },
         {
             title: "merging pull request 1 only, leaving every other pull request and git merge open",
-            rules: [...WHOLE_PUSH, "Bash(gh pr merge 1)", ...WHOLE_APPROVAL],
+            rules: [...WHOLE_PUSH, ...inBothShells("gh pr merge 1"), ...WHOLE_APPROVAL],
         },
         {
             title: 'merging the branch "feature" only, leaving every other merge open',
-            rules: [...WHOLE_PUSH, "Bash(git merge feature)", ...WHOLE_APPROVAL],
+            rules: [...WHOLE_PUSH, ...inBothShells("git merge feature"), ...WHOLE_APPROVAL],
         },
         {
             title: "approving pull request 1 only, leaving every other pull request open",
-            rules: [...WHOLE_PUSH, ...WHOLE_MERGE, "Bash(gh pr review 1 --approve)"],
+            rules: [...WHOLE_PUSH, ...WHOLE_MERGE, ...inBothShells("gh pr review 1 --approve")],
         },
         {
             title: "reviewing pull request 1 only, with any flags",
-            rules: [...WHOLE_PUSH, ...WHOLE_MERGE, "Bash(gh pr review 1 *)"],
+            rules: [...WHOLE_PUSH, ...WHOLE_MERGE, ...inBothShells("gh pr review 1 *")],
         },
     ];
 
@@ -107,11 +120,11 @@ test("the lock-down route refuses with lockdown-not-declared when the deny rules
             );
         },
         (fixture) => {
-            denyRulesOf(fixture).permissions.deny = [
-                "Bash(git push origin main)",
-                "Bash(gh pr merge 1)",
-                "Bash(gh pr review 1 --approve)",
-            ];
+            denyRulesOf(fixture).permissions.deny = inBothShells(
+                "git push origin main",
+                "gh pr merge 1",
+                "gh pr review 1 --approve",
+            );
         },
     );
 });
@@ -135,4 +148,63 @@ test("the lock-down route approves with this repository's own deny rules in plac
             denyRulesOf(fixture).permissions.deny = [...rules];
         },
     );
+});
+
+// ---- One shell left open --------------------------------------------------------------------------
+
+// Rule sets that deny every family somewhere, yet leave a shell through which the agent can still
+// push, merge or approve; the title says which.
+const ONE_SHELL_OPEN_RULE_SETS: readonly {
+    readonly title: string;
+    readonly rules: readonly string[];
+}[] = [
+    {
+        title: "every family is denied in Bash, with PowerShell open",
+        rules: inBashOnly(...PUSH_COMMANDS, ...MERGE_COMMANDS, ...APPROVAL_COMMANDS),
+    },
+    {
+        title: "every family is denied in PowerShell, with Bash open",
+        rules: inPowerShellOnly(...PUSH_COMMANDS, ...MERGE_COMMANDS, ...APPROVAL_COMMANDS),
+    },
+    {
+        title: "push is denied in Bash alone",
+        rules: [...inBashOnly(...PUSH_COMMANDS), ...WHOLE_MERGE, ...WHOLE_APPROVAL],
+    },
+    {
+        title: "merge is denied in PowerShell alone",
+        rules: [...WHOLE_PUSH, ...inPowerShellOnly(...MERGE_COMMANDS), ...WHOLE_APPROVAL],
+    },
+    {
+        title: "pull-request approval is denied in Bash alone",
+        rules: [...WHOLE_PUSH, ...WHOLE_MERGE, ...inBashOnly(...APPROVAL_COMMANDS)],
+    },
+    {
+        title: "push and merge are denied only in Bash and approval only in PowerShell",
+        rules: [
+            ...inBashOnly(...PUSH_COMMANDS, ...MERGE_COMMANDS),
+            ...inPowerShellOnly(...APPROVAL_COMMANDS),
+        ],
+    },
+    {
+        title: "Bash denies only the bare git push and PowerShell denies every git push",
+        rules: ["Bash(git push)", "PowerShell(git push *)", ...WHOLE_MERGE, ...WHOLE_APPROVAL],
+    },
+];
+
+describe("Using the deny rules check", () => {
+    describe("given deny rules that leave one shell open", () => {
+        for (const { title, rules } of ONE_SHELL_OPEN_RULE_SETS) {
+            describe(`and ${title}`, () => {
+                describe("when the rules are checked for a lock-down", () => {
+                    test("then it should not count them as denying the required actions", () => {
+                        assert.equal(
+                            deniesRequiredActions(rules),
+                            false,
+                            `these rules counted as a lock-down: ${JSON.stringify(rules)}`,
+                        );
+                    });
+                });
+            });
+        }
+    });
 });

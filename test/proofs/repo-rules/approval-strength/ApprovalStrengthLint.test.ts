@@ -2,10 +2,11 @@
 // pass, and strength only selects a label. Each test plants one file in a throw-away copy of the
 // repository and runs the repository's lint commands over it:
 //   - a function that takes a VerifiedApproval parameter fails the lint;
-//   - a check that compares strength with 'verified' to decide a result fails the lint;
+//   - a check that compares strength with 'verified' to decide a result fails the lint, and so does
+//     one that compares it with an ApprovalStrength constant, or tests it with startsWith or includes;
 //   - choosing a label by strength passes, so the lint fails for the planted reason only.
 import assert from "node:assert/strict";
-import { after, before, test } from "node:test";
+import { after, before, describe, test } from "node:test";
 import { RepositoryRuleName } from "../../../../tools/repo-rules/RunRepositoryRules.ts";
 import { copyRepository, type ScratchRepository } from "../support/ScratchRepository.ts";
 
@@ -148,3 +149,110 @@ test(
         );
     },
 );
+
+// ---- Deciding by the constants, and by string and list methods -----------------------------------
+
+// A function whose result depends on the strength, written as the conventions ask, with the constants.
+const gateDeciding = (body: string): string =>
+    [
+        "import { ApprovalStrength, type Approval } from '@revisum/contracts';",
+        "export function mayMerge(approval: Approval): boolean {",
+        `  ${body}`,
+        "}",
+        "",
+    ].join("\n");
+
+const STRENGTH_DECISIONS: readonly { readonly form: string; readonly body: string }[] = [
+    {
+        form: "=== ApprovalStrength.Verified",
+        body: "return approval.strength === ApprovalStrength.Verified;",
+    },
+    {
+        form: "!== ApprovalStrength.Declared",
+        body: "return approval.strength !== ApprovalStrength.Declared;",
+    },
+    {
+        form: "the constant on the left of the comparison",
+        body: "return ApprovalStrength.Verified === approval.strength;",
+    },
+    {
+        form: "a local holding the strength, compared with the constant",
+        body: "const level = approval.strength; return level === ApprovalStrength.Verified;",
+    },
+    {
+        form: ".startsWith with a string",
+        body: "return approval.strength.startsWith('verif');",
+    },
+    {
+        form: ".startsWith with the constant",
+        body: "return approval.strength.startsWith(ApprovalStrength.Verified);",
+    },
+    {
+        form: ".includes on the strength",
+        body: "return approval.strength.includes('verif');",
+    },
+    {
+        form: "a list of strength strings, asked with .includes",
+        body: "return ['verified'].includes(approval.strength);",
+    },
+    {
+        form: "a list of strength constants, asked with .includes",
+        body: "return [ApprovalStrength.Verified].includes(approval.strength);",
+    },
+];
+
+const NOT_STRENGTH_DECISIONS: readonly { readonly form: string; readonly source: string }[] = [
+    {
+        form: "the constant used to build an approval's fields",
+        source: [
+            "import { ApprovalStrength } from '@revisum/contracts';",
+            "export const verifiedFields = { strength: ApprovalStrength.Verified };",
+            "",
+        ].join("\n"),
+    },
+    {
+        form: "a list holding 'verified', asked about something other than strength",
+        source: [
+            "export const isCheckedAccount = (account: { readonly emailState: string }): boolean =>",
+            "  ['verified'].includes(account.emailState);",
+            "",
+        ].join("\n"),
+    },
+    {
+        form: ".startsWith on something other than strength",
+        source: [
+            "export const isVerifiedName = (name: string): boolean => name.startsWith('verified');",
+            "",
+        ].join("\n"),
+    },
+];
+
+describe("Using the approval strength check", () => {
+    for (const { form, body } of STRENGTH_DECISIONS) {
+        describe(`given a gate that decides by the strength with ${form}`, () => {
+            describe("when the check runs", () => {
+                test("then it should fail, naming the file", { timeout: TIMEOUT }, () => {
+                    assertLintFailsOn(
+                        "packages/engine/src/planted-constant-gate.ts",
+                        gateDeciding(body),
+                    );
+                });
+            });
+        });
+    }
+
+    for (const { form, source } of NOT_STRENGTH_DECISIONS) {
+        describe(`given ${form}`, () => {
+            describe("when the check runs", () => {
+                test("then it should pass", { timeout: TIMEOUT }, () => {
+                    const outcome = scratch.lintWith(
+                        "packages/engine/src/planted-unrelated.ts",
+                        source,
+                        ONLY_THE_RULE,
+                    );
+                    assert.equal(outcome.passed, true, outcome.failureOutput);
+                });
+            });
+        });
+    }
+});
