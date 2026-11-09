@@ -13,8 +13,8 @@ import {
     readOneOf,
     type Issues,
     type Parsed,
-} from "../../plan-decoders.ts";
-import { DOWNLOAD_KINDS, LARGEST_DOWNLOAD_BYTES } from "../../plan-grammar.ts";
+} from "../ReadRecord.ts";
+import { DOWNLOAD_KINDS, LARGEST_DOWNLOAD_BYTES } from "../../schema/PlanFields.ts";
 import type { ParseContext } from "../ParseContext.ts";
 import { refuse } from "../Refuse.ts";
 import { readExpectedText } from "../text/ReadTextOrValue.ts";

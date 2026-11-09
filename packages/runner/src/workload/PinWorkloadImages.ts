@@ -1,8 +1,8 @@
 // The two images a workload needs, both here: Revisum's run image, taken as tagged, and the team's,
 // which is never pulled and is the only one compared with the id the request pins.
 import { success, type Result } from "@revisum/contracts";
-import type { ContainerEngine, ImageAnswer } from "../container-engine.ts";
-import { RUN_IMAGE_TAG } from "../run-image.ts";
+import type { ContainerEngine, ImageAnswer } from "../containers/ContainerEngine.ts";
+import { RUN_IMAGE_TAG } from "../image/RunImage.ts";
 import type { CheckedWorkloadRequest } from "./CheckWorkloadRequest.ts";
 import { workloadRefused, type WorkloadRefusal } from "./WorkloadRefusal.ts";
 

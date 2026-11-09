@@ -9,7 +9,7 @@ import {
     type DriverErrorCode,
     type PageReadFailure,
 } from "@revisum/contracts";
-import type { Logger } from "../logging.ts";
+import type { Logger } from "./logging/LoggingManifest.ts";
 
 export const errorText = (error: unknown): string =>
     (error instanceof Error ? error.message : String(error)).slice(0, 200);

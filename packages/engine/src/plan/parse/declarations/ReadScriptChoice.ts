@@ -11,10 +11,10 @@ import {
     type ScriptParameterType,
     type ScriptSource,
 } from "@revisum/contracts";
-import { brand } from "../../../brand.ts";
-import { readFieldPointers } from "../../../project/call-declarations.ts";
+import { brand } from "../../../foundation/Brand.ts";
+import { readFieldPointers } from "../../../project/ReadCallDeclarations.ts";
 import { isInlineScript } from "../../IsInlineScript.ts";
-import { looksLikeCredential } from "../../literal-secrets.ts";
+import { looksLikeCredential } from "../../LooksLikeCredential.ts";
 import {
     allValid,
     INVALID,
@@ -22,8 +22,8 @@ import {
     readOneOf,
     type Issues,
     type Parsed,
-} from "../../plan-decoders.ts";
-import { MAXIMUM_INLINE_SCRIPT_LENGTH } from "../../plan-grammar.ts";
+} from "../ReadRecord.ts";
+import { MAXIMUM_INLINE_SCRIPT_LENGTH } from "../../schema/PlanFields.ts";
 import { optionalField, readFields } from "../../ReadFields.ts";
 import type { ParseContext } from "../ParseContext.ts";
 import { refuse } from "../Refuse.ts";

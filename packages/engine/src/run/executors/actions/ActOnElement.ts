@@ -1,5 +1,5 @@
 import { stepFailed, StepOutcome } from "@revisum/contracts";
-import { resolveInputStep, type InputStep } from "../../../run-values.ts";
+import { resolveInputStep, type InputStep } from "../../values/RunValues.ts";
 import { actGuarded } from "../../ActGuarded.ts";
 import type { StepExecutor, StepNeeds } from "../StepExecutor.ts";
 

@@ -4,7 +4,7 @@ import {
     type MultiLineText,
     type TextOrValue,
 } from "@revisum/contracts";
-import { allValid, INVALID, readList, type Issues, type Parsed } from "../../plan-decoders.ts";
+import { allValid, INVALID, readList, type Issues, type Parsed } from "../ReadRecord.ts";
 import { readFields } from "../../ReadFields.ts";
 import type { ParseContext } from "../ParseContext.ts";
 import { refuse } from "../Refuse.ts";

@@ -7,16 +7,9 @@ import {
     type SafeText,
     type TextOrValue,
 } from "@revisum/contracts";
-import { looksLikeCredential } from "../../literal-secrets.ts";
-import {
-    allValid,
-    INVALID,
-    peekRecord,
-    readList,
-    readRecord,
-    type Parsed,
-} from "../../plan-decoders.ts";
-import { MAXIMUM_PATH_SEGMENTS, MAXIMUM_QUERY_VALUES, QUERY_KEY } from "../../plan-grammar.ts";
+import { looksLikeCredential } from "../../LooksLikeCredential.ts";
+import { allValid, INVALID, peekRecord, readList, readRecord, type Parsed } from "../ReadRecord.ts";
+import { MAXIMUM_PATH_SEGMENTS, MAXIMUM_QUERY_VALUES, QUERY_KEY } from "../../schema/PlanFields.ts";
 import type { ParseContext } from "../ParseContext.ts";
 import { refuse } from "../Refuse.ts";
 import { readTextOrValue, readValueReference } from "./ReadTextOrValue.ts";

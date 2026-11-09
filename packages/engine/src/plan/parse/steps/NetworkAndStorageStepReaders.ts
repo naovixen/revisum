@@ -10,7 +10,7 @@ import {
     type StorageEntryName,
 } from "@revisum/contracts";
 import type { ReadableInput } from "../../../decoding/ReadableCopy.ts";
-import { allValid, INVALID, readOneOf, type Parsed } from "../../plan-decoders.ts";
+import { allValid, INVALID, readOneOf, type Parsed } from "../ReadRecord.ts";
 import type { StepSection, StepTypeIn } from "../../StepFacts.ts";
 import { readRequestCount } from "../assertions/ReadRequestCount.ts";
 import { readResponseAssertion } from "../assertions/ReadResponseAssertion.ts";

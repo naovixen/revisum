@@ -11,11 +11,11 @@ import {
     type StepByType,
     type StepRecord,
 } from "@revisum/contracts";
-import { rememberFromClipboard } from "../../../clock-and-clipboard-steps.ts";
-import { canonicalJson } from "../../../hashing.ts";
-import { rememberFromResponse } from "../../../network-and-storage/network-and-storage-steps.ts";
-import { normalise, type Verdict } from "../../../oracle.ts";
-import { resolveLocator } from "../../../run-values.ts";
+import { rememberFromClipboard } from "../clock-and-clipboard/CheckClipboard.ts";
+import { canonicalJson } from "../../../foundation/Sha256.ts";
+import { rememberFromResponse } from "../network-and-storage/CheckRequests.ts";
+import { normalise, type Verdict } from "../../outcome/Verdict.ts";
+import { resolveLocator } from "../../values/RunValues.ts";
 import { poll } from "../../Poll.ts";
 import { clockAndClipboardContext } from "../clock-and-clipboard/ClockAndClipboardExecutors.ts";
 import { networkReadContext } from "../network-and-storage/NetworkAndStorageExecutors.ts";

@@ -1,9 +1,5 @@
 // Clock advances and clipboard checks, which the session's clock and clipboard ports carry out.
-import {
-    advanceClock,
-    checkClipboard,
-    type ClockAndClipboardContext,
-} from "../../../clock-and-clipboard-steps.ts";
+import { advanceClock, checkClipboard, type ClockAndClipboardContext } from "./CheckClipboard.ts";
 import type { SessionContext, StepExecutorTable } from "../StepExecutor.ts";
 
 // What the clock and clipboard steps use: the run's session and values.

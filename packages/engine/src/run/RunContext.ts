@@ -20,17 +20,17 @@ import {
     type FixtureReference,
     type HostInfo,
 } from "@revisum/contracts";
-import type { DatabaseCommandContext } from "../database-commands/database-command-steps.ts";
-import type { Logger, RunEventSink } from "../logging.ts";
-import type { RunPins } from "../manifest.ts";
-import type { NamedScripts } from "../page-scripts/NamedScriptSources.ts";
+import type { DatabaseCommandContext } from "./executors/database-commands/RunDatabaseStep.ts";
+import type { Logger, RunEventSink } from "./logging/LoggingManifest.ts";
+import type { RunPins } from "./seal/BuildManifest.ts";
+import type { NamedScripts } from "./executors/page-scripts/NamedScriptSources.ts";
 import type { ClearedRun } from "../policy/ClearedRun.ts";
-import type { PolicyGate } from "../policy/policy-gate.ts";
-import type { RememberedValues } from "../RememberedValues.ts";
-import type { RunStep } from "../RunStep.ts";
-import type { RunValues } from "../run-values.ts";
-import type { ResolvedSecrets } from "../secrets/secret-resolution.ts";
-import type { CallStepContext } from "../service-calls/call-steps.ts";
+import type { PolicyGate } from "../policy/PolicyGate.ts";
+import type { RememberedValues } from "./values/RememberedValues.ts";
+import type { RunStep } from "./steps/RunStep.ts";
+import type { RunValues } from "./values/RunValues.ts";
+import type { ResolvedSecrets } from "../secrets/ResolvePlanSecrets.ts";
+import type { CallStepContext } from "./executors/service-calls/RunCallStep.ts";
 
 // How a cleared run is to be run. What it runs, under which project, on which target and as which
 // standing are the ClearedRun's alone.

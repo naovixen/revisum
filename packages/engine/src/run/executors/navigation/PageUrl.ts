@@ -9,7 +9,7 @@ import {
     type Result,
     type StepRecord,
 } from "@revisum/contracts";
-import { resolvePathTemplate } from "../../../run-values.ts";
+import { resolvePathTemplate } from "../../values/RunValues.ts";
 import { denialNow } from "../../ActGuarded.ts";
 import type { RunContext } from "../../RunContext.ts";
 import { deniedStep, type DeniedStep } from "../StepExecutor.ts";

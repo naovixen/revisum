@@ -22,13 +22,13 @@ import {
     type TestIdAttribute,
     type UnsafeFeature,
 } from "@revisum/contracts";
-import type { Limits, Project } from "../../project/project-parser.ts";
+import type { Limits, Project } from "../../project/ParseProject.ts";
 import {
     declaredCommands,
     declaredScripts,
     enabledUnsafeFeatures,
-} from "../../project/unsafe-feature-declarations.ts";
-import type { Issues } from "../plan-decoders.ts";
+} from "../../project/ReadUnsafeFeatures.ts";
+import type { Issues } from "./ReadRecord.ts";
 
 // What a plan may refer to, taken from the trusted project.
 export type PlanRules = {

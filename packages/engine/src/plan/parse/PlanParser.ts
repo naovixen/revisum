@@ -12,8 +12,8 @@
 // read only once the trusted project enables each one; a disabled one is refused with
 // unsafe_feature_disabled at the field that names it, every use of it, with nothing under it read.
 import { success, type Plan, type PlanData, type PlanError, type Result } from "@revisum/contracts";
-import { brand } from "../../brand.ts";
-import type { Project } from "../../project/project-parser.ts";
+import { brand } from "../../foundation/Brand.ts";
+import type { Project } from "../../project/ParseProject.ts";
 import { planRulesOf } from "./ParseContext.ts";
 import { readPlanData } from "./ReadPlanData.ts";
 

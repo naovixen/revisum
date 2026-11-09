@@ -20,23 +20,23 @@ const IN_PAGE_FILES = [
     "packages/auditor-act/src/in-page/MeasureOcclusion.ts",
     "packages/auditor-act/src/in-page/HideSampledText.ts",
     "packages/auditor-act/src/in-page/SettleFrames.ts",
-    "packages/driver-cdp/src/in-page/Actionability.ts",
-    "packages/driver-cdp/src/in-page/AdvanceDocumentClock.ts",
-    "packages/driver-cdp/src/in-page/AfterTwoFrames.ts",
-    "packages/driver-cdp/src/in-page/ArmHitCheck.ts",
-    "packages/driver-cdp/src/in-page/EnabledState.ts",
-    "packages/driver-cdp/src/in-page/FindByLabel.ts",
-    "packages/driver-cdp/src/in-page/FocusAndSelect.ts",
-    "packages/driver-cdp/src/in-page/GuardDetails.ts",
-    "packages/driver-cdp/src/in-page/MaskElements.ts",
-    "packages/driver-cdp/src/in-page/NodesAPressPasses.ts",
-    "packages/driver-cdp/src/in-page/PageAudit.ts",
-    "packages/driver-cdp/src/in-page/PageInfo.ts",
-    "packages/driver-cdp/src/in-page/ProbeElement.ts",
-    "packages/driver-cdp/src/in-page/ReadClipboardText.ts",
-    "packages/driver-cdp/src/in-page/ScriptResultText.ts",
-    "packages/driver-cdp/src/in-page/StructuralSelectorValidity.ts",
-    "packages/driver-cdp/src/in-page/WindowOfTheDocument.ts",
+    "packages/driver-cdp/src/in-page/elements/Actionability.ts",
+    "packages/driver-cdp/src/in-page/document/AdvanceDocumentClock.ts",
+    "packages/driver-cdp/src/in-page/document/AfterTwoFrames.ts",
+    "packages/driver-cdp/src/in-page/elements/ArmHitCheck.ts",
+    "packages/driver-cdp/src/in-page/elements/EnabledState.ts",
+    "packages/driver-cdp/src/in-page/elements/FindByLabel.ts",
+    "packages/driver-cdp/src/in-page/elements/FocusAndSelect.ts",
+    "packages/driver-cdp/src/in-page/elements/GuardDetails.ts",
+    "packages/driver-cdp/src/in-page/elements/MaskElements.ts",
+    "packages/driver-cdp/src/in-page/elements/NodesAPressPasses.ts",
+    "packages/driver-cdp/src/in-page/document/PageAudit.ts",
+    "packages/driver-cdp/src/in-page/document/PageInfo.ts",
+    "packages/driver-cdp/src/in-page/elements/ProbeElement.ts",
+    "packages/driver-cdp/src/in-page/document/ReadClipboardText.ts",
+    "packages/driver-cdp/src/in-page/document/ScriptResultText.ts",
+    "packages/driver-cdp/src/in-page/elements/StructuralSelectorValidity.ts",
+    "packages/driver-cdp/src/in-page/document/WindowOfTheDocument.ts",
 ];
 
 const everywhereSyntax = [
@@ -231,11 +231,6 @@ export default defineConfig([
     {
         files: ["packages/*/src/index.ts"],
         rules: { "no-restricted-syntax": ["error", ...everywhereSyntax] },
-    },
-    {
-        // An entry point of the package, like index.ts: named for what it is, not for an export.
-        files: ["packages/driver-cdp/src/testing.ts"],
-        rules: { "revisum/file-name-matches-export": "off" },
     },
     {
         // A test file is one long describe callback, so function length says nothing about it.

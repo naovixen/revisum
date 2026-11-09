@@ -2,23 +2,23 @@ import { hostAndPort, success, type Result } from "@revisum/contracts";
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import { createServer as createTcpServer } from "node:net";
 import type { Duplex } from "node:stream";
-import { directConnector, type AddressConnector } from "./AddressConnector.ts";
-import { systemResolver, type AddressResolver } from "./AddressResolver.ts";
-import { createAddressVetter } from "./AddressVetter.ts";
-import { TREATMENT_OF_CLIENT } from "./ClientTreatment.ts";
-import { connectingInTurn } from "./ConnectInTurn.ts";
+import { directConnector, type AddressConnector } from "./addresses/AddressConnector.ts";
+import { systemResolver, type AddressResolver } from "./addresses/AddressResolver.ts";
+import { createAddressVetter } from "./addresses/AddressVetter.ts";
+import { TREATMENT_OF_CLIENT } from "./requests/ClientTreatment.ts";
+import { connectingInTurn } from "./addresses/ConnectInTurn.ts";
 import type { EgressProxy } from "./EgressProxy.ts";
 import { createOpenSockets } from "./OpenSockets.ts";
-import { declarationLookup } from "./OriginDeclaration.ts";
-import { createOutboundGate } from "./OutboundGate.ts";
+import { declarationLookup } from "./addresses/OriginDeclaration.ts";
+import { createOutboundGate } from "./addresses/OutboundGate.ts";
 import { ProxyClient } from "./ProxyClient.ts";
 import { createProxyListeners, type PlannedListener } from "./ProxyListeners.ts";
 import { createProxyRecord, type ProxyRecordListeners } from "./ProxyRecord.ts";
-import type { ProxyRules } from "./ProxyRules.ts";
+import type { ProxyRules } from "./rules/ProxyRules.ts";
 import type { ProxyStartFailure } from "./ProxyStartFailure.ts";
-import { createTcpConnectionRelay } from "./RelayTcpConnection.ts";
-import { createRequestForwarder } from "./RequestForwarder.ts";
-import { createTunnelOpener } from "./TunnelOpener.ts";
+import { createTcpConnectionRelay } from "./tunnels/RelayTcpConnection.ts";
+import { createRequestForwarder } from "./requests/RequestForwarder.ts";
+import { createTunnelOpener } from "./tunnels/TunnelOpener.ts";
 
 export type ProxyServerOptions = ProxyRecordListeners & {
     // A service unless given.

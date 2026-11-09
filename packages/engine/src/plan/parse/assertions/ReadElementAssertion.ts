@@ -10,7 +10,7 @@ import {
     type TextOrValue,
 } from "@revisum/contracts";
 import type { ReadableInput } from "../../../decoding/ReadableCopy.ts";
-import { INVALID, isOneOf, readInteger, readOneOf, type Parsed } from "../../plan-decoders.ts";
+import { INVALID, isOneOf, readInteger, readOneOf, type Parsed } from "../ReadRecord.ts";
 import {
     ATTRIBUTE_NAME,
     CLASS_TOKEN,
@@ -20,7 +20,7 @@ import {
     MAXIMUM_STYLE_VALUE_LENGTH,
     MAXIMUM_URL_LENGTH,
     STYLE_PROPERTY,
-} from "../../plan-grammar.ts";
+} from "../../schema/PlanFields.ts";
 import { readFields } from "../../ReadFields.ts";
 import { knownField } from "../KnownField.ts";
 import { isFeatureEnabledElseRefused, type ParseContext } from "../ParseContext.ts";

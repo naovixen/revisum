@@ -4,8 +4,8 @@ import {
     RequestCountKind,
     type RequestCount,
 } from "@revisum/contracts";
-import { INVALID, readInteger, readRecord, type Parsed } from "../../plan-decoders.ts";
-import { MAXIMUM_EXPECTED_COUNT } from "../../plan-grammar.ts";
+import { INVALID, readInteger, readRecord, type Parsed } from "../ReadRecord.ts";
+import { MAXIMUM_EXPECTED_COUNT } from "../../schema/PlanFields.ts";
 import type { ParseContext } from "../ParseContext.ts";
 import { refuse } from "../Refuse.ts";
 import { readAssertionHead } from "./ReadAssertionHead.ts";

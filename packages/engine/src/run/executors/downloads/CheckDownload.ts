@@ -9,7 +9,7 @@ import {
     type StepRecord,
     type TextOrValue,
 } from "@revisum/contracts";
-import { resolveText } from "../../../run-values.ts";
+import { resolveText } from "../../values/RunValues.ts";
 import type { RunContext } from "../../RunContext.ts";
 import type { StepExecutor, StepNeeds } from "../StepExecutor.ts";
 

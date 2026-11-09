@@ -1,5 +1,5 @@
 import { stepFailed, StepOutcome } from "@revisum/contracts";
-import type { RunNavigateStep } from "../../../RunStep.ts";
+import type { RunNavigateStep } from "../../steps/RunStep.ts";
 import type { StepExecutor, StepNeeds } from "../StepExecutor.ts";
 import { pageUrl } from "./PageUrl.ts";
 

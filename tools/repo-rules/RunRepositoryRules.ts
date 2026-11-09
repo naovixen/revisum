@@ -1,0 +1,216 @@
+// Runs every check in `npm run lint` in one Node process, in a fixed order, and reports all their
+// failures. These are trust rules, so they stay here rather than in ESLint, where a suppression
+// would be an opt-out.
+// A rule's module loads only when that rule runs, so a check file that cannot load fails as its
+// own rule while the others still run, and `--only` starts no more code than it needs.
+//   node tools/repo-rules/RunRepositoryRules.ts                            every rule
+//   node tools/repo-rules/RunRepositoryRules.ts --only imports,glossary    just those rules
+//   node tools/repo-rules/RunRepositoryRules.ts --modules <folder>         the licence rule reads installed packages
+//                                                         from this folder, not node_modules
+import { resolve } from "node:path";
+import { reportProblems } from "./ReadWorkspacePackages.ts";
+
+export const RepositoryRuleName = {
+    Licences: "licences",
+    Layout: "layout",
+    Imports: "imports",
+    CompositionRoot: "composition-root",
+    ImportCycles: "import-cycles",
+    RuntimeImports: "runtime-imports",
+    BrandedCasts: "branded-casts",
+    PersonGates: "person-gates",
+    ApprovalStrength: "approval-strength",
+    ErrorAnchors: "error-anchors",
+    SecretReveal: "secret-reveal",
+    PlanSchema: "plan-schema",
+    DependencyReviews: "dependency-reviews",
+    DenyRules: "deny-rules",
+    Glossary: "glossary",
+} as const;
+
+export type RepositoryRuleName = (typeof RepositoryRuleName)[keyof typeof RepositoryRuleName];
+
+type RuleInput = { readonly root: string; readonly modulesFolder: string | undefined };
+
+export type RepositoryRule = {
+    // What the rule's problems and result line start with.
+    readonly label: string;
+    // The file under tools/ that holds the check.
+    readonly file: string;
+    check(input: RuleInput): Promise<readonly string[]>;
+};
+
+export const REPOSITORY_RULES: Readonly<Record<RepositoryRuleName, RepositoryRule>> = {
+    [RepositoryRuleName.Licences]: {
+        label: "licence check",
+        file: "repo-rules/docs/CheckLicences.ts",
+        check: async ({ root, modulesFolder }) =>
+            (await import("./docs/CheckLicences.ts")).checkLicences(root, modulesFolder),
+    },
+    [RepositoryRuleName.Layout]: {
+        label: "layout check",
+        file: "repo-rules/CheckLayout.ts",
+        check: async ({ root }) => (await import("./CheckLayout.ts")).checkLayout(root),
+    },
+    [RepositoryRuleName.Imports]: {
+        label: "import check",
+        file: "repo-rules/code/CheckImports.ts",
+        check: async ({ root }) => (await import("./code/CheckImports.ts")).checkImports(root),
+    },
+    [RepositoryRuleName.CompositionRoot]: {
+        label: "composition root check",
+        file: "repo-rules/code/CheckCompositionRoot.ts",
+        check: async ({ root }) =>
+            (await import("./code/CheckCompositionRoot.ts")).checkCompositionRoot(root),
+    },
+    [RepositoryRuleName.ImportCycles]: {
+        label: "import cycle check",
+        file: "repo-rules/code/CheckImportCycles.ts",
+        check: async ({ root }) =>
+            (await import("./code/CheckImportCycles.ts")).checkImportCycles(root),
+    },
+    [RepositoryRuleName.RuntimeImports]: {
+        label: "runtime import check",
+        file: "repo-rules/code/CheckRuntimeImports.ts",
+        check: async ({ root }) =>
+            (await import("./code/CheckRuntimeImports.ts")).checkRuntimeImports(root),
+    },
+    [RepositoryRuleName.BrandedCasts]: {
+        label: "branded-type check",
+        file: "repo-rules/code/CheckBrandedCasts.ts",
+        check: async ({ root }) =>
+            (await import("./code/CheckBrandedCasts.ts")).checkBrandedCasts(root),
+    },
+    [RepositoryRuleName.PersonGates]: {
+        label: "person gate check",
+        file: "repo-rules/code/CheckPersonGates.ts",
+        check: async ({ root }) =>
+            (await import("./code/CheckPersonGates.ts")).checkPersonGates(root),
+    },
+    [RepositoryRuleName.ApprovalStrength]: {
+        label: "approval strength check",
+        file: "repo-rules/code/CheckApprovalStrength.ts",
+        check: async ({ root }) =>
+            (await import("./code/CheckApprovalStrength.ts")).checkApprovalStrength(root),
+    },
+    [RepositoryRuleName.ErrorAnchors]: {
+        label: "error anchor check",
+        file: "repo-rules/docs/CheckErrorAnchors.ts",
+        check: async ({ root }) =>
+            (await import("./docs/CheckErrorAnchors.ts")).checkErrorAnchors(root),
+    },
+    [RepositoryRuleName.SecretReveal]: {
+        label: "secret reveal check",
+        file: "repo-rules/code/CheckSecretReveal.ts",
+        check: async ({ root }) =>
+            (await import("./code/CheckSecretReveal.ts")).checkSecretReveal(root),
+    },
+    [RepositoryRuleName.PlanSchema]: {
+        label: "plan schema check",
+        file: "repo-rules/docs/CheckPlanSchema.ts",
+        check: async ({ root }) =>
+            (await import("./docs/CheckPlanSchema.ts")).checkPlanSchema(root),
+    },
+    [RepositoryRuleName.DependencyReviews]: {
+        label: "dependency review check",
+        file: "repo-rules/docs/CheckDependencyReviews.ts",
+        check: async ({ root }) =>
+            (await import("./docs/CheckDependencyReviews.ts")).checkDependencyReviews(root),
+    },
+    [RepositoryRuleName.DenyRules]: {
+        label: "deny rule check",
+        file: "repo-rules/commits/CheckDenyRules.ts",
+        check: async ({ root }) =>
+            (await import("./commits/CheckDenyRules.ts")).checkDenyRules(root),
+    },
+    [RepositoryRuleName.Glossary]: {
+        label: "glossary check",
+        file: "repo-rules/docs/CheckGlossary.ts",
+        check: async ({ root }) => (await import("./docs/CheckGlossary.ts")).checkGlossary(root),
+    },
+};
+
+const ALL_RULE_NAMES: readonly RepositoryRuleName[] = Object.values(RepositoryRuleName);
+
+const isRepositoryRuleName = (word: string): word is RepositoryRuleName =>
+    ALL_RULE_NAMES.some((name) => name === word);
+
+export type RepositoryRuleChoice = {
+    readonly rules: readonly RepositoryRuleName[];
+    readonly modulesFolder: string | undefined;
+};
+
+// The chosen rules in the fixed order, however they were listed. Throws on any word it can't read,
+// so a mistyped rule name can never pass by running nothing.
+function readChoice(words: readonly string[]): RepositoryRuleChoice {
+    let chosen: readonly RepositoryRuleName[] = ALL_RULE_NAMES;
+    let modulesFolder: string | undefined;
+    for (let index = 0; index < words.length; index += 2) {
+        const flag = words[index];
+        const value = words[index + 1];
+        if (value === undefined) {
+            throw new Error(`${String(flag)} needs a value`);
+        }
+        if (flag === "--modules") {
+            modulesFolder = value;
+        } else if (flag === "--only") {
+            const listed = value.split(",");
+            const unknown = listed.filter((word) => !isRepositoryRuleName(word));
+            if (unknown.length > 0) {
+                throw new Error(
+                    `no rule is named ${unknown.join(", ")}; the rules are ${ALL_RULE_NAMES.join(", ")}`,
+                );
+            }
+            chosen = ALL_RULE_NAMES.filter((name) => listed.includes(name));
+        } else {
+            throw new Error(
+                `unknown flag ${String(flag)}; use --only <rule>[,<rule>] or --modules <folder>`,
+            );
+        }
+    }
+    return { rules: chosen, modulesFolder };
+}
+
+// Runs the chosen rules, printing each one's problems and result, and returns the exit status. A
+// rule that throws has failed; the rest still run.
+export async function runRepositoryRules(
+    root: string,
+    choice: RepositoryRuleChoice,
+): Promise<number> {
+    const failed: RepositoryRuleName[] = [];
+    const modulesFolder =
+        choice.modulesFolder === undefined ? undefined : resolve(root, choice.modulesFolder);
+    for (const name of choice.rules) {
+        const rule = REPOSITORY_RULES[name];
+        let problems: readonly string[];
+        try {
+            problems = await rule.check({ root, modulesFolder });
+        } catch (error) {
+            problems = [
+                `could not run: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`,
+            ];
+        }
+        if (reportProblems(rule.label, problems) !== 0) {
+            failed.push(name);
+        }
+    }
+    if (failed.length > 0) {
+        console.error(`repository rules failed: ${failed.join(", ")}`);
+    }
+    return failed.length === 0 ? 0 : 1;
+}
+
+async function main(root: string, words: readonly string[]): Promise<number> {
+    let choice: RepositoryRuleChoice;
+    try {
+        choice = readChoice(words);
+    } catch (error) {
+        console.error(error instanceof Error ? error.message : String(error));
+        return 2;
+    }
+    return runRepositoryRules(root, choice);
+}
+
+if (import.meta.main) {
+    process.exitCode = await main(process.cwd(), process.argv.slice(2));
+}

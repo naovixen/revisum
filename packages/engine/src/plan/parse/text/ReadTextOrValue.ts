@@ -5,9 +5,9 @@ import {
     type TextOrValue,
     type ValueReference,
 } from "@revisum/contracts";
-import { normalise } from "../../../oracle.ts";
-import { INVALID, type Parsed } from "../../plan-decoders.ts";
-import { readValueName } from "../../plan-values.ts";
+import { normalise } from "../../../run/outcome/Verdict.ts";
+import { INVALID, type Parsed } from "../ReadRecord.ts";
+import { readValueName } from "../declarations/ReadPlanClock.ts";
 import { readFields } from "../../ReadFields.ts";
 import type { ParseContext } from "../ParseContext.ts";
 import { refuse } from "../Refuse.ts";

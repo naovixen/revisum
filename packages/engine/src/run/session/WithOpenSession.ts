@@ -1,6 +1,6 @@
 // The scope a run's open session lives in: once it opens, it closes, whatever the use of it throws.
 import { success, type ClosedSession, type Result, type Unavailable } from "@revisum/contracts";
-import type { Planned } from "../../lifecycle.ts";
+import type { Planned } from "../outcome/Transition.ts";
 import type { BrokenDriver } from "../../target/GuardedDriver.ts";
 import type { RunContext } from "../RunContext.ts";
 import { closeKeepingTheResult } from "./CloseKeepingTheResult.ts";

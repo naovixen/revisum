@@ -95,7 +95,7 @@ One section per milestone exit: what `docs/system-design.md` §7 asked for, the 
 | `npm run check:containers`, Docker Desktop | 105 of 105 |
 | `npm run check:linux`, pinned image | 0 failures; 4 skips (same counts; 3 of the skips are in `proofs`) |
 
-The skips are `test/contract/dom-checks.test.ts:62` (a driver without `rememberedValues`) and, on Linux, the three clipboard-proof tests that need xclip.
+The skips are `test/browser/element-state/DomChecks.test.ts:62` (a driver without `rememberedValues`) and, on Linux, the three clipboard-proof tests that need xclip.
 
 **§7 slice.**
 

@@ -3,8 +3,8 @@
 // searched, so of the plan's own files only ReadWrittenText, which searches what this returns, may
 // import it.
 import type { SafeText } from "@revisum/contracts";
-import { brand } from "../brand.ts";
-import { INVALID, isUnsafeText, type Issues, type Parsed } from "./plan-decoders.ts";
+import { brand } from "../foundation/Brand.ts";
+import { INVALID, isUnsafeText, type Issues, type Parsed } from "./parse/ReadRecord.ts";
 
 export function readUnscannedText(
     input: unknown,

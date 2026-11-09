@@ -15,7 +15,7 @@ const CHROMIUM_VERSION = /\d+\.\d+\.\d+\.\d+/g;
 // Chromium on Windows keeps a "<version>.manifest" file beside its executable.
 const VERSION_MANIFEST = /^(\d+\.\d+\.\d+\.\d+)\.manifest$/;
 
-// The version, read from the path first: Chrome for Testing, as tools/install-browsers.ts installs
+// The version, read from the path first: Chrome for Testing, as tools/browsers/ChromeForTestingBuild.ts installs
 // it, lives in a folder named after its build. Running `--version` is avoided on purpose: on
 // Windows Chrome prints nothing for it, and it would start the browser on other systems.
 function chromiumVersion(executablePath: string): string | null {

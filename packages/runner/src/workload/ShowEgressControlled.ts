@@ -1,20 +1,20 @@
 // Egress control, shown before any code of the team's image runs: a network with no route out, the
 // proxy on it, and a probe on that network that fails to get out without the proxy.
 import { success, type Failure, type Result } from "@revisum/contracts";
-import type { ContainerEngine } from "../container-engine.ts";
-import type { ContainerScope } from "../ContainerScope.ts";
+import type { ContainerEngine } from "../containers/ContainerEngine.ts";
+import type { ContainerScope } from "../containers/ContainerScope.ts";
 import {
     DEFAULT_BRIDGE_NETWORK,
     ProxyRole,
     ownCodeMounts,
     probeRunNetwork,
     runImageContainer,
-} from "../run-containers.ts";
+} from "../containers/RunImageContainer.ts";
 import {
     proxyUnreachableDetail,
     startProxyContainer,
     type StartedProxy,
-} from "../StartProxyContainer.ts";
+} from "../egress/StartProxyContainer.ts";
 import type { CheckedWorkloadRequest } from "./CheckWorkloadRequest.ts";
 import { workloadRefused, type WorkloadRefusal } from "./WorkloadRefusal.ts";
 

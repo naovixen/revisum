@@ -6,20 +6,20 @@
 // tells them apart by `denial`, which only the one that came from a denied run holds, and by `manifest`,
 // which is null only on the one whose driver broke its promise before any step ran. The third, holding
 // a manifest and no denial, ran its steps and ended Errored by itself.
-import type { ApprovalLabel } from "../approval.ts";
-import type { Unavailable } from "../browser-driver.ts";
-import type { GuaranteeStatement, RunMode } from "../evidence-mode.ts";
-import type { StubAnswer } from "../network-and-storage.ts";
+import type { ApprovalLabel } from "../ports/Approval.ts";
+import type { Unavailable } from "../ports/BrowserDriver.ts";
+import type { GuaranteeStatement, RunMode } from "../modes/EvidenceMode.ts";
+import type { StubAnswer } from "../plan/steps/NetworkAndStorageStep.ts";
 import type { CleanupResult } from "./CleanupResult.ts";
-import type { Denial } from "./Denial.ts";
-import type { EvidenceRunRecord } from "./EvidenceRunRecord.ts";
-import type { PlanRefusal, SuiteRefusal } from "./Refusal.ts";
+import type { Denial } from "./refusals/Denial.ts";
+import type { EvidenceRunRecord } from "./records/EvidenceRunRecord.ts";
+import type { PlanRefusal, SuiteRefusal } from "./refusals/Refusal.ts";
 import type { EvidenceRunManifest, PlanRunManifest } from "./RunManifest.ts";
 import type { RunReviewItem } from "./RunReviewItem.ts";
 import type { StepResult } from "./StepResult.ts";
-import type { SuiteRunRecord } from "./SuiteRunRecord.ts";
+import type { SuiteRunRecord } from "./records/SuiteRunRecord.ts";
 import type { TerminalState } from "./TerminalState.ts";
-import type { UnsafeFeature } from "../UnsafeFeature.ts";
+import type { UnsafeFeature } from "../plan/UnsafeFeature.ts";
 
 export type RunTimings = {
     readonly totalMilliseconds: number;

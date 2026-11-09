@@ -1,7 +1,7 @@
 import type { StepCode } from "../foundation/StepCode.ts";
 import type { StepOutcome } from "../foundation/StepOutcome.ts";
-import type { CallName, ServiceCallErrorCode } from "../service-calls.ts";
-import type { CommandName } from "../unsafe-plan-features.ts";
+import type { CallName, ServiceCallErrorCode } from "../plan/steps/ServiceCaller.ts";
+import type { CommandName } from "../plan/steps/UnsafeFeaturesDeclaration.ts";
 
 // What a cleanup step ran: one of the plan's declared calls, or one of its database commands.
 export type CleanupSubject = { readonly call: CallName } | { readonly command: CommandName };

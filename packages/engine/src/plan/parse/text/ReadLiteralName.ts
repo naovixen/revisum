@@ -1,6 +1,6 @@
 import { PlanErrorCode, type SafeText } from "@revisum/contracts";
-import { INVALID, type Parsed } from "../../plan-decoders.ts";
-import { MAXIMUM_LITERAL_NAME_LENGTH } from "../../plan-grammar.ts";
+import { INVALID, type Parsed } from "../ReadRecord.ts";
+import { MAXIMUM_LITERAL_NAME_LENGTH } from "../../schema/PlanFields.ts";
 import type { ParseContext } from "../ParseContext.ts";
 import { refuse } from "../Refuse.ts";
 import { readWrittenText } from "./ReadWrittenText.ts";

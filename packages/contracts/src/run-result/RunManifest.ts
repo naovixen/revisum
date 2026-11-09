@@ -1,12 +1,12 @@
 // The run manifest: every input that decides a run's result, so a run can be replayed and compared.
 // The engine builds and hashes it.
-import type { AdapterInfo } from "../browser-driver.ts";
-import type { ImageDigest, SuiteName } from "../evidence-mode.ts";
-import type { AppliedRewrite } from "../isolated-runner.ts";
-import type { RedactionMode } from "../secret.ts";
-import type { Target } from "../target.ts";
-import type { SecretName } from "../SecretName.ts";
-import type { UnsafeFeature } from "../UnsafeFeature.ts";
+import type { AdapterInfo } from "../ports/BrowserDriver.ts";
+import type { ImageDigest, SuiteName } from "../modes/EvidenceMode.ts";
+import type { AppliedRewrite } from "../ports/Runner.ts";
+import type { RedactionMode } from "../ports/Secret.ts";
+import type { Target } from "../ports/Target.ts";
+import type { SecretName } from "../plan/SecretName.ts";
+import type { UnsafeFeature } from "../plan/UnsafeFeature.ts";
 
 // A file of the app under test, by content hash.
 export type FixtureReference = { readonly path: string; readonly sha256: string };

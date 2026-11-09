@@ -3,9 +3,9 @@ import {
     DATABASE_COMMANDS_INPUT,
     unsafeFeatureRecord,
     type buildManifest,
-} from "../../manifest.ts";
+} from "../seal/BuildManifest.ts";
 import { callsServices, runsDatabaseCommands } from "../../plan/CallsServices.ts";
-import { secretRecords } from "../../secrets/secret-resolution.ts";
+import { secretRecords } from "../../secrets/ResolvePlanSecrets.ts";
 import type { PreflightPassed } from "../preflight/CheckPreflight.ts";
 import type { RunContext } from "../RunContext.ts";
 import type { OpenedSession } from "./OpenSession.ts";

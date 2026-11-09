@@ -2,8 +2,8 @@
 // stopped by removing its container, and the wait for that to end the command is bounded, so a daemon
 // that never answers cannot hold the run open.
 import { WorkloadStop, success, type ExecOutcome, type Result } from "@revisum/contracts";
-import type { ContainerEngine, EngineProblem } from "../container-engine.ts";
-import type { ContainerScope } from "../ContainerScope.ts";
+import type { ContainerEngine, EngineProblem } from "../containers/ContainerEngine.ts";
+import type { ContainerScope } from "../containers/ContainerScope.ts";
 import type { CheckedWorkloadRequest } from "./CheckWorkloadRequest.ts";
 import { workloadRefused, type WorkloadRefusal } from "./WorkloadRefusal.ts";
 

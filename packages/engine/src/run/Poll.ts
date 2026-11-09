@@ -5,8 +5,8 @@ import {
     type DocumentSession,
     type PageReadFailure,
 } from "@revisum/contracts";
-import type { Logger } from "../logging.ts";
-import type { Verdict } from "../oracle.ts";
+import type { Logger } from "./logging/LoggingManifest.ts";
+import type { Verdict } from "./outcome/Verdict.ts";
 import { codeOfFailedRead } from "./CodeForThrow.ts";
 import { pollUntil } from "./PollUntil.ts";
 import type { RunContext } from "./RunContext.ts";

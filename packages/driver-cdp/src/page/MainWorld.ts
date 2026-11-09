@@ -6,13 +6,13 @@ import {
     EVALUATE,
     RELEASE_OBJECT,
     RELEASE_OBJECT_GROUP,
-} from "../connection/RuntimeDomain.ts";
-import { DESCRIBE_NODE, RESOLVE_NODE } from "../connection/DomDomain.ts";
-import { GET_EVENT_LISTENERS } from "../connection/DomDebuggerDomain.ts";
+} from "../connection/domains/RuntimeDomain.ts";
+import { DESCRIBE_NODE, RESOLVE_NODE } from "../connection/domains/DomDomain.ts";
+import { GET_EVENT_LISTENERS } from "../connection/domains/DomDebuggerDomain.ts";
 import type { RemoteObject } from "../connection/RemoteObject.ts";
-import { isNotDisabledByItsProperty } from "../in-page/EnabledState.ts";
-import { scriptResultText } from "../in-page/ScriptResultText.ts";
-import { windowOfTheDocument } from "../in-page/WindowOfTheDocument.ts";
+import { isNotDisabledByItsProperty } from "../in-page/elements/EnabledState.ts";
+import { scriptResultText } from "../in-page/document/ScriptResultText.ts";
+import { windowOfTheDocument } from "../in-page/document/WindowOfTheDocument.ts";
 import { AWAITED_VALUE, callArgumentsOf, textOfCall, throwIfThePageThrew } from "./CallDelivery.ts";
 import type { PageCommands } from "./PageCommands.ts";
 import type { PageFunction } from "./PageFunction.ts";

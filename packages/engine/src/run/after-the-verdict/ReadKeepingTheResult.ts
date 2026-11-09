@@ -2,7 +2,7 @@
 // the run has ended before them, and a person needs the result more than anything a broken session
 // or log has left to say.
 import { RunReviewItemCode, StepCode, type Result } from "@revisum/contracts";
-import type { Logger } from "../../logging.ts";
+import type { Logger } from "../logging/LoggingManifest.ts";
 import { errorText } from "../CodeForThrow.ts";
 import { RECORD_UNREAD, recordRead, type RecordRead } from "./RecordRead.ts";
 

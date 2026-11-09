@@ -15,8 +15,8 @@ import {
     GET_STORAGE_ITEMS,
     REMOVE_STORAGE_ITEM,
     SET_STORAGE_ITEM,
-} from "../connection/DomStorageDomain.ts";
-import { PageHeldByDialog } from "../page/PageHeldByDialog.ts";
+} from "../connection/domains/DomStorageDomain.ts";
+import { PageHeldByDialog } from "../page/failures/PageHeldByDialog.ts";
 
 // Sends a command to the page, failing at once when its renderer has died.
 export type PageCommand = <CommandParameters, Reply>(

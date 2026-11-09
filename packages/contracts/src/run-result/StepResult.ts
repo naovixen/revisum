@@ -1,17 +1,17 @@
 // What a run keeps of each step: where it stands in the plan, its outcome, and the records it left.
 // A failed step always holds the code it failed with; a passed one holds a code only to say what it
 // left out; a skipped one holds nothing else.
-import type { A11yFinding } from "../browser-driver.ts";
+import type { A11yFinding } from "../ports/BrowserDriver.ts";
 import type { StepCode } from "../foundation/StepCode.ts";
 import type { StepOutcome } from "../foundation/StepOutcome.ts";
-import type { StubName } from "../network-and-storage.ts";
-import type { DatabaseCommandRecord } from "./DatabaseCommandRecord.ts";
-import type { DownloadRecord } from "./DownloadRecord.ts";
-import type { PageScriptRecord } from "./PageScriptRecord.ts";
-import type { RememberedValueRecord } from "./RememberedValueRecord.ts";
-import type { ServiceCallRecord } from "./ServiceCallRecord.ts";
-import type { StepType } from "../StepType.ts";
-import type { ArtifactReference } from "../ArtifactReference.ts";
+import type { StubName } from "../plan/steps/NetworkAndStorageStep.ts";
+import type { DatabaseCommandRecord } from "./records/DatabaseCommandRecord.ts";
+import type { DownloadRecord } from "./records/DownloadRecord.ts";
+import type { PageScriptRecord } from "./records/PageScriptRecord.ts";
+import type { RememberedValueRecord } from "./records/RememberedValueRecord.ts";
+import type { ServiceCallRecord } from "./records/ServiceCallRecord.ts";
+import type { StepType } from "../plan/StepType.ts";
+import type { ArtifactReference } from "./ArtifactReference.ts";
 
 // What a step that ran may leave beside its outcome, whether it passed or failed.
 export type StepRecords = {

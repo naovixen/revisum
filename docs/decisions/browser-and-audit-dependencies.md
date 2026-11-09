@@ -23,14 +23,14 @@ Each review uses the `DependencyReview` shape from `docs/specs/SPEC-00-repo-seed
 
 | Development tool | Version | Licence | Why | Decision |
 |---|---|---|---|---|
-| `@puppeteer/browsers` | 3.2.6, exact | Apache-2.0; its dependencies are MIT and ISC | Downloads Chrome for Testing 156.0.8078.47 into `.browsers/`, the cache layout `test/support/browsers.ts` reads. Run by `npm run browsers`; nothing imports it at run time | Keep, development only |
+| `@puppeteer/browsers` | 3.2.6, exact | Apache-2.0; its dependencies are MIT and ISC | Downloads Chrome for Testing 156.0.8078.47 into `.browsers/`, the cache layout `test/support/browser/Browsers.ts` reads. Run by `npm run browsers`; nothing imports it at run time | Keep, development only |
 
 Evidence:
 
 - Licences: the `license` field and licence file in each package's npm release.
 - `axe-core` files unmodified: `auditor-axe` and `driver-playwright` read `axe.min.js` from `node_modules/axe-core` as published; neither package copies or edits it.
-- Version pins: `test/unit/auditor-act/rule-set.test.ts` checks that `auditor-axe` depends on `axe-core` 4.14.0 exactly.
-- Driver behaviour: `test/contract/driver-contract.test.ts` runs the same contract against the Playwright targets and the own CDP driver.
+- Version pins: `test/unit/auditor-act/rules/RuleSet.test.ts` checks that `auditor-axe` depends on `axe-core` 4.14.0 exactly.
+- Driver behaviour: `test/browser/lifecycle/DriverContract.test.ts` runs the same contract against the Playwright targets and the own CDP driver.
 
 ## Findings
 
@@ -51,5 +51,5 @@ Changed by the founder, 2026-11-02. This record is kept as it was written; read 
 
 - `driver-playwright` is deleted. Chromium only in phase 1; SPEC-19 adds Firefox through BiDi later. `playwright-core` is no longer an optional adapter and has no dependency review: it is a root dev dependency only, for evidence mode's test workload (`docs/decisions/dev-dependencies.md`).
 - `axe-core` stays pinned in `auditor-axe` alone; the Playwright driver's own copy of the audit step is gone.
-- `npm run browsers` installs only Chrome for Testing and its headless shell. CI, the weekly upkeep job and the dev container install Chromium's system libraries with `tools/install-system-libraries.sh`, not with Playwright's installer.
+- `npm run browsers` installs only Chrome for Testing and its headless shell. CI, the weekly upkeep job and the dev container install Chromium's system libraries with `tools/browsers/install-system-libraries.sh`, not with Playwright's installer.
 - The driver contract now runs on the CDP driver only (two Chromium builds), so the `adapters-substitutable` guarantee is withdrawn until SPEC-19 brings a second driver.

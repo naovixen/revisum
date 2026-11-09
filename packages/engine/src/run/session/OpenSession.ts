@@ -7,18 +7,18 @@ import {
     type Target,
     type Unavailable,
 } from "@revisum/contracts";
-import { totalClockAdvanceMilliseconds } from "../../clock-advance.ts";
-import type { Planned } from "../../lifecycle.ts";
-import { DETERMINISM_INPUTS } from "../../manifest.ts";
-import { reachableOrigins } from "../../ReachableOrigins.ts";
-import { resolvePlanClock } from "../../run-values.ts";
-import { adapterRegistry } from "../../target/adapter-registry.ts";
+import { totalClockAdvanceMilliseconds } from "../executors/clock-and-clipboard/ClockAdvanceMilliseconds.ts";
+import type { Planned } from "../outcome/Transition.ts";
+import { DETERMINISM_INPUTS } from "../seal/BuildManifest.ts";
+import { reachableOrigins } from "../../policy/ReachableOrigins.ts";
+import { resolvePlanClock } from "../values/RunValues.ts";
+import { adapterRegistry } from "../../target/AdapterRegistry.ts";
 import {
     guardedDriver,
     type BrokenDriver,
     type GuardedDriver,
 } from "../../target/GuardedDriver.ts";
-import { BROWSER_BUILD_INPUT, checkPinnedBuild } from "../../target/target-lock.ts";
+import { BROWSER_BUILD_INPUT, checkPinnedBuild } from "../../target/ReadLockfile.ts";
 import type { RunContext } from "../RunContext.ts";
 
 export type OpenedSession = {

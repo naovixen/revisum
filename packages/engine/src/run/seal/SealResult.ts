@@ -12,11 +12,11 @@ import {
     type PlanDriverBrokeResult,
     type UnsafeFeature,
 } from "@revisum/contracts";
-import { approvalLabel } from "../../approval/plan-standing.ts";
-import { guaranteeStatement } from "../../guarantees.ts";
-import type { Logger } from "../../logging.ts";
+import { approvalLabel } from "../../approval/PlanStanding.ts";
+import { guaranteeStatement } from "./GuaranteeStatement.ts";
+import type { Logger } from "../logging/LoggingManifest.ts";
 import { callsServices } from "../../plan/CallsServices.ts";
-import { unsafeFeaturesOf } from "../../plan/unsafe-features.ts";
+import { unsafeFeaturesOf } from "../../plan/UnsafeFeaturesOf.ts";
 import { readKeepingTheResult } from "../after-the-verdict/ReadKeepingTheResult.ts";
 import type { TargetNotDeclared } from "../../policy/TargetNotDeclared.ts";
 import type { RunPorts } from "../RunContext.ts";

@@ -13,7 +13,7 @@ import type {
     StepType,
     StubName,
 } from "@revisum/contracts";
-import type { ContainerRunStep, RunStep, RunStepByType } from "../../RunStep.ts";
+import type { ContainerRunStep, RunStep, RunStepByType } from "../steps/RunStep.ts";
 import type { RunContext } from "../RunContext.ts";
 
 // The run's context once its session is open.

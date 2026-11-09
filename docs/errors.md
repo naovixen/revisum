@@ -3,7 +3,7 @@
 ## In short
 
 - Every code of every closed error-code union has a heading here, so the link `errors#<code>` explains it.
-- `npm run lint` fails, naming the code, when a code has no heading or a heading names a code no union holds (`tools/check-error-anchors.ts`).
+- `npm run lint` fails, naming the code, when a code has no heading or a heading names a code no union holds (`tools/repo-rules/docs/CheckErrorAnchors.ts`).
 - Plan codes use underscores (`unknown_step`); every other union uses hyphens (`not-found`).
 - Each code says what was refused and what to do. Errors carry a code and a location, never the offending value, so private or hostile text is never echoed back.
 

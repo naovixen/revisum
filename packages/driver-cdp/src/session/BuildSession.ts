@@ -9,13 +9,13 @@ import {
     type SessionEnvironment,
     type SessionTab,
 } from "@revisum/contracts";
-import { hitChecks } from "../page/HitChecks.ts";
+import { hitChecks } from "../page/checks/HitChecks.ts";
 import type { PageFunction } from "../page/PageFunction.ts";
 import type { PageWithInput } from "../page/PageOperations.ts";
-import { documentPorts } from "./DocumentPorts.ts";
+import { documentPorts } from "./document/DocumentPorts.ts";
 import type { DriverSession } from "./DriverSession.ts";
 import type { SessionDetails, TabDetails } from "./SessionDetails.ts";
-import { CRASHED } from "./WaitUntilActionable.ts";
+import { CRASHED } from "./actions/WaitUntilActionable.ts";
 
 // Opens a second tab and loads the URL in it. A tab whose page does not load is closed at once.
 async function newTabAt(

@@ -5,7 +5,7 @@ import {
     type ResolvedDownloadStep,
     type DownloadRecord,
 } from "@revisum/contracts";
-import { resolveLocator } from "../../../run-values.ts";
+import { resolveLocator } from "../../values/RunValues.ts";
 import { actGuarded } from "../../ActGuarded.ts";
 import { keptText } from "../../Observe.ts";
 import type { StepContext, StepExecutor, StepNeeds } from "../StepExecutor.ts";

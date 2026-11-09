@@ -9,8 +9,8 @@ import {
     type ResponseAssertion,
 } from "@revisum/contracts";
 import type { ReadableInput } from "../../../decoding/ReadableCopy.ts";
-import { INVALID, isOneOf, readInteger, readOneOf, type Parsed } from "../../plan-decoders.ts";
-import { RESPONSE_STATUS } from "../../plan-grammar.ts";
+import { INVALID, isOneOf, readInteger, readOneOf, type Parsed } from "../ReadRecord.ts";
+import { RESPONSE_STATUS } from "../../schema/PlanFields.ts";
 import { readFields } from "../../ReadFields.ts";
 import { readDeclaredField } from "../declarations/ReadDeclared.ts";
 import { knownField } from "../KnownField.ts";

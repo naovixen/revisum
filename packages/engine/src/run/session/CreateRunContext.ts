@@ -1,17 +1,17 @@
 // The context of a run that passed preflight: what its steps run with.
 import type { SafeText, ValueName } from "@revisum/contracts";
-import type { DatabaseCommandContext } from "../../database-commands/database-command-steps.ts";
+import type { DatabaseCommandContext } from "../executors/database-commands/RunDatabaseStep.ts";
 import type { ClearedRun } from "../../policy/ClearedRun.ts";
-import { policyGate } from "../../policy/policy-gate.ts";
-import { rememberedValues } from "../../RememberedValues.ts";
-import { generateRunValues } from "../../run-values.ts";
+import { policyGate } from "../../policy/PolicyGate.ts";
+import { rememberedValues } from "../values/RememberedValues.ts";
+import { generateRunValues } from "../values/RunValues.ts";
 import {
     commandSecretStore,
     resolvedSecretStore,
     secretEchoRemoval,
     shortSecretObservation,
-} from "../../secrets/secret-resolution.ts";
-import type { CallStepContext } from "../../service-calls/call-steps.ts";
+} from "../../secrets/ResolvePlanSecrets.ts";
+import type { CallStepContext } from "../executors/service-calls/RunCallStep.ts";
 import type { PreflightPassed } from "../preflight/CheckPreflight.ts";
 import type { RunContext, RunInputs, RunPorts } from "../RunContext.ts";
 import type { RunLogging } from "../RunLogging.ts";

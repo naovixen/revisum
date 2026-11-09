@@ -3,7 +3,7 @@
 // a reader names every field of its type, so a new field does not compile until its reader reads it.
 import type { Locator, StepByType, StepType } from "@revisum/contracts";
 import type { ReadableInput, ReadableRecord } from "../../../decoding/ReadableCopy.ts";
-import type { Parsed } from "../../plan-decoders.ts";
+import type { Parsed } from "../ReadRecord.ts";
 import type { FieldOf } from "../../StepFacts.ts";
 import { readLocator } from "../locators/ReadLocator.ts";
 import type { ParseContext } from "../ParseContext.ts";

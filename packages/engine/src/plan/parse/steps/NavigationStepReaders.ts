@@ -1,5 +1,5 @@
 import { SCRIPT_MODES, StepType } from "@revisum/contracts";
-import { allValid, INVALID, readOneOf } from "../../plan-decoders.ts";
+import { allValid, INVALID, readOneOf } from "../ReadRecord.ts";
 import type { StepSection, StepTypeIn } from "../../StepFacts.ts";
 import { readNavigation } from "../text/ReadNavigation.ts";
 import { readWhenPresent, type StepReaderTable } from "./StepReader.ts";

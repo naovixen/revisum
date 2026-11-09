@@ -1,9 +1,5 @@
 // Page scripts, which run through the script port of the document the step stands in.
-import {
-    runEvaluate,
-    runScriptCheck,
-    type PageScriptContext,
-} from "../../../page-scripts/page-script-steps.ts";
+import { runEvaluate, runScriptCheck, type PageScriptContext } from "./RunEvaluate.ts";
 import type { RunContext } from "../../RunContext.ts";
 import type { StepExecutorTable } from "../StepExecutor.ts";
 

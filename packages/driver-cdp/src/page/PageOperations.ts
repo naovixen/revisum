@@ -2,9 +2,9 @@
 // PageOperations into a Session, so auto-waiting, probes and audits behave the same on every
 // protocol. One PageOperations serves one document: the page's top document, or an iframe's.
 import type { A11yNode, Key } from "@revisum/contracts";
-import type { HeldModifierKey } from "./HeldModifierKeys.ts";
+import type { HeldModifierKey } from "./input/HeldModifierKeys.ts";
 import type { PageFunction } from "./PageFunction.ts";
-import type { PressCheck, PressSent } from "./PressCheck.ts";
+import type { PressCheck, PressSent } from "./checks/PressCheck.ts";
 
 export type Point = { readonly x: number; readonly y: number };
 

@@ -15,18 +15,22 @@ import {
     type WorkloadRequest,
     type WorkloadRunner,
 } from "@revisum/contracts";
-import { answeringEngine } from "../AnsweringEngine.ts";
-import { NetworkFailureKind, type ContainerEngine } from "../container-engine.ts";
-import { NetworkKind, withContainerScope, type ContainerScope } from "../ContainerScope.ts";
-import { dependenciesVolumeFor } from "../run-containers.ts";
-import { safeLog } from "../SafeLog.ts";
-import { capturedOutput } from "./CapturedOutput.ts";
+import { answeringEngine } from "../containers/AnsweringEngine.ts";
+import { NetworkFailureKind, type ContainerEngine } from "../containers/ContainerEngine.ts";
+import {
+    NetworkKind,
+    withContainerScope,
+    type ContainerScope,
+} from "../containers/ContainerScope.ts";
+import { dependenciesVolumeFor } from "../containers/RunImageContainer.ts";
+import { safeLog } from "../containers/SafeLog.ts";
+import { capturedOutput } from "./output/CapturedOutput.ts";
 import { checkWorkloadRequest, type CheckedWorkloadRequest } from "./CheckWorkloadRequest.ts";
 import { pinWorkloadImages } from "./PinWorkloadImages.ts";
-import { removeFromOutput } from "./RemoveFromOutput.ts";
+import { removeFromOutput } from "./output/RemoveFromOutput.ts";
 import { runCommandUnderTimeout } from "./RunCommandUnderTimeout.ts";
 import { showEgressControlled } from "./ShowEgressControlled.ts";
-import { startTeamContainer } from "./StartTeamContainer.ts";
+import { startTeamContainer } from "./team-container/StartTeamContainer.ts";
 import { readWorkloadEgress } from "./ReadWorkloadEgress.ts";
 import type { WorkloadLog, WorkloadRefusal } from "./WorkloadRefusal.ts";
 

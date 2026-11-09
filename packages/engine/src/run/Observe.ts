@@ -1,8 +1,8 @@
 // What a result may keep of what the page showed: redacted, and never a secret or a remembered value.
 import { isOneElementRead, UnreadablePage, type ElementProbe } from "@revisum/contracts";
-import { normalise } from "../oracle.ts";
-import { SENSITIVE_PLACEHOLDER } from "../redaction.ts";
-import { SECRET_PLACEHOLDER } from "../secrets/secret-values.ts";
+import { normalise } from "./outcome/Verdict.ts";
+import { SENSITIVE_PLACEHOLDER } from "../secrets/DefaultRedactor.ts";
+import { SECRET_PLACEHOLDER } from "../secrets/SecretRedaction.ts";
 import type { RunContext } from "./RunContext.ts";
 
 // The longest text a result keeps of what the page or a server wrote.

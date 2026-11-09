@@ -8,10 +8,16 @@ import {
     type StepResult,
     type StubAnswer,
 } from "@revisum/contracts";
-import { COMMAND_ERROR_CODES } from "../../database-commands/database-command-steps.ts";
-import { deny, finish, type DeniedRun, type Finished, type Running } from "../../lifecycle.ts";
+import { COMMAND_ERROR_CODES } from "../executors/database-commands/RunDatabaseStep.ts";
+import {
+    deny,
+    finish,
+    type DeniedRun,
+    type Finished,
+    type Running,
+} from "../outcome/Transition.ts";
 import { isSetupStepType } from "../../plan/StepFacts.ts";
-import { NO_ANSWER_CODES } from "../../service-calls/call-steps.ts";
+import { NO_ANSWER_CODES } from "../executors/service-calls/RunCallStep.ts";
 import type { RecordRead } from "../after-the-verdict/RecordRead.ts";
 import type { TimedStep } from "./TimedStep.ts";
 

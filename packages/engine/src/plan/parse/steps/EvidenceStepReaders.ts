@@ -1,8 +1,8 @@
 import { AUDIT_MODES, PlanErrorCode, StepType } from "@revisum/contracts";
-import { brand } from "../../../brand.ts";
-import { looksLikeCredential } from "../../literal-secrets.ts";
-import { INVALID, readOneOf } from "../../plan-decoders.ts";
-import { CAPTURE_NAME } from "../../plan-grammar.ts";
+import { brand } from "../../../foundation/Brand.ts";
+import { looksLikeCredential } from "../../LooksLikeCredential.ts";
+import { INVALID, readOneOf } from "../ReadRecord.ts";
+import { CAPTURE_NAME } from "../../schema/PlanFields.ts";
 import type { StepSection, StepTypeIn } from "../../StepFacts.ts";
 import { refuse } from "../Refuse.ts";
 import type { StepReaderTable } from "./StepReader.ts";

@@ -1,6 +1,6 @@
 # Plan language changelog
 
-Newest entry first. Each entry names the sha256 of `plan.schema.json` as it stood after the change, and `npm run lint` fails when the newest entry does not name the committed schema's hash, so the schema cannot change without an entry here. Regenerate the schema with `node tools/check-plan-schema.ts --write`, which prints the hash to record.
+Newest entry first. Each entry names the sha256 of `plan.schema.json` as it stood after the change, and `npm run lint` fails when the newest entry does not name the committed schema's hash, so the schema cannot change without an entry here. Regenerate the schema with `node tools/repo-rules/docs/CheckPlanSchema.ts --write`, which prints the hash to record.
 
 ## 1.3 (unreleased)
 

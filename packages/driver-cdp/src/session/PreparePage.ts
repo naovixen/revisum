@@ -21,9 +21,9 @@ import {
     FAIL_REQUEST,
     FULFIL_REQUEST,
     GET_RESPONSE_BODY,
-} from "../connection/FetchDomain.ts";
+} from "../connection/domains/FetchDomain.ts";
 import { errorText } from "../connection/ErrorText.ts";
-import { CLICK_WATCH_SCRIPT } from "../page/HitChecks.ts";
+import { CLICK_WATCH_SCRIPT } from "../page/checks/HitChecks.ts";
 import type { PageWatch } from "../page/PageWatch.ts";
 import { PRESS_REPORT_BINDING, WorldName } from "../page/WorldName.ts";
 import { isAllowedUrl } from "./IsAllowedUrl.ts";

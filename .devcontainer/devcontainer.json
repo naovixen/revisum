@@ -20,7 +20,7 @@
   ],
   // The volume starts owned by root. Chromium needs system libraries, installed as in CI. The repo folder
   // is owned by the Windows user, so git needs safe.directory to read it; that grants no push access.
-  "postCreateCommand": "sudo chown node node_modules && npm ci && sudo bash tools/install-system-libraries.sh && git config --global --add safe.directory ${containerWorkspaceFolder} && (git config --global --unset-all credential.helper || true)",
+  "postCreateCommand": "sudo chown node node_modules && npm ci && sudo bash tools/browsers/install-system-libraries.sh && git config --global --add safe.directory ${containerWorkspaceFolder} && (git config --global --unset-all credential.helper || true)",
   "customizations": {
     "vscode": {
       "settings": {

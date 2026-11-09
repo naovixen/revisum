@@ -1,7 +1,7 @@
 // How the run carries out each step type: one executor per type, grouped as the plan language's
 // sections are.
 import type { StepType } from "@revisum/contracts";
-import type { RunStep, RunStepByType } from "../../RunStep.ts";
+import type { RunStep, RunStepByType } from "../steps/RunStep.ts";
 import { actOnElement } from "./actions/ActOnElement.ts";
 import { answerDialog } from "./actions/AnswerDialog.ts";
 import { fillField } from "./actions/FillField.ts";

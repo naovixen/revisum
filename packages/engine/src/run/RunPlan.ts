@@ -7,9 +7,9 @@
 // through its clock and clipboard ports; page scripts through its script port. Database commands
 // go through the run's DatabaseCommandRunner port, which runs each in a workload container.
 import { StepCode, type ClosedSession, type PlanRunResult } from "@revisum/contracts";
-import { plan as planRun, resolve, targetUnavailable, type Planned } from "../lifecycle.ts";
-import type { Logger } from "../logging.ts";
-import { buildManifest, manifestHash } from "../manifest.ts";
+import { plan as planRun, resolve, targetUnavailable, type Planned } from "./outcome/Transition.ts";
+import type { Logger } from "./logging/LoggingManifest.ts";
+import { buildManifest, manifestHash } from "./seal/BuildManifest.ts";
 import { assertBranded } from "../plan/parse/PlanParser.ts";
 import { assertCleared, type ClearedRun } from "../policy/ClearedRun.ts";
 import { isBrokenDriver } from "../target/GuardedDriver.ts";

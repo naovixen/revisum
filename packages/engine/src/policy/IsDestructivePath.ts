@@ -1,7 +1,7 @@
 // How the policy gate reads a URL's path: the way servers commonly read it, so no spelling of a
 // destructive path slips past.
 import type { AllowedUrl } from "@revisum/contracts";
-import type { ProjectPolicy } from "../project/project-parser.ts";
+import type { ProjectPolicy } from "../project/ParseProject.ts";
 
 // Only used to read the path of a URL that is relative to the app under test.
 const RELATIVE_BASE = new URL("https://relative.invalid");

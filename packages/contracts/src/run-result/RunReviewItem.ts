@@ -1,7 +1,7 @@
-import type { SuiteTestId } from "../evidence-mode.ts";
-import { ServiceCallErrorCode } from "../service-calls.ts";
+import type { SuiteTestId } from "../modes/EvidenceMode.ts";
+import { ServiceCallErrorCode } from "../plan/steps/ServiceCaller.ts";
 import { EvidenceOutcomeCode } from "./EvidenceOutcomeCode.ts";
-import type { SafeText } from "../TextOrValue.ts";
+import type { SafeText } from "../plan/TextOrValue.ts";
 
 // A record a plan run reads from the session once its steps have run, left unread: the request
 // decisions the browser refused, what the egress proxy rewrote, or which stubs answered.

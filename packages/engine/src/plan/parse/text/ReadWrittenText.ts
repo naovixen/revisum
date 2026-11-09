@@ -1,6 +1,6 @@
 import { PlanErrorCode, type SafeText } from "@revisum/contracts";
-import { looksLikeCredential } from "../../literal-secrets.ts";
-import { INVALID, type Parsed } from "../../plan-decoders.ts";
+import { looksLikeCredential } from "../../LooksLikeCredential.ts";
+import { INVALID, type Parsed } from "../ReadRecord.ts";
 import { readUnscannedText } from "../../ReadUnscannedText.ts";
 import type { ParseContext } from "../ParseContext.ts";
 import { refuse } from "../Refuse.ts";

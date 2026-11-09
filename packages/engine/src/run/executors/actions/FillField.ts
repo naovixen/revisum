@@ -10,9 +10,9 @@ import {
     type Result,
     type StepCode,
 } from "@revisum/contracts";
-import { canonicalJson } from "../../../hashing.ts";
-import type { RunFillStep } from "../../../RunStep.ts";
-import { resolveFillText, resolveLocator } from "../../../run-values.ts";
+import { canonicalJson } from "../../../foundation/Sha256.ts";
+import type { RunFillStep } from "../../steps/RunStep.ts";
+import { resolveFillText, resolveLocator } from "../../values/RunValues.ts";
 import { actGuarded } from "../../ActGuarded.ts";
 import type { RunContext } from "../../RunContext.ts";
 import type { StepContext, StepExecutor, StepNeeds } from "../StepExecutor.ts";

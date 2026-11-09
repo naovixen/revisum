@@ -16,7 +16,7 @@ import {
     readOneOf,
     readRecord,
     type Parsed,
-} from "../../plan-decoders.ts";
+} from "../ReadRecord.ts";
 import { mapNonEmpty, type NonEmptyList } from "../../../decoding/NonEmptyList.ts";
 import type { ReadableInput, ReadableRecord } from "../../../decoding/ReadableCopy.ts";
 import {
@@ -24,7 +24,7 @@ import {
     DATABASE_COMMAND_FEATURE,
     INLINE_SCRIPT_FEATURE,
     NAMED_SCRIPT_FEATURE,
-} from "../../plan-grammar.ts";
+} from "../../schema/PlanFields.ts";
 import {
     canStandInCleanup,
     canStandInside,

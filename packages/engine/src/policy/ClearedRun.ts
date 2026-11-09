@@ -3,8 +3,8 @@
 // cannot be expressed. Only the gate makes one, only for a target both the plan and the project's
 // matrix declare, and run() takes nothing else.
 import type { Authorised, Target, TargetId } from "@revisum/contracts";
-import type { PlanStanding } from "../approval/plan-standing.ts";
-import type { Project } from "../project/project-parser.ts";
+import type { PlanStanding } from "../approval/PlanStanding.ts";
+import type { Project } from "../project/ParseProject.ts";
 
 export type ClearedRunFields = {
     readonly plan: Authorised;

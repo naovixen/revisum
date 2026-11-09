@@ -1,5 +1,5 @@
 import { isIP } from "node:net";
-import { relayedServices } from "../egress-proxy/TcpRelay.ts";
+import { relayedServices } from "../egress-proxy/tunnels/TcpRelay.ts";
 import type { CheckedWorkloadRequest } from "./CheckWorkloadRequest.ts";
 
 // The names the team's container resolves to the proxy, one per relayed service: the service's

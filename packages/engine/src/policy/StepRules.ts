@@ -20,11 +20,15 @@ import type {
     StepType,
     StubStep,
 } from "@revisum/contracts";
-import type { Project, ProjectPolicy } from "../project/project-parser.ts";
+import type { Project, ProjectPolicy } from "../project/ParseProject.ts";
 import { isInlineChoice } from "../plan/IsInlineChoice.ts";
-import { declaredCommands, declaredScripts } from "../project/unsafe-feature-declarations.ts";
+import { declaredCommands, declaredScripts } from "../project/ReadUnsafeFeatures.ts";
 import { isDestructivePath, readUrl, type ReadUrl } from "./IsDestructivePath.ts";
-import { isAllowedName, isBlankName, matchesIrreversiblePattern } from "./irreversible-patterns.ts";
+import {
+    isAllowedName,
+    isBlankName,
+    matchesIrreversiblePattern,
+} from "./BuiltInIrreversiblePatterns.ts";
 
 // What the static check judges a step with, made once for the whole plan.
 export type StaticContext = {

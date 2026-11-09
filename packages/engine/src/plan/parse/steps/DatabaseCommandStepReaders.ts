@@ -1,7 +1,7 @@
 // Database commands, an unsafe feature: read only once the project enables it, which the step list
 // checks before it reads a step.
 import { CallEffect, PlanErrorCode, StepType } from "@revisum/contracts";
-import { allValid, INVALID } from "../../plan-decoders.ts";
+import { allValid, INVALID } from "../ReadRecord.ts";
 import type { StepSection, StepTypeIn } from "../../StepFacts.ts";
 import { readBackendAssertion } from "../assertions/ReadBackendAssertion.ts";
 import { readScriptArguments } from "../declarations/ReadCallArguments.ts";

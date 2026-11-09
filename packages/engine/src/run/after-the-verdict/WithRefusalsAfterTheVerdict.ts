@@ -1,6 +1,6 @@
 // What request decisions the browser refused after the verdict do to it.
 import { StepCode, stepFailed, TerminalState, type FailedStep } from "@revisum/contracts";
-import { finish } from "../../lifecycle.ts";
+import { finish } from "../outcome/Transition.ts";
 import { ranStep, TimedStepKind } from "../steps/TimedStep.ts";
 import type { StepsVerdict } from "../steps/VerdictOfSteps.ts";
 

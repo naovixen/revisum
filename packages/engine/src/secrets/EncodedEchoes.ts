@@ -2,7 +2,7 @@
 // escapes, HTML entities and base64. Everything here works on plain text, so it needs no secret: the
 // secret-values module reads the value and hands it here.
 import { MINIMUM_SECRET_LENGTH } from "@revisum/contracts";
-import { normalise } from "../oracle.ts";
+import { normalise } from "../run/outcome/Verdict.ts";
 import { htmlWritings, jsonWritings } from "./JsonWritings.ts";
 
 // Lower-cases each character whose lower-case form has the same length, so positions found in the

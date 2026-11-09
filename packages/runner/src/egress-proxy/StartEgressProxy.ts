@@ -1,6 +1,6 @@
 import { failure, type DeclaredService, type EgressPolicy, type Result } from "@revisum/contracts";
 import type { EgressProxy } from "./EgressProxy.ts";
-import { proxyRules } from "./ParseProxyRules.ts";
+import { proxyRules } from "./rules/ParseProxyRules.ts";
 import { ProxyStartFailureCode, type ProxyStartFailure } from "./ProxyStartFailure.ts";
 import { startProxyServer, type ProxyServerOptions } from "./StartProxyServer.ts";
 

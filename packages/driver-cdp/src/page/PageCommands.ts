@@ -5,12 +5,12 @@ import { CREATE_ISOLATED_WORLD } from "../connection/BrowserCommand.ts";
 import type { BrowserEvent } from "../connection/BrowserEvent.ts";
 import type { CdpConnection } from "../connection/CdpConnection.ts";
 import { errorText } from "../connection/ErrorText.ts";
-import { DocumentGone } from "./DocumentGone.ts";
-import { FRAME_REMOVED, LOST_OBJECT, isLostObject } from "./LostObject.ts";
+import { DocumentGone } from "./failures/DocumentGone.ts";
+import { FRAME_REMOVED, LOST_OBJECT, isLostObject } from "./failures/LostObject.ts";
 import type { HasStepEnded } from "./PageOperations.ts";
-import { PageHeldByDialog } from "./PageHeldByDialog.ts";
+import { PageHeldByDialog } from "./failures/PageHeldByDialog.ts";
 import type { PageWatch } from "./PageWatch.ts";
-import { StepHasEnded } from "./StepHasEnded.ts";
+import { StepHasEnded } from "./failures/StepHasEnded.ts";
 import { WorldName } from "./WorldName.ts";
 
 export class PageCommands {

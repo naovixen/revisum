@@ -8,16 +8,16 @@ import {
     NAVIGATE,
     SET_SCRIPT_EXECUTION_DISABLED,
 } from "../connection/BrowserCommand.ts";
-import { CALL_FUNCTION_ON, EVALUATE, GET_PROPERTIES } from "../connection/RuntimeDomain.ts";
-import { DESCRIBE_NODE, RESOLVE_NODE } from "../connection/DomDomain.ts";
-import { QUERY_ACCESSIBILITY_TREE } from "../connection/AccessibilityDomain.ts";
+import { CALL_FUNCTION_ON, EVALUATE, GET_PROPERTIES } from "../connection/domains/RuntimeDomain.ts";
+import { DESCRIBE_NODE, RESOLVE_NODE } from "../connection/domains/DomDomain.ts";
+import { QUERY_ACCESSIBILITY_TREE } from "../connection/domains/AccessibilityDomain.ts";
 import type { CdpConnection } from "../connection/CdpConnection.ts";
 import { MalformedBrowserReply } from "../connection/MalformedBrowserReply.ts";
 import type { CallResult, FrameTree } from "../connection/RemoteObject.ts";
-import { frameContentOffset } from "../in-page/Actionability.ts";
-import { afterTwoFrames } from "../in-page/AfterTwoFrames.ts";
-import { nodesAPressPasses, pressActsByItself } from "../in-page/NodesAPressPasses.ts";
-import { isConnectedToItsDocument } from "../in-page/ProbeElement.ts";
+import { frameContentOffset } from "../in-page/elements/Actionability.ts";
+import { afterTwoFrames } from "../in-page/document/AfterTwoFrames.ts";
+import { nodesAPressPasses, pressActsByItself } from "../in-page/elements/NodesAPressPasses.ts";
+import { isConnectedToItsDocument } from "../in-page/elements/ProbeElement.ts";
 import {
     AWAITED_OBJECT,
     AWAITED_VALUE,
@@ -26,15 +26,15 @@ import {
     throwIfThePageThrew,
     type CallDelivery,
 } from "./CallDelivery.ts";
-import { CdpPageInput } from "./CdpPageInput.ts";
-import { ClickCheckWorld } from "./ClickCheckWorld.ts";
-import { decodePoint } from "./DecodePoint.ts";
-import type { HeldModifierKey } from "./HeldModifierKeys.ts";
-import { isDocumentGone, isFrameOutOfReach, isLostObject } from "./LostObject.ts";
+import { CdpPageInput } from "./input/CdpPageInput.ts";
+import { ClickCheckWorld } from "./checks/ClickCheckWorld.ts";
+import { decodePoint } from "./input/DecodePoint.ts";
+import type { HeldModifierKey } from "./input/HeldModifierKeys.ts";
+import { isDocumentGone, isFrameOutOfReach, isLostObject } from "./failures/LostObject.ts";
 import { MainWorld } from "./MainWorld.ts";
 import { PageCommands } from "./PageCommands.ts";
 import type { PageFunction } from "./PageFunction.ts";
-import { PageHeldByDialog } from "./PageHeldByDialog.ts";
+import { PageHeldByDialog } from "./failures/PageHeldByDialog.ts";
 import type {
     ExposedStates,
     HasStepEnded,
@@ -46,8 +46,8 @@ import type {
     SelectOutcome,
 } from "./PageOperations.ts";
 import type { PageWatch } from "./PageWatch.ts";
-import type { PressCheck, PressSent } from "./PressCheck.ts";
-import { accessibilityTreeOf, exposedStatesOf, roleAndNameOf } from "./RoleAndNameOf.ts";
+import type { PressCheck, PressSent } from "./checks/PressCheck.ts";
+import { accessibilityTreeOf, exposedStatesOf, roleAndNameOf } from "./checks/RoleAndNameOf.ts";
 import { WhenLoaded, type LoadWait } from "./WhenLoaded.ts";
 
 // Where a CdpPage's document is when it is an iframe's: its element in the parent document, and its frame.

@@ -1,7 +1,7 @@
 # Weekly browser upkeep for the own CDP driver. It reads the latest Stable Chrome for Testing
 # version from Google's public version list. When that major is newer than the pinned build, it
 # installs the new build and its headless shell and re-runs the contract and capability suites on
-# them. Then tools/browser-upkeep.ts reports the average fix hours per major, flags the kill
+# them. Then tools/scheduled/SummariseUpkeep.ts reports the average fix hours per major, flags the kill
 # criterion when they are over the limit, and fails when the new major has no upkeep record.
 # Runs in the same pinned image as the "ci" workflow.
 name: browser-upkeep
@@ -30,7 +30,7 @@ jobs:
             bash -euo pipefail -c '
               npm ci
               # The system libraries the browsers need on Linux, installed as root.
-              bash tools/install-system-libraries.sh
+              bash tools/browsers/install-system-libraries.sh
               chown -R node:node /workspace
               su node -c "bash -euo pipefail" <<"UPKEEP"
                 npm run browsers
@@ -45,10 +45,10 @@ jobs:
                   npx @puppeteer/browsers install "chrome-headless-shell@${stable}" --path "$PWD/.browsers/latest"
                   export CHROME_PATH="$PWD/.browsers/latest/chrome/linux-${stable}/chrome-linux64/chrome"
                   export CHROME_HEADLESS_SHELL_PATH="$PWD/.browsers/latest/chrome-headless-shell/linux-${stable}/chrome-headless-shell-linux64/chrome-headless-shell"
-                  node tools/run-test-folder.ts test/contract || suites=1
+                  node tools/test-runner/RunTestFolder.ts test/browser || suites=1
                 fi
                 upkeep=0
-                node tools/browser-upkeep.ts --versions .browsers/latest-versions.json || upkeep=1
+                node tools/scheduled/SummariseUpkeep.ts --versions .browsers/latest-versions.json || upkeep=1
                 exit $(( suites | upkeep ))
           UPKEEP
             '

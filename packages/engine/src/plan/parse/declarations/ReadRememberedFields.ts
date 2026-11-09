@@ -5,9 +5,9 @@ import {
     type JsonPointer,
     type ValueName,
 } from "@revisum/contracts";
-import { brand } from "../../../brand.ts";
-import { allValid, INVALID, type Parsed } from "../../plan-decoders.ts";
-import { readValueName } from "../../plan-values.ts";
+import { brand } from "../../../foundation/Brand.ts";
+import { allValid, INVALID, type Parsed } from "../ReadRecord.ts";
+import { readValueName } from "./ReadPlanClock.ts";
 import { isNameTaken, type ParseContext } from "../ParseContext.ts";
 import { refuse } from "../Refuse.ts";
 

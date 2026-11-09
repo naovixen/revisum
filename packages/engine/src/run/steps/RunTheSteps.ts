@@ -6,12 +6,12 @@ import {
     type Session,
     type StepResult,
 } from "@revisum/contracts";
-import { finish, start, type Resolved, type Running } from "../../lifecycle.ts";
+import { finish, start, type Resolved, type Running } from "../outcome/Transition.ts";
 import {
     observedRequestNames,
     startObserving,
-} from "../../network-and-storage/network-and-storage-steps.ts";
-import type { RunStep } from "../../RunStep.ts";
+} from "../executors/network-and-storage/CheckRequests.ts";
+import type { RunStep } from "./RunStep.ts";
 import {
     logFailureAfterTheVerdict,
     readRecord,

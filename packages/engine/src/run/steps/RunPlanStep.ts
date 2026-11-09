@@ -12,7 +12,7 @@ import {
     type StubName,
 } from "@revisum/contracts";
 import { isAssertionStepType, isSetupStepType } from "../../plan/StepFacts.ts";
-import type { ContainerRunStep, RunStep } from "../../RunStep.ts";
+import type { ContainerRunStep, RunStep } from "./RunStep.ts";
 import { codeForThrow } from "../CodeForThrow.ts";
 import {
     ExecutorOutcome,

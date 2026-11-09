@@ -8,12 +8,12 @@ import {
     type Result,
     type WorkloadRequest,
 } from "@revisum/contracts";
-import { relayOrigin, tcpRelaysFor } from "../egress-proxy/TcpRelay.ts";
-import { PROXY_PORT } from "../proxy-container.ts";
-import { readVariableName } from "../ReadVariableName.ts";
-import { repositoryFolder } from "../run-containers.ts";
-import type { CheckedVariable } from "../workload-environment.ts";
-import { areMountablePaths } from "./AreMountablePaths.ts";
+import { relayOrigin, tcpRelaysFor } from "../egress-proxy/tunnels/TcpRelay.ts";
+import { PROXY_PORT } from "../egress/StartRecordKeeping.ts";
+import { readVariableName } from "../containers/ReadVariableName.ts";
+import { repositoryFolder } from "../containers/RunImageContainer.ts";
+import type { CheckedVariable } from "./WorkloadEnvironment.ts";
+import { areMountablePaths } from "./team-container/AreMountablePaths.ts";
 import { workloadRefused, type WorkloadRefusal } from "./WorkloadRefusal.ts";
 
 // Each stream is cut here, so a chatty suite cannot exhaust memory or bloat what is kept.

@@ -1,11 +1,15 @@
 // What the proxy decided for a workload, read back from its container and turned into egress events.
 // Each read has its own bound, so a wedged one leaves the record marked unread and still reaches removal.
 import type { EgressEvent, ProxyDecision } from "@revisum/contracts";
-import type { ContainerEngine } from "../container-engine.ts";
-import { joinEgressEvents } from "../egress-events.ts";
-import { hasProxyLostRecords, readDecisions, readLookups } from "../run-containers.ts";
+import type { ContainerEngine } from "../containers/ContainerEngine.ts";
+import { joinEgressEvents } from "../egress/JoinEgressEvents.ts";
+import {
+    hasProxyLostRecords,
+    readDecisions,
+    readLookups,
+} from "../containers/RunImageContainer.ts";
 import type { CheckedWorkloadRequest } from "./CheckWorkloadRequest.ts";
-import { processEvents } from "./ProcessEvents.ts";
+import { processEvents } from "./output/ProcessEvents.ts";
 import type { WorkloadLog } from "./WorkloadRefusal.ts";
 
 type WorkloadEgressRecord = {

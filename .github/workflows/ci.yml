@@ -86,7 +86,7 @@ jobs:
             --volume "$GITHUB_WORKSPACE:/workspace" --workdir /workspace \
             --env PUSHED_COMMITS \
             "$PINNED_IMAGE" \
-            bash -euo pipefail -c 'chown -R node:node /workspace && su node -c "node tools/check-tests-apart.ts --commits $PUSHED_COMMITS"'
+            bash -euo pipefail -c 'chown -R node:node /workspace && su node -c "node tools/repo-rules/commits/CheckTestsApart.ts --commits $PUSHED_COMMITS"'
       - name: Fail if a pushed commit changes a golden without naming a defect
         if: always() && github.event_name == 'push'
         env:
@@ -96,7 +96,7 @@ jobs:
             --volume "$GITHUB_WORKSPACE:/workspace" --workdir /workspace \
             --env PUSHED_COMMITS \
             "$PINNED_IMAGE" \
-            bash -euo pipefail -c 'chown -R node:node /workspace && su node -c "node tools/CheckGoldenChanges.ts --commits $PUSHED_COMMITS"'
+            bash -euo pipefail -c 'chown -R node:node /workspace && su node -c "node tools/repo-rules/commits/CheckGoldenChanges.ts --commits $PUSHED_COMMITS"'
       - name: Keep this job's test results for the gates
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -121,11 +121,11 @@ jobs:
       matrix:
         include:
           - suite: browser-shard-1
-            command: node tools/run-test-folder.ts --browser-shard 1/3 test/unit test/contract
+            command: node tools/test-runner/RunTestFolder.ts --browser-shard 1/3 test/unit test/browser
           - suite: browser-shard-2
-            command: node tools/run-test-folder.ts --browser-shard 2/3 test/unit test/contract
+            command: node tools/test-runner/RunTestFolder.ts --browser-shard 2/3 test/unit test/browser
           - suite: browser-shard-3
-            command: node tools/run-test-folder.ts --browser-shard 3/3 test/unit test/contract
+            command: node tools/test-runner/RunTestFolder.ts --browser-shard 3/3 test/unit test/browser
           - suite: proofs
             command: npm run proofs
           - suite: replay
@@ -138,7 +138,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .browsers
-          key: browsers-${{ hashFiles('tools/install-browsers.ts', 'package-lock.json') }}
+          key: browsers-${{ hashFiles('tools/browsers/ChromeForTestingBuild.ts', 'package-lock.json') }}
       - name: Run the suite in the pinned image
         env:
           SUITE_COMMAND: ${{ matrix.command }}
@@ -153,7 +153,7 @@ jobs:
               node --version | grep -q "^v24\." || { echo "Node 24 required, found $(node --version)"; exit 1; }
               npm ci
               # The system libraries the browsers need on Linux, installed as root.
-              bash tools/install-system-libraries.sh
+              bash tools/browsers/install-system-libraries.sh
               # Chrome refuses to sandbox as root, so the browsers and the suite run as "node".
               chown -R node:node /workspace
               # The runner saves the cache as another user, which must be able to read every file.
@@ -185,7 +185,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .browsers
-          key: browsers-${{ hashFiles('tools/install-browsers.ts', 'package-lock.json') }}
+          key: browsers-${{ hashFiles('tools/browsers/ChromeForTestingBuild.ts', 'package-lock.json') }}
       # The browsers run inside the run image, which brings its own system libraries.
       - name: Install the dependencies and browsers the tests mount
         run: |
@@ -277,4 +277,4 @@ jobs:
       - name: Fail if the test set and other files change together
         env:
           BASE_BRANCH: ${{ github.base_ref }}
-        run: git diff --name-only "origin/$BASE_BRANCH...HEAD" | node tools/check-tests-apart.ts
+        run: git diff --name-only "origin/$BASE_BRANCH...HEAD" | node tools/repo-rules/commits/CheckTestsApart.ts

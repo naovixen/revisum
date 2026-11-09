@@ -10,10 +10,10 @@ import {
     type Rejected,
     type PlanRunResult,
 } from "@revisum/contracts";
-import type { PlanStanding } from "../approval/plan-standing.ts";
+import type { PlanStanding } from "../approval/PlanStanding.ts";
 import { ClearedRunKind } from "../policy/ClearedRun.ts";
-import { policyGate } from "../policy/policy-gate.ts";
-import type { Project } from "../project/project-parser.ts";
+import { policyGate } from "../policy/PolicyGate.ts";
+import type { Project } from "../project/ParseProject.ts";
 import type { RunInputs, RunPorts } from "./RunContext.ts";
 import { runPlan } from "./RunPlan.ts";
 import { targetNotDeclaredResult } from "./seal/TargetNotDeclaredResult.ts";

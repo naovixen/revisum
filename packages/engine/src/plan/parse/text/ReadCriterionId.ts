@@ -1,9 +1,9 @@
 // The acceptance criterion an assertion checks, as a plan names it.
 import { PlanErrorCode, type CriterionId } from "@revisum/contracts";
-import { brand } from "../../../brand.ts";
-import { looksLikeCredential } from "../../literal-secrets.ts";
-import type { Parsed } from "../../plan-decoders.ts";
-import { CRITERION_FIELD, CRITERION_ID } from "../../plan-grammar.ts";
+import { brand } from "../../../foundation/Brand.ts";
+import { looksLikeCredential } from "../../LooksLikeCredential.ts";
+import type { Parsed } from "../ReadRecord.ts";
+import { CRITERION_FIELD, CRITERION_ID } from "../../schema/PlanFields.ts";
 import type { ParseContext } from "../ParseContext.ts";
 import { refuse } from "../Refuse.ts";
 

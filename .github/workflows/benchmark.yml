@@ -1,4 +1,4 @@
-# The performance benchmark: a weekly trend alarm, never a gate. tools/benchmark.ts runs the
+# The performance benchmark: a weekly trend alarm, never a gate. tools/scheduled/BenchmarkRuns.ts runs the
 # sign-up plan 20 times on the CDP driver's headless shell and compares the median setup time and
 # peak memory with docs/decisions/benchmark-baseline.json. A median more than 30% over its baseline
 # prints a warning and a job-summary line; the tool always exits 0. It runs on a schedule and by
@@ -34,7 +34,7 @@ jobs:
             bash -euo pipefail -c '
               npm ci
               # The system libraries Chromium needs on Linux, installed as root.
-              bash tools/install-system-libraries.sh
+              bash tools/browsers/install-system-libraries.sh
               # Chrome refuses to sandbox as root, so the browsers and the benchmark run as "node".
               chown -R node:node /workspace
               su node -c "npm run browsers && npm run benchmark"

@@ -61,7 +61,7 @@ The founder drives one Claude Code session, which works through the spec queue i
 | 7. Push | Founder | Reads the commits, then pushes to `main` | — |
 
 - An optional cold review uses `docs/prompts/session-review.md`, in a third fresh helper.
-- The test set is `test/`, `proofs/`, `fixtures/` and `golden/`. No commit may change it together with anything else; this stops a change editing a test to make its own code pass. Check staged files with `git diff --cached --name-only | node tools/check-tests-apart.ts`. CI runs the same check on pull requests, and on every push to `main` checks each pushed commit on its own (`--commits <from>..<to>`).
+- The test set is `test/`, `proofs/`, `fixtures/` and `golden/`. No commit may change it together with anything else; this stops a change editing a test to make its own code pass. Check staged files with `git diff --cached --name-only | node tools/repo-rules/commits/CheckTestsApart.ts`. CI runs the same check on pull requests, and on every push to `main` checks each pushed commit on its own (`--commits <from>..<to>`).
 - `.github/CODEOWNERS` gives the test set and CI configuration to the founder.
 
 ## Definition of Done
@@ -82,11 +82,11 @@ A spec is done when all of these hold:
 | `npm run check` | Everything below, in order. Must be green before you finish |
 | `npm run check:linux` | `npm run check` on CI's pinned Linux image, in Docker. Needs Docker Desktop running |
 | `npm run typecheck` | `tsc --build` over every package and `tools/`. A wrong-way import between packages fails here |
-| `npm run lint` | Checks that read only files, all in one process (`tools/RunRepositoryRules.ts`): licences and roles, folder layout, imports, dependency reviews, deny rules, the glossary and more. `node tools/RunRepositoryRules.ts --only <rule>[,<rule>]` runs just those |
+| `npm run lint` | Checks that read only files, all in one process (`tools/repo-rules/RunRepositoryRules.ts`): licences and roles, folder layout, imports, dependency reviews, deny rules, the glossary and more. `node tools/repo-rules/RunRepositoryRules.ts --only <rule>[,<rule>]` runs just those |
 | `npm run lint:code` | ESLint's code rules, straight after `npm run lint`. Its config and local rules are in `tools/eslint/`; code that predates them is baselined in `eslint-suppressions.json` |
 | `npm run format` | Prettier over packages, tools and tests |
 | `npm run lint:names` | The naming lint's self-test, then the naming lint over the repository |
-| `npm test` | Unit and contract tests (`test/unit/`, `test/contract/`) |
+| `npm test` | Unit and browser tests (`test/unit/`, `test/browser/`) |
 | `npm run proofs` | Hostile plans, secret leaks, egress, PII and audit-chain proofs (`test/proofs/`) |
 | `npm run replay` | Golden runs replayed and compared by hash (`test/replay/`) |
 | `npm run goldens:record` | Remakes `golden/closed-language` and, on Windows x64 only, `golden/replay/windows-signup`. Not part of `npm run check` |
@@ -110,9 +110,9 @@ The code must read without any other document. File naming and the rest of the c
 - No single-letter names except loop indices `i`, `j`, `k` and coordinates `x`, `y`, and never as an export. That includes generic type parameters: write `<Value>`, not `<T>`.
 - No unexplained abbreviations. Allowed: id, url, uri, html, css, json, http, api, cli, ci, pr, cdp, bidi, wcag, act, a11y, pii, sha256, svg, png, dom, os. Standard names (ai, mcp, sarif, junit, oidc, jwt, lti) are spelt out in `docs/glossary.md`.
 - Prefer readable code to comments: rename or extract first. Comment only what the code can't say, such as why, in plain English. Never cite a spec in a comment: code and tests read without the specs.
-- The product name is written once, in `PRODUCT` in `packages/contracts/src/product.ts`.
+- The product name is written once, in `PRODUCT` in `packages/contracts/src/product/Product.ts`.
 - `docs/glossary.md` maps each domain term to its code name. Add a row when you add a term.
-- `npm run lint:names` enforces these rules. Its configuration is `tools/naming-lint-config.ts`.
+- `npm run lint:names` enforces these rules. Its configuration is `tools/repo-rules/naming/NamingLint.ts`.
 
 ## Commit trailers
 
@@ -126,6 +126,6 @@ Defect: <number>              when the commit changes a file under golden/
 ```
 
 - Keys are exact, one value per line, in the message's last paragraph. `Agent:` appears at most once, as `claude-code/<version>`; each `Spec:` and criterion id must exist in `docs/specs/`. A `Co-Authored-By:` naming Claude needs an `Agent:` line.
-- Goldens are frozen from the reset commit on. `Defect:` must name a row in `docs/decisions/refactor-defects.md`; CI checks each pushed commit with `node tools/CheckGoldenChanges.ts --commits <from>..<to>`.
-- A commit can't be amended, so check the message first: `node tools/check-commit-trailers.ts --message <file>`.
-- `npm run gates` fails on a malformed commit after the trailer cut-over (`TRAILER_CUT_OVER` in `tools/project-metrics.ts`). One already made is listed with its reason in `KNOWN_MALFORMED_COMMITS` by a later commit.
+- Goldens are frozen from the reset commit on. `Defect:` must name a row in `docs/decisions/refactor-defects.md`; CI checks each pushed commit with `node tools/repo-rules/commits/CheckGoldenChanges.ts --commits <from>..<to>`.
+- A commit can't be amended, so check the message first: `node tools/repo-rules/commits/CommitTrailers.ts --message <file>`.
+- `npm run gates` fails on a malformed commit after the trailer cut-over (`TRAILER_CUT_OVER` in `tools/metrics/ProjectMetrics.ts`). One already made is listed with its reason in `KNOWN_MALFORMED_COMMITS` by a later commit.

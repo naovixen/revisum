@@ -25,11 +25,11 @@ import {
     REMOVE_SCRIPT_ON_NEW_DOCUMENT,
 } from "../connection/BrowserCommand.ts";
 import type { FrameTree } from "../connection/RemoteObject.ts";
-import { CALL_FUNCTION_ON, EVALUATE } from "../connection/RuntimeDomain.ts";
-import { DESCRIBE_NODE, GET_FRAME_OWNER, RESOLVE_NODE } from "../connection/DomDomain.ts";
+import { CALL_FUNCTION_ON, EVALUATE } from "../connection/domains/RuntimeDomain.ts";
+import { DESCRIBE_NODE, GET_FRAME_OWNER, RESOLVE_NODE } from "../connection/domains/DomDomain.ts";
 import { errorText } from "../connection/ErrorText.ts";
-import { advanceDocumentClock } from "../in-page/AdvanceDocumentClock.ts";
-import { isDocumentGone } from "../page/LostObject.ts";
+import { advanceDocumentClock } from "../in-page/document/AdvanceDocumentClock.ts";
+import { isDocumentGone } from "../page/failures/LostObject.ts";
 import type { PageCommand } from "./PageStorage.ts";
 
 // One page of the session, as the clock reaches it.

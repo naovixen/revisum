@@ -20,12 +20,12 @@
 import { errorText } from '../connection/ErrorText.ts';
 import { ATTACHED_TO_TARGET, DETACHED_FROM_TARGET, DIALOG_CLOSED, DIALOG_OPENING, DOWNLOAD_WILL_BEGIN, INSPECTOR_TARGET_CRASHED, type DownloadBegun, FRAME_NAVIGATED, FRAME_REQUESTED_NAVIGATION, FRAME_STOPPED_LOADING, NAVIGATED_WITHIN_DOCUMENT, REQUEST_PAUSED, TARGET_CRASHED, type BrowserEvent, type RequestPaused } from '../connection/BrowserEvent.ts';
 import { CLOSE_TARGET, ENABLE_INSPECTOR, HANDLE_DIALOG, SET_AUTO_ATTACH, SET_DOWNLOAD_BEHAVIOUR, type BrowserCommand } from '../connection/BrowserCommand.ts';
-import { ENABLE_REQUEST_HOLDING } from '../connection/FetchDomain.ts';
-import { RUN_IF_WAITING_FOR_DEBUGGER } from '../connection/RuntimeDomain.ts';
+import { ENABLE_REQUEST_HOLDING } from '../connection/domains/FetchDomain.ts';
+import { RUN_IF_WAITING_FOR_DEBUGGER } from '../connection/domains/RuntimeDomain.ts';
 import type { CdpConnection } from '../connection/CdpConnection.ts';
 import { CdpError } from '../connection/CdpError.ts';
 import type { PageEvents } from './PageEvents.ts';
-import { PageHeldByDialog } from './PageHeldByDialog.ts';
+import { PageHeldByDialog } from './failures/PageHeldByDialog.ts';
 
 const DOCUMENT_REQUEST = 'Document';
 

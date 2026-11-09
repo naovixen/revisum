@@ -19,7 +19,7 @@ import {
     readOneOf,
     type Issues,
     type Parsed,
-} from "../../plan-decoders.ts";
+} from "../ReadRecord.ts";
 import {
     ALL_LOCATOR_KINDS,
     LOCATOR_FEATURES,
@@ -31,7 +31,7 @@ import {
     LOCATOR_FIELDS,
     type LocatorKind,
     type OPTIONAL_LOCATOR_FIELDS,
-} from "../../plan-grammar.ts";
+} from "../../schema/PlanFields.ts";
 import { optionalField, readFields, type OptionalField } from "../../ReadFields.ts";
 import { knownField } from "../KnownField.ts";
 import type { ListedFields } from "../ListedFields.ts";

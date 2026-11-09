@@ -8,8 +8,8 @@ import {
     writeStorage,
     type NetworkReadContext,
     type NetworkStepContext,
-} from "../../../network-and-storage/network-and-storage-steps.ts";
-import { stubAndStorageSecretStore } from "../../../secrets/secret-resolution.ts";
+} from "./CheckRequests.ts";
+import { stubAndStorageSecretStore } from "../../../secrets/ResolvePlanSecrets.ts";
 import type { SessionContext, StepExecutorTable } from "../StepExecutor.ts";
 
 type NetworkContextSource = Pick<

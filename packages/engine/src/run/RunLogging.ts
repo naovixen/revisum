@@ -1,8 +1,8 @@
 // What a run logs and redacts with, from its first log entry, whether or not it was cleared.
 import type { Redactor } from "@revisum/contracts";
-import { canonicalJson, sha256 } from "../hashing.ts";
-import { manifestLogger, type Logger } from "../logging.ts";
-import { withSecretRedaction, type ResolvedSecrets } from "../secrets/secret-resolution.ts";
+import { canonicalJson, sha256 } from "../foundation/Sha256.ts";
+import { manifestLogger, type Logger } from "./logging/LoggingManifest.ts";
+import { withSecretRedaction, type ResolvedSecrets } from "../secrets/ResolvePlanSecrets.ts";
 import type { RunPorts } from "./RunContext.ts";
 import type { RunSubject } from "./seal/SealResult.ts";
 

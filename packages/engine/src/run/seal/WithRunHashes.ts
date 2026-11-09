@@ -1,7 +1,7 @@
 // The two hashes of a run result, made the same way for plan runs and evidence runs. Neither is keyed:
 // anyone can recompute them, so an edit to a result shows only against a copy of the hash held elsewhere.
 import type { RunResult, RunResultBasis } from "@revisum/contracts";
-import { canonicalJson, sha256 } from "../../hashing.ts";
+import { canonicalJson, sha256 } from "../../foundation/Sha256.ts";
 
 // Timings differ from run to run, and the manifest's hash stands in for its body.
 const LEFT_OUT_OF_BOTH: readonly (keyof RunResult)[] = [

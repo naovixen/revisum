@@ -1,6 +1,6 @@
 // A run that preflight refused, before any driver call: logged and sealed as Refused.
 import { RefusalCode, type PlanRefusal, type PlanRunResult } from "@revisum/contracts";
-import { refuse, type Planned } from "../../lifecycle.ts";
+import { refuse, type Planned } from "../outcome/Transition.ts";
 import { logKeepingTheResult } from "../after-the-verdict/ReadKeepingTheResult.ts";
 import { refusedResult } from "../seal/RefusedResult.ts";
 import { runTimeOfNothingRan, sealResult, type NothingRanContext } from "../seal/SealResult.ts";

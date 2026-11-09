@@ -7,9 +7,9 @@ import {
     type Result,
     type StepByType,
 } from "@revisum/contracts";
-import { checkPage as judgePage } from "../../../oracle.ts";
-import { resolveText } from "../../../run-values.ts";
-import { SECRET_PLACEHOLDER } from "../../../secrets/secret-values.ts";
+import { checkPage as judgePage } from "../../outcome/Verdict.ts";
+import { resolveText } from "../../values/RunValues.ts";
+import { SECRET_PLACEHOLDER } from "../../../secrets/SecretRedaction.ts";
 import { isCheckStopped, poll, verdictOfFailedRead } from "../../Poll.ts";
 import type { RunContext } from "../../RunContext.ts";
 import type { StepExecutor, StepNeeds } from "../StepExecutor.ts";

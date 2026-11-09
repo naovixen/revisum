@@ -57,12 +57,12 @@ Windows, this machine, Chrome for Testing 156. The second row's range comes from
 | File | Tests | Why |
 |---|---|---|
 | `test/proofs/criterion-id-lint.test.ts` | 5 recorded | Its lint checked the `{ criterion }` tag, which no longer exists |
-| `test/contract/cdp-pages-and-downloads.test.ts` | -5 | Hover, select, upload, dialog and frame refusals were Playwright's limitations; fakes in unit tests still cover `unsupported-step` |
-| `test/contract/chromium-disabled-features.test.ts` | -1 | Checked Playwright's default features |
-| `test/contract/target-refusals.test.ts` | -2, +1 | The device refusal pair needed Playwright; a new test covers `adapter-not-registered` |
-| `test/proofs/dependency-review-lint.test.ts` | -1 | Its example moved `playwright-core` onto the default set |
-| `test/proofs/licence-roles.test.ts` | -2 | The `action` and `driver-playwright` packages are gone |
-| `test/proofs/page-script-driver-dependencies.test.ts` | -3 | Tests of the Playwright driver |
+| `test/browser/downloads/CdpPagesAndDownloads.test.ts` | -5 | Hover, select, upload, dialog and frame refusals were Playwright's limitations; fakes in unit tests still cover `unsupported-step` |
+| `test/browser/lifecycle/ChromiumDisabledFeatures.test.ts` | -1 | Checked Playwright's default features |
+| `test/unit/engine/run/preflight/TargetRefusals.test.ts` | -2, +1 | The device refusal pair needed Playwright; a new test covers `adapter-not-registered` |
+| `test/proofs/repo-rules/licences-and-reviews/DependencyReviewLint.test.ts` | -1 | Its example moved `playwright-core` onto the default set |
+| `test/proofs/repo-rules/licences-and-reviews/LicenceRoles.test.ts` | -2 | The `action` and `driver-playwright` packages are gone |
+| `test/proofs/repo-rules/licences-and-reviews/PageScriptDriverDependencies.test.ts` | -3 | Tests of the Playwright driver |
 | Per-target loops in contract and proof files | Varies | Loops lost their Playwright targets; the CDP cases stay |
 
 | `plan-migration`, `plan-version-compatibility`, `unsafe-feature-previous-versions`, `page-checks-previous-version` (unit) | 27 test calls | One plan language version: nothing older to migrate or accept |
@@ -76,7 +76,7 @@ Real-driver `unsupported-step` checks for plan values, page states, network stub
 
 ### Golden reset
 
-The one reviewed reset, after the plan-version, Playwright, feature-list and refusal-code changes. From here goldens are frozen: `tools/CheckGoldenChanges.ts` fails a commit that changes one without a `Defect: <number>` trailer. Remake them with `npm run goldens:record`.
+The one reviewed reset, after the plan-version, Playwright, feature-list and refusal-code changes. From here goldens are frozen: `tools/repo-rules/commits/CheckGoldenChanges.ts` fails a commit that changes one without a `Defect: <number>` trailer. Remake them with `npm run goldens:record`.
 
 Every change is one of these, and all were recomputed from the old content:
 

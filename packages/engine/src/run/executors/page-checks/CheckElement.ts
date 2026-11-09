@@ -1,7 +1,7 @@
 import { stepFailed, StepOutcome, type ElementProbe, type StepByType } from "@revisum/contracts";
-import { canonicalJson } from "../../../hashing.ts";
-import { checkElement as judgeElement, domReadFor } from "../../../oracle.ts";
-import { resolveElementAssertion, resolveLocator } from "../../../run-values.ts";
+import { canonicalJson } from "../../../foundation/Sha256.ts";
+import { checkElement as judgeElement, domReadFor } from "../../outcome/Verdict.ts";
+import { resolveElementAssertion, resolveLocator } from "../../values/RunValues.ts";
 import { observe } from "../../Observe.ts";
 import { isCheckStopped, poll } from "../../Poll.ts";
 import type { StepExecutor, StepNeeds } from "../StepExecutor.ts";

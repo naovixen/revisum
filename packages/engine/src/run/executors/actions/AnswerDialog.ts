@@ -7,7 +7,7 @@ import {
     type Result,
     type StepCode,
 } from "@revisum/contracts";
-import { resolveText } from "../../../run-values.ts";
+import { resolveText } from "../../values/RunValues.ts";
 import { actGuarded } from "../../ActGuarded.ts";
 import type { RunContext } from "../../RunContext.ts";
 import type { StepExecutor, StepNeeds } from "../StepExecutor.ts";

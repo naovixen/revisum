@@ -4,7 +4,7 @@ import {
     type StorageAssertion,
 } from "@revisum/contracts";
 import type { ReadableInput } from "../../../decoding/ReadableCopy.ts";
-import { INVALID, readOneOf, type Parsed } from "../../plan-decoders.ts";
+import { INVALID, readOneOf, type Parsed } from "../ReadRecord.ts";
 import type { ParseContext } from "../ParseContext.ts";
 import { readExpectedText } from "../text/ReadTextOrValue.ts";
 import { readAssertionHead, readKindAlone, readKindAndValue } from "./ReadAssertionHead.ts";

@@ -15,17 +15,10 @@ import {
     type Step,
     type TargetId,
 } from "@revisum/contracts";
-import { brand } from "../../brand.ts";
-import { readId } from "../../project/project-parser.ts";
-import { looksLikeCredential } from "../literal-secrets.ts";
-import {
-    allValid,
-    INVALID,
-    readList,
-    readRecord,
-    type Issues,
-    type Parsed,
-} from "../plan-decoders.ts";
+import { brand } from "../../foundation/Brand.ts";
+import { readId } from "../../project/ParseProject.ts";
+import { looksLikeCredential } from "../LooksLikeCredential.ts";
+import { allValid, INVALID, readList, readRecord, type Issues, type Parsed } from "./ReadRecord.ts";
 import {
     CURRENT_PLAN_VERSION,
     FEATURE_ID,
@@ -34,8 +27,12 @@ import {
     META_FIELDS,
     OPTIONAL_PLAN_FIELDS,
     PLAN_FIELDS,
-} from "../plan-grammar.ts";
-import { readGeneratedValues, readPlanClock, type ValueContext } from "../plan-values.ts";
+} from "../schema/PlanFields.ts";
+import {
+    readGeneratedValues,
+    readPlanClock,
+    type ValueContext,
+} from "./declarations/ReadPlanClock.ts";
 import {
     readableCopy,
     type ReadableInput,

@@ -1,15 +1,15 @@
 // Checks on an element or the page, and remember steps, which read a value for the steps after them.
 import { ElementAssertionKind, PlanErrorCode, StepType } from "@revisum/contracts";
-import { allValid, INVALID } from "../../plan-decoders.ts";
-import { FROM_FIELD } from "../../plan-grammar.ts";
-import { readValueName } from "../../plan-values.ts";
+import { allValid, INVALID } from "../ReadRecord.ts";
+import { FROM_FIELD } from "../../schema/PlanFields.ts";
+import { readValueName } from "../declarations/ReadPlanClock.ts";
 import type { StepSection, StepTypeIn } from "../../StepFacts.ts";
 import { readElementAssertion } from "../assertions/ReadElementAssertion.ts";
 import { readPageAssertion } from "../assertions/ReadPageAssertion.ts";
 import { isNameTaken } from "../ParseContext.ts";
 import { refuse } from "../Refuse.ts";
 import { readCriterionId } from "../text/ReadCriterionId.ts";
-import { readRememberSource } from "./ReadRememberSource.ts";
+import { readRememberSource } from "../declarations/ReadRememberSource.ts";
 import { readStepLocator, type StepReaderTable } from "./StepReader.ts";
 
 // Checks that count matches, which a position picking one of them would make meaningless.

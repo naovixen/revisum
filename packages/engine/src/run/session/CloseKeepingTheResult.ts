@@ -1,6 +1,6 @@
 // Closing the session once the steps have a verdict, without letting the close change it.
 import type { Clock, ClosedSession, Session } from "@revisum/contracts";
-import type { Logger } from "../../logging.ts";
+import type { Logger } from "../logging/LoggingManifest.ts";
 import { recordsWithoutAClose } from "../../target/GuardedDriver.ts";
 import { errorText } from "../CodeForThrow.ts";
 import {

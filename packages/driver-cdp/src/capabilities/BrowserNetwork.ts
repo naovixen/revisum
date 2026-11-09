@@ -34,7 +34,7 @@ import {
     type BrowserEvent,
     type RequestAtRequestStage,
 } from "../connection/BrowserEvent.ts";
-import { SET_BYPASS_SERVICE_WORKER } from "../connection/NetworkDomain.ts";
+import { SET_BYPASS_SERVICE_WORKER } from "../connection/domains/NetworkDomain.ts";
 import type { CdpConnection } from "../connection/CdpConnection.ts";
 
 // What a stub answers a held request with, as Fetch.fulfillRequest takes it, and what to do once the

@@ -1,6 +1,6 @@
 import { stepFailed } from "@revisum/contracts";
-import type { RunStepByType } from "../../../RunStep.ts";
-import { resolveLocator } from "../../../run-values.ts";
+import type { RunStepByType } from "../../steps/RunStep.ts";
+import { resolveLocator } from "../../values/RunValues.ts";
 import type { StepExecutor, StepNeeds } from "../StepExecutor.ts";
 
 // Runs a frame step's steps inside the iframe its locator finds.
