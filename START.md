@@ -44,16 +44,16 @@ Architecture refactor:
     - [x] Re-run the trust-path break test; a break that goes uncaught becomes a finding to fix. At `3c01fcd`, of 115 planted defects, 106 were caught, including the 3 missed earlier. The other 9 were gaps in the tests, not bugs: rows 433 to 441, each now with a fast unit test proven to fail with its defect planted (`3793f06`).
     - [x] Close phase 3: at `2d0f5a6`, `npm run check:linux` is green (77 minutes, serial: 6,996 unit and contract tests, 1,390 browser tests with 60 skipped, proofs, replay, gates) and `npm run check:containers` is green (168 of 170, 2 skipped). `npm run check:push` was green on Windows one fix earlier, at `bb7a7bf`. The Linux check found a real race: a tab the driver closed could leave a command unanswered until its deadline (row 442, fixed).
   - [ ] The founder pushes, and CI takes 10 minutes or less. Waits for the end of the refactor (founder, 2026-11-08), so it doesn't hold up phase 4. Not yet measured.
-- [ ] Phase 4: move files, constants for magic strings, formatting. **Resume here.** The move map and its risks are in `C:\Users\naomi\.claude\projects\E--revisum\phase-4\` (`move-map.tsv`, `move-map-summary.md`): 1,882 files.
+- [x] Phase 4: move files, constants for magic strings, formatting. The move map and its risks are in `C:\Users\naomi\.claude\projects\E--revisum\phase-4\` (`move-map.tsv`, `move-map-summary.md`): 1,882 files.
   - [x] Golden check tolerates a move: tests, then code, keeping the old and new globs and updating ignore files
   - [x] Move packages, tools, config and docs (`79725ed`)
   - [x] Move test data, tests and helpers, with their imports and paths (`e88db4c`). Goldens and fixtures all exact renames. Stale paths left for phase 5: `CLAUDE.md` names the old `tools/check-tests-apart.ts` (now `tools/repo-rules/commits/CheckTestsApart.ts`), and `docs/prompts/session-00-seed.md`, `session-core-review.md` and `session-decision-assessment.md` have one old path each and need the founder's agreement
   - [x] Verify the move at `4a95f3e`: `npm run check:linux` green (78 minutes) and `npm run check:containers` green (168 of 170, 2 skipped); goldens rename-only; test counts reconciled
   - [x] Sweeps, each its own commit pair: domain strings to constants, `curly`, Prettier; new ESLint rules on. Baselined for phase 6: 730 magic strings and 101 size entries (assumptions 34 and 35)
   - [x] Carried findings: 193, 196, 245, 294, 320, 326, 332, 356, with each fix tested. `engine/src/project/` may no longer import `engine/src/plan/`, by rule
-  - [ ] Phase-end checks: `npm run check:linux`, `npm run check:containers`
+  - [x] Phase-end checks, at `a3a8447`: `npm run check:linux` green (81 minutes: 7,064 unit and contract tests, 1,390 browser tests with 60 skipped, proofs in two runs, 615 and 204 of 208 with 4 skipped for the full tier, 7 replay tests; goldens unchanged since the move) and `npm run check:containers` green (168 of 170, 2 skipped)
   - [ ] After the founder pushes: drop the legacy `fixtures/` and `golden/` globs
-- [ ] Phase 5: docs and final trust-path review; the founder pushes
+- [ ] Phase 5: docs and final trust-path review; the founder pushes. **Resume here.**
 - [ ] Phase 6: test titles and remaining suppressions (may run alongside M3)
 
 Where phase 3 stands, from `docs/decisions/refactor-defects.md`:
