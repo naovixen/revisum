@@ -77,7 +77,7 @@ const noExportStar = {
 };
 
 const NON_EMPTY_STRING = "Literal[value=/[\\s\\S]/]";
-const FIXED_VALUE_PROPERTY = "(type|kind|code|outcome|state)";
+const FIXED_VALUE_PROPERTY = "(type|kind|code|outcome|state|device)";
 const useNamedConstant =
     "Use the member of the value's constant object, not a string literal: .claude/rules/typescript.md.";
 

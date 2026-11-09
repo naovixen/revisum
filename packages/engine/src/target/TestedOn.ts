@@ -1,7 +1,13 @@
 // What a report says a run was tested on, built only from the target and the build that ran it.
 // The wording names what was really there: an emulated phone viewport is never "a phone", and
 // Playwright's patched WebKit is never "Safari".
-import type { BrowserBuild, DeviceProfileId, Engine, Fidelity, Target } from "@revisum/contracts";
+import {
+    DeviceProfileId,
+    type BrowserBuild,
+    type Engine,
+    type Fidelity,
+    type Target,
+} from "@revisum/contracts";
 import { targetFidelity } from "./TargetFidelity.ts";
 
 const ENGINE_WORDING: { readonly [Name in Engine]: (major: string) => string } = {
@@ -12,10 +18,10 @@ const ENGINE_WORDING: { readonly [Name in Engine]: (major: string) => string } =
 };
 
 const DEVICE_WORDING: { readonly [Profile in DeviceProfileId]: string } = {
-    "desktop-1280": "desktop viewport",
-    "laptop-1024": "laptop viewport",
-    "tablet-820": "tablet viewport",
-    "phone-390": "phone viewport",
+    [DeviceProfileId.Desktop1280]: "desktop viewport",
+    [DeviceProfileId.Laptop1024]: "laptop viewport",
+    [DeviceProfileId.Tablet820]: "tablet viewport",
+    [DeviceProfileId.Phone390]: "phone viewport",
 };
 
 // The engine itself needs no note; anything else says how it stands in for a device.

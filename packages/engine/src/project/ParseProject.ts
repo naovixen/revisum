@@ -7,7 +7,7 @@ import {
     PlanErrorCode,
     COLOR_SCHEMES,
     DEFAULT_TEST_ID_ATTRIBUTE,
-    DEVICE_PROFILES,
+    DeviceProfileId,
     ENGINES,
     FIDELITIES,
     MOTION_PREFERENCES,
@@ -20,7 +20,6 @@ import {
     type CallDeclaration,
     type CallName,
     type DeclaredService,
-    type DeviceProfileId,
     type FixtureName,
     type IrreversiblePatterns,
     type Locale,
@@ -78,7 +77,7 @@ import {
 } from "../plan/schema/PlanFields.ts";
 import { readableCopy } from "../decoding/ReadableCopy.ts";
 
-const DEVICE_IDS = Object.keys(DEVICE_PROFILES) as DeviceProfileId[];
+const DEVICE_IDS: readonly DeviceProfileId[] = Object.values(DeviceProfileId);
 
 export type Limits = {
     readonly maximumPlanBytes: number;

@@ -4,6 +4,7 @@
 // and every process it started (Chromium), sampled from /proc every 100 ms. tools/scheduled/BenchmarkRuns.ts
 // calls this and compares the medians with the stored Linux baseline; it is never a gate.
 import {
+    DeviceProfileId,
     EventKind,
     failure,
     loadTrustedProject,
@@ -81,7 +82,7 @@ const projectFileFor = (origin: string): unknown => ({
             id: TARGET_ID,
             adapter: "cdp",
             engine: "chromium",
-            device: "desktop-1280",
+            device: DeviceProfileId.Desktop1280,
             locale: "en-GB",
             timezone: "UTC",
             colorScheme: "light",

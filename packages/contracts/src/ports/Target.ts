@@ -13,13 +13,32 @@ export const ENGINES: readonly Engine[] = Object.values(Engine);
 
 // A closed set of device profiles owned by this package, so no vendor's device list decides
 // what a target looks like. Sizes are css pixels.
-export const DEVICE_PROFILES = {
-    "desktop-1280": { width: 1280, height: 800, scale: 1, mobile: false, touch: false },
-    "laptop-1024": { width: 1024, height: 768, scale: 1, mobile: false, touch: false },
-    "tablet-820": { width: 820, height: 1180, scale: 2, mobile: true, touch: true },
-    "phone-390": { width: 390, height: 844, scale: 3, mobile: true, touch: true },
+export const DeviceProfileId = {
+    Desktop1280: "desktop-1280",
+    Laptop1024: "laptop-1024",
+    Tablet820: "tablet-820",
+    Phone390: "phone-390",
 } as const;
-export type DeviceProfileId = keyof typeof DEVICE_PROFILES;
+export type DeviceProfileId = (typeof DeviceProfileId)[keyof typeof DeviceProfileId];
+
+export const DEVICE_PROFILES = {
+    [DeviceProfileId.Desktop1280]: {
+        width: 1280,
+        height: 800,
+        scale: 1,
+        mobile: false,
+        touch: false,
+    },
+    [DeviceProfileId.Laptop1024]: {
+        width: 1024,
+        height: 768,
+        scale: 1,
+        mobile: false,
+        touch: false,
+    },
+    [DeviceProfileId.Tablet820]: { width: 820, height: 1180, scale: 2, mobile: true, touch: true },
+    [DeviceProfileId.Phone390]: { width: 390, height: 844, scale: 3, mobile: true, touch: true },
+} as const satisfies Record<DeviceProfileId, unknown>;
 export type DeviceProfile = (typeof DEVICE_PROFILES)[DeviceProfileId];
 
 export const ColorScheme = {
