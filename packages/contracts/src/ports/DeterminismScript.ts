@@ -12,10 +12,10 @@
 
 // Removes animation, transitions and caret blink.
 const NO_MOTION_CSS =
-  '*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important;scroll-behavior:auto!important}';
+    "*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important;scroll-behavior:auto!important}";
 
 // The name, given to Symbol.for, of the window property that holds the advance controller.
-export const CLOCK_CONTROLLER_KEY = 'determinism-kit.clock-controller';
+export const CLOCK_CONTROLLER_KEY = "determinism-kit.clock-controller";
 
 // Animation-frame callbacks run once per this many milliseconds of virtual time while any wait.
 const VIRTUAL_FRAME_MILLISECONDS = 16;
@@ -35,10 +35,10 @@ const VIRTUAL_FRAME_MILLISECONDS = 16;
 //     included, and each waiting animation-frame callback.
 // Before a callback past maximumCallbacks would fire, it stops with runaway true.
 export function determinismScript(seed: number, fixedTimeMilliseconds: number): string {
-  if (!Number.isInteger(seed) || !Number.isInteger(fixedTimeMilliseconds)) {
-    throw new TypeError('seed and fixedTimeMilliseconds must be integers');
-  }
-  return `
+    if (!Number.isInteger(seed) || !Number.isInteger(fixedTimeMilliseconds)) {
+        throw new TypeError("seed and fixedTimeMilliseconds must be integers");
+    }
+    return `
 (() => {
   const FIXED = ${fixedTimeMilliseconds};
   const FRAME = ${VIRTUAL_FRAME_MILLISECONDS};
@@ -198,8 +198,8 @@ export function determinismScript(seed: number, fixedTimeMilliseconds: number): 
 // after determinismScript, and adds it again at the new time after every advance, so a document
 // loaded later starts where the run's clock is and page time never goes backwards.
 export function virtualClockScript(elapsedMilliseconds: number): string {
-  if (!Number.isInteger(elapsedMilliseconds) || elapsedMilliseconds < 0) {
-    throw new TypeError('elapsedMilliseconds must be a whole number, at least 0');
-  }
-  return `globalThis[Symbol.for(${JSON.stringify(CLOCK_CONTROLLER_KEY)})]?.useVirtualTimers(${elapsedMilliseconds});`;
+    if (!Number.isInteger(elapsedMilliseconds) || elapsedMilliseconds < 0) {
+        throw new TypeError("elapsedMilliseconds must be a whole number, at least 0");
+    }
+    return `globalThis[Symbol.for(${JSON.stringify(CLOCK_CONTROLLER_KEY)})]?.useVirtualTimers(${elapsedMilliseconds});`;
 }

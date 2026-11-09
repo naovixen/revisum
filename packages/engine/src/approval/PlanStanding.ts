@@ -3,25 +3,36 @@
 // origins and never opens the merge gate. Changing a plan by one byte changes its hash, so the
 // approval it had no longer applies. A declared approval opens the gate exactly as a verified one
 // does: strength only picks the label.
-import type { Approval, ApprovalStore, ApprovalStrength, Plan } from '@revisum/contracts';
-import { planHash } from '../run/seal/BuildManifest.ts';
-import { mintedApprovals } from './MintedApprovals.ts';
-import { ApprovalLabel, ApprovalSubjectKind } from '@revisum/contracts';
-import { PlanStandingMode } from './PlanStandingMode.ts';
+import type { Approval, ApprovalStore, ApprovalStrength, Plan } from "@revisum/contracts";
+import { planHash } from "../run/seal/BuildManifest.ts";
+import { mintedApprovals } from "./MintedApprovals.ts";
+import { ApprovalLabel, ApprovalSubjectKind } from "@revisum/contracts";
+import { PlanStandingMode } from "./PlanStandingMode.ts";
 
-export type PlanStanding = { readonly mode: 'approved'; readonly approval: Approval } | { readonly mode: 'proposal' };
+export type PlanStanding =
+    { readonly mode: "approved"; readonly approval: Approval } | { readonly mode: "proposal" };
 
 // The approval of this exact plan, or null when its hash has none.
 export function approvalFor(plan: Plan, store: ApprovalStore): Approval | null {
-  const hash = planHash(plan);
-  return store.forSubject(hash).find((approval) => approval.subject.kind === ApprovalSubjectKind.Plan && approval.subject.hash === hash) ?? null;
+    const hash = planHash(plan);
+    return (
+        store
+            .forSubject(hash)
+            .find(
+                (approval) =>
+                    approval.subject.kind === ApprovalSubjectKind.Plan &&
+                    approval.subject.hash === hash,
+            ) ?? null
+    );
 }
 
 const PROPOSAL: PlanStanding = { mode: PlanStandingMode.Proposal };
 
 export function planStanding(plan: Plan, store: ApprovalStore): PlanStanding {
-  const approval = approvalFor(plan, store);
-  return approval === null ? PROPOSAL : ownStanding(plan, { mode: PlanStandingMode.Approved, approval });
+    const approval = approvalFor(plan, store);
+    return approval === null
+        ? PROPOSAL
+        : ownStanding(plan, { mode: PlanStandingMode.Approved, approval });
 }
 
 // The standing a plan may act on: the one it was given only when that standing's approval is for
@@ -30,15 +41,24 @@ export function planStanding(plan: Plan, store: ApprovalStore): PlanStanding {
 // approval, read back from JSON say, has the same fields and says nothing about who checked what.
 // The policy gate and run() both use this.
 export function ownStanding(plan: Plan, standing: PlanStanding | undefined): PlanStanding {
-  if (standing?.mode !== PlanStandingMode.Approved || !mintedApprovals.has(standing.approval)) {return PROPOSAL;}
-  const subject = standing.approval.subject;
-  return subject.kind === ApprovalSubjectKind.Plan && subject.hash === planHash(plan) ? standing : PROPOSAL;
+    if (standing?.mode !== PlanStandingMode.Approved || !mintedApprovals.has(standing.approval)) {
+        return PROPOSAL;
+    }
+    const subject = standing.approval.subject;
+    return subject.kind === ApprovalSubjectKind.Plan && subject.hash === planHash(plan)
+        ? standing
+        : PROPOSAL;
 }
 
 // True only for an approved plan, whatever the approval's strength.
-export const mergeGateOpen = (standing: PlanStanding): boolean => standing.mode === PlanStandingMode.Approved && mintedApprovals.has(standing.approval);
+export const mergeGateOpen = (standing: PlanStanding): boolean =>
+    standing.mode === PlanStandingMode.Approved && mintedApprovals.has(standing.approval);
 
-const APPROVAL_LABELS: Readonly<Record<ApprovalStrength, ApprovalLabel>> = { verified: ApprovalLabel.Verified, declared: ApprovalLabel.DeclaredNotVerified };
+const APPROVAL_LABELS: Readonly<Record<ApprovalStrength, ApprovalLabel>> = {
+    verified: ApprovalLabel.Verified,
+    declared: ApprovalLabel.DeclaredNotVerified,
+};
 
 // What every verdict, report, metric or level resting on the approval says about it.
-export const approvalLabel = (approval: Approval): ApprovalLabel => APPROVAL_LABELS[approval.strength];
+export const approvalLabel = (approval: Approval): ApprovalLabel =>
+    APPROVAL_LABELS[approval.strength];

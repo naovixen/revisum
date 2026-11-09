@@ -1,5 +1,11 @@
 // The elements a locator matches in one document.
-import { StructuralLocatorKind, SemanticLocatorKind, DEFAULT_TEST_ID_ATTRIBUTE, type Position, type ResolvedLocator } from "@revisum/contracts";
+import {
+    StructuralLocatorKind,
+    SemanticLocatorKind,
+    DEFAULT_TEST_ID_ATTRIBUTE,
+    type Position,
+    type ResolvedLocator,
+} from "@revisum/contracts";
 import {
     findByLabel,
     findByTestId,
@@ -94,7 +100,8 @@ async function matches<Handle>(
             if (locator.inside !== undefined && scope.length !== 1) {
                 return [];
             }
-            const text = locator.by === StructuralLocatorKind.Css ? locator.selector : locator.expression;
+            const text =
+                locator.by === StructuralLocatorKind.Css ? locator.selector : locator.expression;
             return operations.callForElements(findStructural, [
                 locator.by,
                 text,

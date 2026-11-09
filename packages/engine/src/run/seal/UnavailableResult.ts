@@ -11,7 +11,12 @@ export function unavailableResult(
     context: NothingRanContext,
 ): PlanRunResult {
     logKeepingTheResult(
-        { kind: EventKind.RunState, state: "TargetUnavailable", targetId, code: unavailable.reason },
+        {
+            kind: EventKind.RunState,
+            state: "TargetUnavailable",
+            targetId,
+            code: unavailable.reason,
+        },
         context.logger,
     );
     return sealResult(

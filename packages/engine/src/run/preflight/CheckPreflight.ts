@@ -11,7 +11,8 @@
 // gives it a TargetNotDeclared), and an adapter that is not registered, one whose `supports` says no
 // and a browser build other than the pinned one are found as the run opens its session.
 import {
-    RefusalCode, failure,
+    RefusalCode,
+    failure,
     isElementCheckNoDriverDecides,
     isWiredPort,
     success,

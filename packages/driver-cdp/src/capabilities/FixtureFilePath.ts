@@ -1,6 +1,12 @@
 // The project's declared fixtures, which an upload step sends and a stub serves, and never a file
 // outside their folder.
-import { DriverErrorCode, failure, success, type DriverError, type Result } from "@revisum/contracts";
+import {
+    DriverErrorCode,
+    failure,
+    success,
+    type DriverError,
+    type Result,
+} from "@revisum/contracts";
 import { readFileSync, realpathSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
 import { errorText } from "../connection/ErrorText.ts";

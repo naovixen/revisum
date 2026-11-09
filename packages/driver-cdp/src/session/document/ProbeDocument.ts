@@ -1,6 +1,7 @@
 // A read-only look at the element a locator matches in one document.
 import {
-    DomReadKind, isSeveralElements,
+    DomReadKind,
+    isSeveralElements,
     UnreadablePage,
     type DomRead,
     type DomValue,
@@ -79,10 +80,15 @@ function decodeDomValue(text: string, read: DomRead): DomValue | undefined {
     switch (read.kind) {
         case DomReadKind.Classes:
             return Array.isArray(classes) && classes.every((token) => typeof token === "string")
-                ? { kind: DomReadKind.Classes, classes: classes.filter((token) => typeof token === "string") }
+                ? {
+                      kind: DomReadKind.Classes,
+                      classes: classes.filter((token) => typeof token === "string"),
+                  }
                 : undefined;
         case DomReadKind.ComputedStyle:
-            return typeof value === "string" ? { kind: DomReadKind.ComputedStyle, value } : undefined;
+            return typeof value === "string"
+                ? { kind: DomReadKind.ComputedStyle, value }
+                : undefined;
         case DomReadKind.Attribute:
             return typeof value === "string" || value === null
                 ? { kind: DomReadKind.Attribute, value }

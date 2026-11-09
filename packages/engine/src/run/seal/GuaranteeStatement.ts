@@ -2,29 +2,35 @@
 // lost one is lost, so a plan run and an evidence run can never describe themselves differently
 // for the same conditions. The level is the summary: 'isolated' only when every guarantee holds.
 import {
-  GUARANTEE_IDS, GuaranteeLevel,
-  GuaranteeId, type GuaranteeLossReason, type GuaranteeStatement, type RunIsolation, RunMode, type UnsafeFeature,
-} from '@revisum/contracts';
+    GUARANTEE_IDS,
+    GuaranteeLevel,
+    GuaranteeId,
+    type GuaranteeLossReason,
+    type GuaranteeStatement,
+    type RunIsolation,
+    RunMode,
+    type UnsafeFeature,
+} from "@revisum/contracts";
 
 // The isolation of a run on the host, with no egress enforcement: what a run is handed when no
 // isolated runner started it.
 export const HOST_ISOLATION: RunIsolation = { guaranteeLevel: () => GuaranteeLevel.Host };
 
 export type GuaranteeConditions = {
-  readonly mode: RunMode;
-  // True when every request went through the isolated runner's egress proxy.
-  readonly egressEnforced: boolean;
-  // True when the suite's own, unmasked screenshots are kept as artefacts.
-  readonly unmaskedScreenshotsKept: boolean;
-  // The unsafe features the run's plan uses (unsafeFeaturesOf); empty for a closed plan and for an
-  // evidence run.
-  readonly unsafeFeatures: readonly UnsafeFeature[];
-  // True when the target's adapter cannot pin the clock, the time zone or randomness
-  // (AdapterInfo.cannotPin), so no replay of the run can be claimed identical. Absent means false.
-  readonly determinismUnpinned?: boolean;
-  // True when the plan calls a declared service and the project does not record the replies, so
-  // replayManifest refuses the run. Absent means false.
-  readonly repliesNotRecorded?: boolean;
+    readonly mode: RunMode;
+    // True when every request went through the isolated runner's egress proxy.
+    readonly egressEnforced: boolean;
+    // True when the suite's own, unmasked screenshots are kept as artefacts.
+    readonly unmaskedScreenshotsKept: boolean;
+    // The unsafe features the run's plan uses (unsafeFeaturesOf); empty for a closed plan and for an
+    // evidence run.
+    readonly unsafeFeatures: readonly UnsafeFeature[];
+    // True when the target's adapter cannot pin the clock, the time zone or randomness
+    // (AdapterInfo.cannotPin), so no replay of the run can be claimed identical. Absent means false.
+    readonly determinismUnpinned?: boolean;
+    // True when the plan calls a declared service and the project does not record the replies, so
+    // replayManifest refuses the run. Absent means false.
+    readonly repliesNotRecorded?: boolean;
 };
 
 // The guarantees each unsafe feature gives up, and only those. Egress control, no ambient
@@ -38,66 +44,92 @@ export type GuaranteeConditions = {
 //   - A database command is the team's own program, judged only by its declaration, and replay
 //     reuses its recorded output, which cannot show the database was in the same state.
 const LOST_TO_FEATURE: { readonly [Feature in UnsafeFeature]: readonly GuaranteeId[] } = {
-  'css-locator': ['semantic-locators'],
-  'xpath-locator': ['semantic-locators'],
-  'dom-checks': ['observable-checks'],
-  'page-script': ['plan-closed', 'actions-guarded', 'observable-checks', 'pii-masked'],
-  'inline-page-script': ['plan-closed', 'actions-guarded', 'observable-checks', 'pii-masked'],
-  'database-command': ['plan-closed', 'actions-guarded', 'replay-identical'],
+    "css-locator": ["semantic-locators"],
+    "xpath-locator": ["semantic-locators"],
+    "dom-checks": ["observable-checks"],
+    "page-script": ["plan-closed", "actions-guarded", "observable-checks", "pii-masked"],
+    "inline-page-script": ["plan-closed", "actions-guarded", "observable-checks", "pii-masked"],
+    "database-command": ["plan-closed", "actions-guarded", "replay-identical"],
 };
 
 // Why `guarantee` does not hold under the run's mode, isolation, adapter and recording setting alone:
 // empty when it holds. Unrecorded replies count only where egress is enforced: a run on the host has
 // already lost the claim to egress, and its statement, and so its committed hashes, stay as they were.
-function conditionReasons(guarantee: GuaranteeId, conditions: GuaranteeConditions): GuaranteeLossReason[] {
-  const reason = isolationReason(guarantee, conditions);
-  const replayOfPlan = guarantee === GuaranteeId.ReplayIdentical && conditions.mode === RunMode.Plan;
-  const unpinned = replayOfPlan && conditions.determinismUnpinned === true;
-  const notRecorded = replayOfPlan && conditions.egressEnforced && conditions.repliesNotRecorded === true;
-  return [
-    ...(reason === undefined ? [] : [reason]),
-    ...(unpinned ? ['determinism-unpinned' as const] : []),
-    ...(notRecorded ? ['replies-not-recorded' as const] : []),
-  ];
+function conditionReasons(
+    guarantee: GuaranteeId,
+    conditions: GuaranteeConditions,
+): GuaranteeLossReason[] {
+    const reason = isolationReason(guarantee, conditions);
+    const replayOfPlan =
+        guarantee === GuaranteeId.ReplayIdentical && conditions.mode === RunMode.Plan;
+    const unpinned = replayOfPlan && conditions.determinismUnpinned === true;
+    const notRecorded =
+        replayOfPlan && conditions.egressEnforced && conditions.repliesNotRecorded === true;
+    return [
+        ...(reason === undefined ? [] : [reason]),
+        ...(unpinned ? ["determinism-unpinned" as const] : []),
+        ...(notRecorded ? ["replies-not-recorded" as const] : []),
+    ];
 }
 
 // Why `guarantee` does not hold under the run's mode and isolation alone, or undefined when it holds.
-function isolationReason(guarantee: GuaranteeId, conditions: GuaranteeConditions): GuaranteeLossReason | undefined {
-  switch (guarantee) {
-    // The team's own test code drives the page, finds elements and decides what passes.
-    case GuaranteeId.PlanClosed: case GuaranteeId.ActionsGuarded: case GuaranteeId.SemanticLocators: case GuaranteeId.ObservableChecks:
-      return conditions.mode === RunMode.Evidence ? 'evidence-mode' : undefined;
-    // Suite code, the suite's browser and the app server it starts cannot be pinned; and without
-    // egress control, nor can what a plan run's page reaches.
-    case GuaranteeId.ReplayIdentical:
-      if (conditions.mode === RunMode.Evidence) {return 'evidence-mode';}
-      return conditions.egressEnforced ? undefined : 'egress-unenforceable';
-    // Only the isolated runner routes every process through the proxy and keeps credentials out.
-    case GuaranteeId.EgressEnforced: case GuaranteeId.NoAmbientCredentials:
-      return conditions.egressEnforced ? undefined : 'egress-unenforceable';
-    // Every output passes through the redactor, whatever produced the text.
-    case GuaranteeId.SecretsRedacted:
-      return undefined;
-    // Revisum's own captures are masked; the suite's screenshots are not.
-    case GuaranteeId.PiiMasked:
-      return conditions.unmaskedScreenshotsKept ? 'evidence-mode' : undefined;
-  }
+function isolationReason(
+    guarantee: GuaranteeId,
+    conditions: GuaranteeConditions,
+): GuaranteeLossReason | undefined {
+    switch (guarantee) {
+        // The team's own test code drives the page, finds elements and decides what passes.
+        case GuaranteeId.PlanClosed:
+        case GuaranteeId.ActionsGuarded:
+        case GuaranteeId.SemanticLocators:
+        case GuaranteeId.ObservableChecks:
+            return conditions.mode === RunMode.Evidence ? "evidence-mode" : undefined;
+        // Suite code, the suite's browser and the app server it starts cannot be pinned; and without
+        // egress control, nor can what a plan run's page reaches.
+        case GuaranteeId.ReplayIdentical:
+            if (conditions.mode === RunMode.Evidence) {
+                return "evidence-mode";
+            }
+            return conditions.egressEnforced ? undefined : "egress-unenforceable";
+        // Only the isolated runner routes every process through the proxy and keeps credentials out.
+        case GuaranteeId.EgressEnforced:
+        case GuaranteeId.NoAmbientCredentials:
+            return conditions.egressEnforced ? undefined : "egress-unenforceable";
+        // Every output passes through the redactor, whatever produced the text.
+        case GuaranteeId.SecretsRedacted:
+            return undefined;
+        // Revisum's own captures are masked; the suite's screenshots are not.
+        case GuaranteeId.PiiMasked:
+            return conditions.unmaskedScreenshotsKept ? "evidence-mode" : undefined;
+    }
 }
 
 // Every reason `guarantee` is lost: the run's conditions first, then each unsafe feature that
 // gives it up, in the order the features are given.
-function lossReasons(guarantee: GuaranteeId, conditions: GuaranteeConditions): GuaranteeLossReason[] {
-  const features = conditions.unsafeFeatures.filter((feature) => LOST_TO_FEATURE[feature].includes(guarantee));
-  return [...conditionReasons(guarantee, conditions), ...features];
+function lossReasons(
+    guarantee: GuaranteeId,
+    conditions: GuaranteeConditions,
+): GuaranteeLossReason[] {
+    const features = conditions.unsafeFeatures.filter((feature) =>
+        LOST_TO_FEATURE[feature].includes(guarantee),
+    );
+    return [...conditionReasons(guarantee, conditions), ...features];
 }
 
 export function guaranteeStatement(conditions: GuaranteeConditions): GuaranteeStatement {
-  const holds: GuaranteeId[] = [];
-  const lost: { readonly guarantee: GuaranteeId; readonly because: GuaranteeLossReason }[] = [];
-  for (const guarantee of GUARANTEE_IDS) {
-    const reasons = lossReasons(guarantee, conditions);
-    if (reasons.length === 0) {holds.push(guarantee);}
-    else {lost.push(...reasons.map((because) => ({ guarantee, because })));}
-  }
-  return { level: lost.length === 0 ? GuaranteeLevel.Isolated : GuaranteeLevel.Host, holds, lost };
+    const holds: GuaranteeId[] = [];
+    const lost: { readonly guarantee: GuaranteeId; readonly because: GuaranteeLossReason }[] = [];
+    for (const guarantee of GUARANTEE_IDS) {
+        const reasons = lossReasons(guarantee, conditions);
+        if (reasons.length === 0) {
+            holds.push(guarantee);
+        } else {
+            lost.push(...reasons.map((because) => ({ guarantee, because })));
+        }
+    }
+    return {
+        level: lost.length === 0 ? GuaranteeLevel.Isolated : GuaranteeLevel.Host,
+        holds,
+        lost,
+    };
 }

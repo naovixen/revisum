@@ -9,7 +9,8 @@
 //     straight after, and reads through an isolated world, so the page's scripts can neither see
 //     the read nor change what it returns.
 import {
-    DriverErrorCode, failure,
+    DriverErrorCode,
+    failure,
     success,
     type ClipboardPort,
     type DriverError,
@@ -92,7 +93,10 @@ export class RunClipboard implements ClipboardPort {
 
     async readText(maximumCharacters: number): Promise<Result<string, DriverError>> {
         if (this.#crashed()) {
-            return failure({ code: DriverErrorCode.TargetCrashed, detail: "the page's renderer died" });
+            return failure({
+                code: DriverErrorCode.TargetCrashed,
+                detail: "the page's renderer died",
+            });
         }
         try {
             const { frameTree } = await this.#command(GET_FRAME_TREE, {});
@@ -130,7 +134,10 @@ export class RunClipboard implements ClipboardPort {
             return success(text);
         } catch (error) {
             if (this.#crashed()) {
-                return failure({ code: DriverErrorCode.TargetCrashed, detail: "the page's renderer died" });
+                return failure({
+                    code: DriverErrorCode.TargetCrashed,
+                    detail: "the page's renderer died",
+                });
             }
             if (error instanceof PageHeldByDialog) {
                 return failure({ code: DriverErrorCode.DialogOpen, detail: errorText(error) });

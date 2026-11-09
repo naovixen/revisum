@@ -1,7 +1,9 @@
 // An action in one document: the wait for its element, the runtime guard, the input, and what the
 // input started.
 import {
-    StepType, DriverErrorCode, failure,
+    StepType,
+    DriverErrorCode,
+    failure,
     success,
     type ActionGuard,
     type DriverError,

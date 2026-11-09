@@ -2,7 +2,9 @@
 // has, with the browser armed, just before the press, to save the one download it starts. A popup the click opens, or a download that is not its own,
 // fails the step with unsupported-step and nothing of it is kept.
 import {
-    DriverErrorCode, StepType, failure,
+    DriverErrorCode,
+    StepType,
+    failure,
     type ActionGuard,
     type DownloadedFile,
     type DriverError,

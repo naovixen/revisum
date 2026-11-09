@@ -6,7 +6,8 @@
 // the proxy is still seen. A database command's request names the one service its policy allows over
 // TCP: the proxy relays that port and the team's container maps the service's name to the proxy.
 import {
-    WorkloadOutcomeKind, PRODUCT,
+    WorkloadOutcomeKind,
+    PRODUCT,
     failure,
     success,
     type Result,

@@ -36,7 +36,12 @@ type FailedReadCode = (typeof STEP_CODE_OF_FAILED_READ)[PageReadFailureCode];
 export function codeOfFailedRead(readFailure: PageReadFailure, logger: Logger): FailedReadCode {
     const code = STEP_CODE_OF_FAILED_READ[readFailure.code];
     if (code === StepCode.AdapterError) {
-        logger.log({ kind: EventKind.StepEnd, outcome: "failed", code, detail: readFailure.detail });
+        logger.log({
+            kind: EventKind.StepEnd,
+            outcome: "failed",
+            code,
+            detail: readFailure.detail,
+        });
     }
     return code;
 }

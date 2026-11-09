@@ -4,36 +4,56 @@
 // The request's policy allows only the command's service over TCP; the declared services give the
 // runner that service's address and port. No proxy variable is set, since the command speaks TCP.
 // The engine judges the reply itself.
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
-  PRODUCT,
-  type DatabaseCommandRequest, type DatabaseCommandRunner, type DeclaredService, type Result, type WorkloadErrorCode, type WorkloadOutcome,
-  type WorkloadRunner,
-} from '@revisum/engine';
+    PRODUCT,
+    type DatabaseCommandRequest,
+    type DatabaseCommandRunner,
+    type DeclaredService,
+    type Result,
+    type WorkloadErrorCode,
+    type WorkloadOutcome,
+    type WorkloadRunner,
+} from "@revisum/engine";
 
 export type DatabaseCommandRunnerOptions = {
-  readonly workload: WorkloadRunner;
-  // The trusted project's declared services.
-  readonly services: readonly DeclaredService[];
+    readonly workload: WorkloadRunner;
+    // The trusted project's declared services.
+    readonly services: readonly DeclaredService[];
 };
 
-export function databaseCommandRunner(options: DatabaseCommandRunnerOptions): DatabaseCommandRunner {
-  return {
-    async run(request: DatabaseCommandRequest): Promise<Result<WorkloadOutcome, WorkloadErrorCode>> {
-      // Only the services the policy names travel with the request: the runner relays no other.
-      const services = options.services.filter((service) => request.policy.allowTcpServices.includes(service.name));
-      const outputDirectory = mkdtempSync(join(tmpdir(), `${PRODUCT.name}-database-command-`));
-      try {
-        return await options.workload.run({
-          image: request.image, argv: request.argv, workingDirectory: '.', environment: request.environment, policy: request.policy,
-          timeoutMilliseconds: request.timeoutMilliseconds, outputDirectory, services, httpProxyVariables: false,
-          maximumOutputBytes: request.maximumOutputBytes,
-        });
-      } finally {
-        rmSync(outputDirectory, { recursive: true, force: true });
-      }
-    },
-  };
+export function databaseCommandRunner(
+    options: DatabaseCommandRunnerOptions,
+): DatabaseCommandRunner {
+    return {
+        async run(
+            request: DatabaseCommandRequest,
+        ): Promise<Result<WorkloadOutcome, WorkloadErrorCode>> {
+            // Only the services the policy names travel with the request: the runner relays no other.
+            const services = options.services.filter((service) =>
+                request.policy.allowTcpServices.includes(service.name),
+            );
+            const outputDirectory = mkdtempSync(
+                join(tmpdir(), `${PRODUCT.name}-database-command-`),
+            );
+            try {
+                return await options.workload.run({
+                    image: request.image,
+                    argv: request.argv,
+                    workingDirectory: ".",
+                    environment: request.environment,
+                    policy: request.policy,
+                    timeoutMilliseconds: request.timeoutMilliseconds,
+                    outputDirectory,
+                    services,
+                    httpProxyVariables: false,
+                    maximumOutputBytes: request.maximumOutputBytes,
+                });
+            } finally {
+                rmSync(outputDirectory, { recursive: true, force: true });
+            }
+        },
+    };
 }

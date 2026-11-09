@@ -2,7 +2,14 @@
 // and as it acts, in one table. Every
 // step type has an entry, so a new type does not compile until someone decides what may deny it:
 // nothing is allowed by default for want of a case.
-import { DialogAction, CallEffect, StubAction, StructuralLocatorKind, SemanticLocatorKind, literalText } from "@revisum/contracts";
+import {
+    DialogAction,
+    CallEffect,
+    StubAction,
+    StructuralLocatorKind,
+    SemanticLocatorKind,
+    literalText,
+} from "@revisum/contracts";
 import type {
     AllowedUrl,
     DatabaseCommandStep,
@@ -220,7 +227,9 @@ function scriptRule(step: PageScriptStep, context: StaticContext): PolicyRuleId 
     if (declaration === undefined) {
         return "undeclared-origin";
     }
-    return !context.approved && declaration.effect === CallEffect.Write && !declaration.allowInProposals
+    return !context.approved &&
+        declaration.effect === CallEffect.Write &&
+        !declaration.allowInProposals
         ? "side-effect-in-proposal"
         : null;
 }
@@ -246,7 +255,9 @@ function callRule(step: ServiceCallStep, context: StaticContext): PolicyRuleId |
     ) {
         return "production-origin";
     }
-    return !context.approved && declaration.effect === CallEffect.Write && !declaration.allowInProposals
+    return !context.approved &&
+        declaration.effect === CallEffect.Write &&
+        !declaration.allowInProposals
         ? "side-effect-in-proposal"
         : null;
 }
@@ -267,7 +278,9 @@ function commandRule(step: DatabaseCommandStep, context: StaticContext): PolicyR
     if (context.project.productionOrigins.some((origin) => origin === service.origin)) {
         return "production-origin";
     }
-    return !context.approved && declaration.effect === CallEffect.Write && !declaration.allowInProposals
+    return !context.approved &&
+        declaration.effect === CallEffect.Write &&
+        !declaration.allowInProposals
         ? "side-effect-in-proposal"
         : null;
 }
@@ -300,7 +313,8 @@ const isIrreversibleText = (text: string | null, action: GuardedAction): boolean
 // XPath locator, by that exact selector or expression in its unsafe features' list.
 function isAllowedUnnamed(locator: Locator, element: ResolvedElement, project: Project): boolean {
     const allowed = project.policy.unnamedControlsAllowedByTestId;
-    const testId = locator.by === SemanticLocatorKind.TestId ? literalText(locator.testId) : undefined;
+    const testId =
+        locator.by === SemanticLocatorKind.TestId ? literalText(locator.testId) : undefined;
     const structural = structuralQuery(locator);
     return (
         (testId !== undefined && allowed.includes(testId)) ||

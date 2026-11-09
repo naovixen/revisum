@@ -8,5 +8,5 @@ export const EXIT_PRECEDENCE: readonly ExitCode[] = [4, 2, 3, 1, 5, 0];
 // What an unavailable target means for the run: a required one fails it with exit code 3; an
 // optional one is skipped with a warning, so neither passes silently.
 export type UnavailableTargetOutcome =
-  | { readonly exitCode: 3 }
-  | { readonly exitCode: 0; readonly skipped: true; readonly warning: string };
+    | { readonly exitCode: 3 }
+    | { readonly exitCode: 0; readonly skipped: true; readonly warning: string };

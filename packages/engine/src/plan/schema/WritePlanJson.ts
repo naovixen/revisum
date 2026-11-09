@@ -2,7 +2,8 @@
 // input (canonicalJson: sorted keys), so the file does not depend on the key order or layout the
 // plan was written in, and it is laid out with two-space indentation, LF line ends and a final
 // newline. The plan hash stays the hash of canonicalJson itself, not of this file.
-import type { Plan } from '@revisum/contracts';
-import { canonicalJson } from '../../foundation/Sha256.ts';
+import type { Plan } from "@revisum/contracts";
+import { canonicalJson } from "../../foundation/Sha256.ts";
 
-export const writePlanJson = (plan: Plan): string => `${JSON.stringify(JSON.parse(canonicalJson(plan)), null, 2)}\n`;
+export const writePlanJson = (plan: Plan): string =>
+    `${JSON.stringify(JSON.parse(canonicalJson(plan)), null, 2)}\n`;

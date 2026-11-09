@@ -41,7 +41,10 @@ export function cdpDriver(options: CdpDriverOptions): OwnBrowserDriver {
         },
         supports(target) {
             if (target.engine !== Engine.Chromium) {
-                return failure({ reason: UnavailableReason.EngineNotSupported, detail: NOT_CHROMIUM });
+                return failure({
+                    reason: UnavailableReason.EngineNotSupported,
+                    detail: NOT_CHROMIUM,
+                });
             }
             return success(true);
         },
@@ -54,7 +57,10 @@ export function cdpDriver(options: CdpDriverOptions): OwnBrowserDriver {
         },
         async open(target, environment) {
             if (target.engine !== Engine.Chromium) {
-                return failure({ reason: UnavailableReason.EngineNotSupported, detail: NOT_CHROMIUM });
+                return failure({
+                    reason: UnavailableReason.EngineNotSupported,
+                    detail: NOT_CHROMIUM,
+                });
             }
             const opened = await openSessionEgress(options.egress, environment.allowedOrigins);
             if (!opened.ok) {

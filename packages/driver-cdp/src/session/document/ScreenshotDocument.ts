@@ -1,6 +1,7 @@
 // Screenshots of one document's viewport, with what must stay hidden painted solid black.
 import {
-    DriverErrorCode, failure,
+    DriverErrorCode,
+    failure,
     success,
     type DriverError,
     type PageReadFailure,

@@ -1,6 +1,9 @@
 // Auto-waiting for the one element an action acts on, re-read under one deadline.
 import {
-    DriverErrorCode, ElementStateKind, PageReadFailureCode, failure,
+    DriverErrorCode,
+    ElementStateKind,
+    PageReadFailureCode,
+    failure,
     success,
     type DriverError,
     type PageReadFailure,
@@ -104,7 +107,10 @@ function whyNotActionable<Handle>(
     switch (look.kind) {
         case "not-one-match":
             return look.count === 0
-                ? { code: DriverErrorCode.NotFound, detail: `not-found after ${timeoutMilliseconds} ms` }
+                ? {
+                      code: DriverErrorCode.NotFound,
+                      detail: `not-found after ${timeoutMilliseconds} ms`,
+                  }
                 : {
                       code: DriverErrorCode.Ambiguous,
                       detail: `${look.count} matches after ${timeoutMilliseconds} ms`,
@@ -196,7 +202,10 @@ export async function waitUntilFound<Handle>(
         if (Date.now() >= deadline) {
             return failure(
                 found.length === 0
-                    ? { code: DriverErrorCode.NotFound, detail: `not-found after ${timeoutMilliseconds} ms` }
+                    ? {
+                          code: DriverErrorCode.NotFound,
+                          detail: `not-found after ${timeoutMilliseconds} ms`,
+                      }
                     : {
                           code: DriverErrorCode.Ambiguous,
                           detail: `${found.length} matches after ${timeoutMilliseconds} ms`,

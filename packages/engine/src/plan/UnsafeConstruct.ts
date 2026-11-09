@@ -2,7 +2,9 @@
 // these for every step type. Each construct is placed at the field that names its feature, the same
 // path the plan parser refuses a disabled one at.
 import {
-    RememberElementRead, StructuralLocatorKind, DOM_CHECK_KINDS,
+    RememberElementRead,
+    StructuralLocatorKind,
+    DOM_CHECK_KINDS,
     type DatabaseCommandStep,
     type Locator,
     type PageScriptStep,

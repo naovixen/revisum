@@ -8,45 +8,62 @@
 //   - text that is not JSON is script-result-invalid.
 // The caller then reads only the declared fields, by JSON pointer. The text itself is never kept:
 // the run records its sha256.
-import { failure, success, type Result } from '@revisum/contracts';
+import { failure, success, type Result } from "@revisum/contracts";
 
 // How deeply a script's result may nest lists and objects.
 export const MAXIMUM_SCRIPT_RESULT_DEPTH = 64;
 
-type ScriptResultErrorCode = 'script-result-too-large' | 'script-result-invalid';
+type ScriptResultErrorCode = "script-result-too-large" | "script-result-invalid";
 
 // The deepest nesting of lists and objects in JSON text, counting only brackets outside strings.
 // It stops counting once past `limit`, so a long run of brackets costs no more than the limit.
 // A database command's output is scanned the same way.
 export function nestingDepth(text: string, limit: number): number {
-  let depth = 0;
-  let deepest = 0;
-  let inString = false;
-  for (let index = 0; index < text.length; index++) {
-    const character = text[index];
-    if (inString) {
-      // A backslash escapes the next character, a quote among them.
-      if (character === '\\') {index++;}
-      else if (character === '"') {inString = false;}
-      continue;
+    let depth = 0;
+    let deepest = 0;
+    let inString = false;
+    for (let index = 0; index < text.length; index++) {
+        const character = text[index];
+        if (inString) {
+            // A backslash escapes the next character, a quote among them.
+            if (character === "\\") {
+                index++;
+            } else if (character === '"') {
+                inString = false;
+            }
+            continue;
+        }
+        if (character === '"') {
+            inString = true;
+        } else if (character === "[" || character === "{") {
+            depth++;
+            if (depth > deepest) {
+                deepest = depth;
+            }
+            if (deepest > limit) {
+                return deepest;
+            }
+        } else if (character === "]" || character === "}") {
+            depth--;
+        }
     }
-    if (character === '"') {inString = true;}
-    else if (character === '[' || character === '{') {
-      depth++;
-      if (depth > deepest) {deepest = depth;}
-      if (deepest > limit) {return deepest;}
-    } else if (character === ']' || character === '}') {depth--;}
-  }
-  return deepest;
+    return deepest;
 }
 
 // The script's result as a JSON value, or why it is refused.
-export function decodeScriptResult(text: string, maximumResultBytes: number): Result<unknown, ScriptResultErrorCode> {
-  if (Buffer.byteLength(text, 'utf8') > maximumResultBytes) {return failure('script-result-too-large');}
-  if (nestingDepth(text, MAXIMUM_SCRIPT_RESULT_DEPTH) > MAXIMUM_SCRIPT_RESULT_DEPTH) {return failure('script-result-invalid');}
-  try {
-    return success(JSON.parse(text));
-  } catch {
-    return failure('script-result-invalid');
-  }
+export function decodeScriptResult(
+    text: string,
+    maximumResultBytes: number,
+): Result<unknown, ScriptResultErrorCode> {
+    if (Buffer.byteLength(text, "utf8") > maximumResultBytes) {
+        return failure("script-result-too-large");
+    }
+    if (nestingDepth(text, MAXIMUM_SCRIPT_RESULT_DEPTH) > MAXIMUM_SCRIPT_RESULT_DEPTH) {
+        return failure("script-result-invalid");
+    }
+    try {
+        return success(JSON.parse(text));
+    } catch {
+        return failure("script-result-invalid");
+    }
 }

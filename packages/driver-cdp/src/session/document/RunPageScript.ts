@@ -2,7 +2,8 @@
 // page: the run ends without it, and closing the session ends the page. One not yet called when the
 // time runs out, such as behind a page that holds the driver's own calls, is never called.
 import {
-    DriverErrorCode, failure,
+    DriverErrorCode,
+    failure,
     success,
     type DriverError,
     type PageScriptCall,
@@ -56,7 +57,9 @@ export async function runPageScript<Handle>(
             return failure(DIALOG_OPEN);
         }
         return failure(
-            events.crashed() ? CRASHED : { code: DriverErrorCode.ScriptFailed, detail: errorText(error) },
+            events.crashed()
+                ? CRASHED
+                : { code: DriverErrorCode.ScriptFailed, detail: errorText(error) },
         );
     }
     if (events.crashed()) {

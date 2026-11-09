@@ -26,8 +26,7 @@ export function measureOcclusion(): OcclusionInPage {
     if (right - left < 1 || bottom - top < 1) {
         return { inView: false, hits: 0, total: 0 };
     }
-    const parentOf = (node: Node): Node | undefined =>
-        node.parentNode ?? (node as ShadowRoot).host;
+    const parentOf = (node: Node): Node | undefined => node.parentNode ?? (node as ShadowRoot).host;
     const isInside = (hit: Element): boolean => {
         let node: Node | undefined = hit;
         while (node !== undefined) {

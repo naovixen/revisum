@@ -15,7 +15,9 @@
 //   - While any stub or check is active, the pages bypass their service workers, so every matching
 //     request is seen and answered the same way, whatever a worker would have done with it.
 import {
-    DriverErrorCode, PathMatch, failure,
+    DriverErrorCode,
+    PathMatch,
+    failure,
     success,
     type DriverError,
     type NetworkPort,
@@ -303,7 +305,10 @@ export class BrowserNetwork implements NetworkPort {
     ): Promise<Result<void, DriverError>> {
         const observation = this.#observations.get(name);
         if (observation === undefined) {
-            return failure({ code: DriverErrorCode.UnsupportedStep, detail: "the request is not observed" });
+            return failure({
+                code: DriverErrorCode.UnsupportedStep,
+                detail: "the request is not observed",
+            });
         }
         const startedAt = Date.now();
         const deadline = startedAt + timeoutMilliseconds;

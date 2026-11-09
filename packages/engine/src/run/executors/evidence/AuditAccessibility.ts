@@ -28,7 +28,11 @@ export const auditAccessibility: StepExecutor<
         return stepFailed(codeOfFailedRead(audited.error, context.logger));
     }
     const findings = [...audited.value].sort(byRuleId);
-    context.logger.log({ kind: EventKind.Audit, stepIndex: context.index, findings: findings.length });
+    context.logger.log({
+        kind: EventKind.Audit,
+        stepIndex: context.index,
+        findings: findings.length,
+    });
     if (step.mode === AuditMode.Report || findings.length === 0) {
         return { outcome: StepOutcome.Passed, findings };
     }

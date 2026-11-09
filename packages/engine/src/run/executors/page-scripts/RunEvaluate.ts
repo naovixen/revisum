@@ -11,24 +11,51 @@
 // are read. Neither the text nor a field's value is kept: the result and the log record the
 // text's sha256, and a remembered value's name and sha256.
 import {
-  BackendAssertionKind, failure, stepFailed, success, StepOutcome,
-  type StepCode, type BackendAssertion, CallEffect, type Clock, type DocumentSession, type EvaluateStep, type ExpectScriptStep, type FieldName,
-  type JsonPointer, type ParameterName, type Result, type SafeText, type ScriptArguments, type ScriptChoice, type ScriptName,
-  type PageScriptRecord, type ScriptParameterType, type ValueName,
-} from '@revisum/contracts';
-import type { Logger } from '../../logging/LoggingManifest.ts';
-import { isInlineChoice } from '../../../plan/IsInlineChoice.ts';
-import { rememberedFieldEntries } from '../../../plan/parse/declarations/ReadPlanClock.ts';
-import type { Project } from '../../../project/ParseProject.ts';
-import { recordsOfRemembered, type RememberedRecord, type RememberedValues } from '../../values/RememberedValues.ts';
-import { resolveText, type RunValues } from '../../values/RunValues.ts';
-import { sha256UnlessHoldingASecret } from '../../../secrets/ResolvePlanSecrets.ts';
-import { argumentProblem, runValueArgument, type ArgumentValue } from '../service-calls/ArgumentValue.ts';
-import { checkBackendField, fieldAt, fieldText } from '../service-calls/CheckBackendField.ts';
-import type { NamedScripts } from './NamedScriptSources.ts';
-import { decodeScriptResult } from './DecodeScriptResult.ts';
-import { isJudgedLookDone, pollUntil, type JudgedLook } from '../../PollUntil.ts';
-import { EventKind } from '../../logging/LoggingManifest.ts';
+    BackendAssertionKind,
+    failure,
+    stepFailed,
+    success,
+    StepOutcome,
+    type StepCode,
+    type BackendAssertion,
+    CallEffect,
+    type Clock,
+    type DocumentSession,
+    type EvaluateStep,
+    type ExpectScriptStep,
+    type FieldName,
+    type JsonPointer,
+    type ParameterName,
+    type Result,
+    type SafeText,
+    type ScriptArguments,
+    type ScriptChoice,
+    type ScriptName,
+    type PageScriptRecord,
+    type ScriptParameterType,
+    type ValueName,
+} from "@revisum/contracts";
+import type { Logger } from "../../logging/LoggingManifest.ts";
+import { isInlineChoice } from "../../../plan/IsInlineChoice.ts";
+import { rememberedFieldEntries } from "../../../plan/parse/declarations/ReadPlanClock.ts";
+import type { Project } from "../../../project/ParseProject.ts";
+import {
+    recordsOfRemembered,
+    type RememberedRecord,
+    type RememberedValues,
+} from "../../values/RememberedValues.ts";
+import { resolveText, type RunValues } from "../../values/RunValues.ts";
+import { sha256UnlessHoldingASecret } from "../../../secrets/ResolvePlanSecrets.ts";
+import {
+    argumentProblem,
+    runValueArgument,
+    type ArgumentValue,
+} from "../service-calls/ArgumentValue.ts";
+import { checkBackendField, fieldAt, fieldText } from "../service-calls/CheckBackendField.ts";
+import type { NamedScripts } from "./NamedScriptSources.ts";
+import { decodeScriptResult } from "./DecodeScriptResult.ts";
+import { isJudgedLookDone, pollUntil, type JudgedLook } from "../../PollUntil.ts";
+import { EventKind } from "../../logging/LoggingManifest.ts";
 
 // A declared script's limits when its declaration sets none: 5 seconds and 256 KiB.
 const DEFAULT_SCRIPT_TIMEOUT_MILLISECONDS = 5000;
@@ -38,94 +65,131 @@ const SCRIPT_CHECK_INTERVAL_MILLISECONDS = 100;
 
 // What the run hands these steps. `remembered` is how an evaluate adds to the run's values.
 export type PageScriptContext = {
-  readonly project: Project;
-  // Every page script the plan names, as the project declares it, with its source.
-  readonly scripts: NamedScripts;
-  readonly values: RunValues;
-  readonly remembered: RememberedValues;
-  readonly clock: Clock;
-  readonly logger: Logger;
-  // True when text holds one of the run's secrets, in any form.
-  readonly holdsSecret: (text: string) => boolean;
+    readonly project: Project;
+    // Every page script the plan names, as the project declares it, with its source.
+    readonly scripts: NamedScripts;
+    readonly values: RunValues;
+    readonly remembered: RememberedValues;
+    readonly clock: Clock;
+    readonly logger: Logger;
+    // True when text holds one of the run's secrets, in any form.
+    readonly holdsSecret: (text: string) => boolean;
 };
-
 
 // What one of these steps gives its step result. An evaluate that remembers one value records it
 // as `remembered`, as a remember step does; one that remembers several records them all in
 // `rememberedValues`, in the order the plan names them.
 type PageScriptOutcome =
-  | {
-    readonly outcome: typeof StepOutcome.Passed;
-    readonly pageScript?: PageScriptRecord;
-    readonly remembered?: RememberedRecord;
-    readonly rememberedValues?: readonly RememberedRecord[];
-  }
-  | { readonly outcome: typeof StepOutcome.Failed; readonly code: StepCode; readonly pageScript?: PageScriptRecord };
+    | {
+          readonly outcome: typeof StepOutcome.Passed;
+          readonly pageScript?: PageScriptRecord;
+          readonly remembered?: RememberedRecord;
+          readonly rememberedValues?: readonly RememberedRecord[];
+      }
+    | {
+          readonly outcome: typeof StepOutcome.Failed;
+          readonly code: StepCode;
+          readonly pageScript?: PageScriptRecord;
+      };
 
-const failedWith = (code: StepCode, pageScript?: PageScriptRecord): PageScriptOutcome =>
-  ({ ...stepFailed(code), ...(pageScript === undefined ? {} : { pageScript }) });
+const failedWith = (code: StepCode, pageScript?: PageScriptRecord): PageScriptOutcome => ({
+    ...stepFailed(code),
+    ...(pageScript === undefined ? {} : { pageScript }),
+});
 
 // A script ready to run: its source text and what its declaration, or the plan, says of it.
 type ScriptToRun = {
-  readonly name: ScriptName | null;
-  readonly source: string;
-  readonly parameters: Readonly<Record<ParameterName, ScriptParameterType>>;
-  readonly effect: CallEffect;
-  readonly fields: Readonly<Record<FieldName, JsonPointer>>;
-  readonly timeoutMilliseconds: number;
-  readonly maximumResultBytes: number;
+    readonly name: ScriptName | null;
+    readonly source: string;
+    readonly parameters: Readonly<Record<ParameterName, ScriptParameterType>>;
+    readonly effect: CallEffect;
+    readonly fields: Readonly<Record<FieldName, JsonPointer>>;
+    readonly timeoutMilliseconds: number;
+    readonly maximumResultBytes: number;
 };
 
 // The script a step names. The named scripts hold every one the run's plan names, with its source,
 // so a name not among them is a step from a plan the run was not cleared for, which cannot run here.
-function scriptToRun(choice: ScriptChoice, context: PageScriptContext): Result<ScriptToRun, StepCode> {
-  if (isInlineChoice(choice)) {
-    const inline = choice.inline;
-    // An inline script declares no parameters, so it is called with one empty object.
+function scriptToRun(
+    choice: ScriptChoice,
+    context: PageScriptContext,
+): Result<ScriptToRun, StepCode> {
+    if (isInlineChoice(choice)) {
+        const inline = choice.inline;
+        // An inline script declares no parameters, so it is called with one empty object.
+        return success({
+            name: null,
+            source: inline.source,
+            parameters: {},
+            effect: inline.effect,
+            fields: inline.fields ?? {},
+            timeoutMilliseconds: DEFAULT_SCRIPT_TIMEOUT_MILLISECONDS,
+            maximumResultBytes: DEFAULT_MAXIMUM_SCRIPT_RESULT_BYTES,
+        });
+    }
+    const named = context.scripts.get(choice);
+    if (named === undefined) {
+        return failure("unsupported-step");
+    }
+    const declaration = named.declaration;
+    let source: string;
+    try {
+        source = new TextDecoder("utf-8", { fatal: true }).decode(named.source);
+    } catch {
+        // A file that is not UTF-8 text is no script the page could run.
+        return failure("script-failed");
+    }
     return success({
-      name: null, source: inline.source, parameters: {}, effect: inline.effect, fields: inline.fields ?? {},
-      timeoutMilliseconds: DEFAULT_SCRIPT_TIMEOUT_MILLISECONDS, maximumResultBytes: DEFAULT_MAXIMUM_SCRIPT_RESULT_BYTES,
+        name: choice,
+        source,
+        parameters: declaration.parameters,
+        effect: declaration.effect,
+        fields: declaration.fields ?? {},
+        timeoutMilliseconds: declaration.timeoutMilliseconds ?? DEFAULT_SCRIPT_TIMEOUT_MILLISECONDS,
+        maximumResultBytes: declaration.maximumResultBytes ?? DEFAULT_MAXIMUM_SCRIPT_RESULT_BYTES,
     });
-  }
-  const named = context.scripts.get(choice);
-  if (named === undefined) {return failure('unsupported-step');}
-  const declaration = named.declaration;
-  let source: string;
-  try {
-    source = new TextDecoder('utf-8', { fatal: true }).decode(named.source);
-  } catch {
-    // A file that is not UTF-8 text is no script the page could run.
-    return failure('script-failed');
-  }
-  return success({
-    name: choice, source, parameters: declaration.parameters, effect: declaration.effect, fields: declaration.fields ?? {},
-    timeoutMilliseconds: declaration.timeoutMilliseconds ?? DEFAULT_SCRIPT_TIMEOUT_MILLISECONDS,
-    maximumResultBytes: declaration.maximumResultBytes ?? DEFAULT_MAXIMUM_SCRIPT_RESULT_BYTES,
-  });
 }
 
 // The step's arguments as JSON values, each checked against its declared parameter. A run value's
 // text is only known now, so it is checked as a call's argument is: one that does not fit is
 // parameter-invalid. The parser checked the literal ones; they are checked again all the same.
-function scriptArguments(given: ScriptArguments, script: ScriptToRun, context: PageScriptContext): Result<Record<string, ArgumentValue>, StepCode> {
-  const resolved: Record<string, ArgumentValue> = {};
-  for (const [name, argument] of Object.entries(given)) {
-    const type = Object.entries(script.parameters).find(([parameter]) => parameter === name)?.[1];
-    if (type === undefined) {return failure('parameter-invalid');}
-    let value: ArgumentValue;
-    if (typeof argument === 'object') {
-      const text = resolveText(argument, context.values, context.project.limits.maximumTextLength);
-      if (!text.ok) {return text;}
-      const fitted = runValueArgument(type, text.value);
-      if (fitted === undefined) {return failure('parameter-invalid');}
-      value = fitted;
-    } else {
-      value = argument;
+function scriptArguments(
+    given: ScriptArguments,
+    script: ScriptToRun,
+    context: PageScriptContext,
+): Result<Record<string, ArgumentValue>, StepCode> {
+    const resolved: Record<string, ArgumentValue> = {};
+    for (const [name, argument] of Object.entries(given)) {
+        const type = Object.entries(script.parameters).find(
+            ([parameter]) => parameter === name,
+        )?.[1];
+        if (type === undefined) {
+            return failure("parameter-invalid");
+        }
+        let value: ArgumentValue;
+        if (typeof argument === "object") {
+            const text = resolveText(
+                argument,
+                context.values,
+                context.project.limits.maximumTextLength,
+            );
+            if (!text.ok) {
+                return text;
+            }
+            const fitted = runValueArgument(type, text.value);
+            if (fitted === undefined) {
+                return failure("parameter-invalid");
+            }
+            value = fitted;
+        } else {
+            value = argument;
+        }
+        if (argumentProblem(type, value) !== undefined) {
+            return failure("parameter-invalid");
+        }
+        resolved[name] = value;
     }
-    if (argumentProblem(type, value) !== undefined) {return failure('parameter-invalid');}
-    resolved[name] = value;
-  }
-  return success(resolved);
+    return success(resolved);
 }
 
 type OneRun = { readonly result: Result<unknown, StepCode>; readonly resultSha256: string | null };
@@ -133,86 +197,187 @@ type OneRun = { readonly result: Result<unknown, StepCode>; readonly resultSha25
 // Runs the script once through the driver and decodes its result. Each run is logged by step,
 // outcome, code, the result text's sha256 and duration only.
 async function runOnce(
-  session: DocumentSession, script: ScriptToRun, callArguments: Readonly<Record<string, ArgumentValue>>, stepIndex: number,
-  stepType: 'evaluate' | 'expectScript', context: PageScriptContext,
+    session: DocumentSession,
+    script: ScriptToRun,
+    callArguments: Readonly<Record<string, ArgumentValue>>,
+    stepIndex: number,
+    stepType: "evaluate" | "expectScript",
+    context: PageScriptContext,
 ): Promise<OneRun> {
-  const startedAt = context.clock.now();
-  const ran = await session.runScript({
-    source: script.source, arguments: callArguments, timeoutMilliseconds: script.timeoutMilliseconds, maximumResultBytes: script.maximumResultBytes,
-  });
-  const result: Result<unknown, StepCode> = ran.ok ? decodeScriptResult(ran.value, script.maximumResultBytes) : failure(ran.error.code);
-  // Only a result text accepted in full is hashed: an oversized one may have been cut short.
-  const resultSha256 = ran.ok && result.ok ? sha256UnlessHoldingASecret(ran.value, context.holdsSecret) : null;
-  context.logger.log({
-    kind: EventKind.PageScript, stepIndex, stepType, outcome: result.ok ? 'passed' : 'failed',
-    ...(result.ok ? {} : { code: result.error }), ...(resultSha256 === null ? {} : { sha256: resultSha256 }),
-    durationMilliseconds: context.clock.now() - startedAt,
-  });
-  return { result, resultSha256 };
+    const startedAt = context.clock.now();
+    const ran = await session.runScript({
+        source: script.source,
+        arguments: callArguments,
+        timeoutMilliseconds: script.timeoutMilliseconds,
+        maximumResultBytes: script.maximumResultBytes,
+    });
+    const result: Result<unknown, StepCode> = ran.ok
+        ? decodeScriptResult(ran.value, script.maximumResultBytes)
+        : failure(ran.error.code);
+    // Only a result text accepted in full is hashed: an oversized one may have been cut short.
+    const resultSha256 =
+        ran.ok && result.ok ? sha256UnlessHoldingASecret(ran.value, context.holdsSecret) : null;
+    context.logger.log({
+        kind: EventKind.PageScript,
+        stepIndex,
+        stepType,
+        outcome: result.ok ? "passed" : "failed",
+        ...(result.ok ? {} : { code: result.error }),
+        ...(resultSha256 === null ? {} : { sha256: resultSha256 }),
+        durationMilliseconds: context.clock.now() - startedAt,
+    });
+    return { result, resultSha256 };
 }
 
 // A declared result field, by the JSON pointer its declaration gives it.
-function resultField(document: unknown, script: ScriptToRun, field: FieldName): Result<unknown, 'field-missing'> {
-  const pointer = Object.entries(script.fields).find(([name]) => name === field)?.[1];
-  return pointer === undefined ? failure('field-missing') : fieldAt(document, pointer);
+function resultField(
+    document: unknown,
+    script: ScriptToRun,
+    field: FieldName,
+): Result<unknown, "field-missing"> {
+    const pointer = Object.entries(script.fields).find(([name]) => name === field)?.[1];
+    return pointer === undefined ? failure("field-missing") : fieldAt(document, pointer);
 }
 
 // The texts of the result fields an evaluate remembers. Every field is read before any is kept.
-function textsToRemember(step: EvaluateStep, document: unknown, script: ScriptToRun): Result<readonly (readonly [ValueName, string])[], StepCode> {
-  const entries: (readonly [ValueName, string])[] = [];
-  for (const [name, field] of rememberedFieldEntries(step.remember)) {
-    const found = resultField(document, script, field);
-    if (!found.ok) {return found;}
-    const text = fieldText(found.value);
-    if (text === undefined) {return failure('field-missing');}
-    entries.push([name, text]);
-  }
-  return success(entries);
+function textsToRemember(
+    step: EvaluateStep,
+    document: unknown,
+    script: ScriptToRun,
+): Result<readonly (readonly [ValueName, string])[], StepCode> {
+    const entries: (readonly [ValueName, string])[] = [];
+    for (const [name, field] of rememberedFieldEntries(step.remember)) {
+        const found = resultField(document, script, field);
+        if (!found.ok) {
+            return found;
+        }
+        const text = fieldText(found.value);
+        if (text === undefined) {
+            return failure("field-missing");
+        }
+        entries.push([name, text]);
+    }
+    return success(entries);
 }
 
-export async function runEvaluate(step: EvaluateStep, stepIndex: number, session: DocumentSession, context: PageScriptContext): Promise<PageScriptOutcome> {
-  const script = scriptToRun(step.script, context);
-  if (!script.ok) {return failedWith(script.error);}
-  const callArguments = scriptArguments(step.arguments, script.value, context);
-  if (!callArguments.ok) {return failedWith(callArguments.error);}
-  const once = await runOnce(session, script.value, callArguments.value, stepIndex, step.type, context);
-  const pageScript: PageScriptRecord = { script: script.value.name, attempts: 1, resultSha256: once.resultSha256 };
-  if (!once.result.ok) {return failedWith(once.result.error, pageScript);}
-  const texts = textsToRemember(step, once.result.value, script.value);
-  if (!texts.ok) {return failedWith(texts.error, pageScript);}
-  const remembered = context.remembered.rememberAll(texts.value, stepIndex);
-  if (!remembered.ok) {return failedWith(remembered.error, pageScript);}
-  return { outcome: StepOutcome.Passed, pageScript, ...recordsOfRemembered(remembered.value) };
+export async function runEvaluate(
+    step: EvaluateStep,
+    stepIndex: number,
+    session: DocumentSession,
+    context: PageScriptContext,
+): Promise<PageScriptOutcome> {
+    const script = scriptToRun(step.script, context);
+    if (!script.ok) {
+        return failedWith(script.error);
+    }
+    const callArguments = scriptArguments(step.arguments, script.value, context);
+    if (!callArguments.ok) {
+        return failedWith(callArguments.error);
+    }
+    const once = await runOnce(
+        session,
+        script.value,
+        callArguments.value,
+        stepIndex,
+        step.type,
+        context,
+    );
+    const pageScript: PageScriptRecord = {
+        script: script.value.name,
+        attempts: 1,
+        resultSha256: once.resultSha256,
+    };
+    if (!once.result.ok) {
+        return failedWith(once.result.error, pageScript);
+    }
+    const texts = textsToRemember(step, once.result.value, script.value);
+    if (!texts.ok) {
+        return failedWith(texts.error, pageScript);
+    }
+    const remembered = context.remembered.rememberAll(texts.value, stepIndex);
+    if (!remembered.ok) {
+        return failedWith(remembered.error, pageScript);
+    }
+    return { outcome: StepOutcome.Passed, pageScript, ...recordsOfRemembered(remembered.value) };
 }
 
 // The text a check compares against, with a value reference resolved; null for a check of no text.
-function expectedText(assertion: BackendAssertion, context: PageScriptContext): Result<SafeText | null, StepCode> {
-  if (!('value' in assertion) || typeof assertion.value === 'number') {return success(null);}
-  return resolveText(assertion.value, context.values, context.project.limits.maximumTextLength);
+function expectedText(
+    assertion: BackendAssertion,
+    context: PageScriptContext,
+): Result<SafeText | null, StepCode> {
+    if (!("value" in assertion) || typeof assertion.value === "number") {
+        return success(null);
+    }
+    return resolveText(assertion.value, context.values, context.project.limits.maximumTextLength);
 }
 
-export async function runScriptCheck(step: ExpectScriptStep, stepIndex: number, session: DocumentSession, context: PageScriptContext): Promise<PageScriptOutcome> {
-  const script = scriptToRun(step.script, context);
-  if (!script.ok) {return failedWith(script.error);}
-  const callArguments = scriptArguments(step.arguments, script.value, context);
-  if (!callArguments.ok) {return failedWith(callArguments.error);}
-  const expected = expectedText(step.assert, context);
-  if (!expected.ok) {return failedWith(expected.error);}
-  const rule = {
-    timeoutMilliseconds: context.project.limits.scriptCheckTimeoutMilliseconds,
-    intervalMilliseconds: SCRIPT_CHECK_INTERVAL_MILLISECONDS,
-    isDone: isJudgedLookDone,
-  };
-  const last = await pollUntil(context.clock, rule, async (attempts): Promise<JudgedLook<PageScriptOutcome>> => {
-    const once = await runOnce(session, script.value, callArguments.value, stepIndex, step.type, context);
-    const pageScript: PageScriptRecord = { script: script.value.name, attempts, resultSha256: once.resultSha256 };
-    // A script that throws, hangs or gives no usable result would do the same again: it stops here.
-    if (!once.result.ok) {return { outcome: failedWith(once.result.error, pageScript), isDone: true };}
-    const field = resultField(once.result.value, script.value, step.field);
-    if (checkBackendField(step.assert, field.ok ? { value: field.value } : undefined, expected.value)) {return { outcome: { outcome: StepOutcome.Passed, pageScript }, isDone: true };}
-    const code = !field.ok && step.assert.kind !== BackendAssertionKind.Present && step.assert.kind !== BackendAssertionKind.Absent ? 'field-missing' : 'assertion-failed';
-    // The parser lets only a read script stand in a check; a write one is never run twice all the same.
-    return { outcome: failedWith(code, pageScript), isDone: script.value.effect === CallEffect.Write };
-  });
-  return last.outcome;
+export async function runScriptCheck(
+    step: ExpectScriptStep,
+    stepIndex: number,
+    session: DocumentSession,
+    context: PageScriptContext,
+): Promise<PageScriptOutcome> {
+    const script = scriptToRun(step.script, context);
+    if (!script.ok) {
+        return failedWith(script.error);
+    }
+    const callArguments = scriptArguments(step.arguments, script.value, context);
+    if (!callArguments.ok) {
+        return failedWith(callArguments.error);
+    }
+    const expected = expectedText(step.assert, context);
+    if (!expected.ok) {
+        return failedWith(expected.error);
+    }
+    const rule = {
+        timeoutMilliseconds: context.project.limits.scriptCheckTimeoutMilliseconds,
+        intervalMilliseconds: SCRIPT_CHECK_INTERVAL_MILLISECONDS,
+        isDone: isJudgedLookDone,
+    };
+    const last = await pollUntil(
+        context.clock,
+        rule,
+        async (attempts): Promise<JudgedLook<PageScriptOutcome>> => {
+            const once = await runOnce(
+                session,
+                script.value,
+                callArguments.value,
+                stepIndex,
+                step.type,
+                context,
+            );
+            const pageScript: PageScriptRecord = {
+                script: script.value.name,
+                attempts,
+                resultSha256: once.resultSha256,
+            };
+            // A script that throws, hangs or gives no usable result would do the same again: it stops here.
+            if (!once.result.ok) {
+                return { outcome: failedWith(once.result.error, pageScript), isDone: true };
+            }
+            const field = resultField(once.result.value, script.value, step.field);
+            if (
+                checkBackendField(
+                    step.assert,
+                    field.ok ? { value: field.value } : undefined,
+                    expected.value,
+                )
+            ) {
+                return { outcome: { outcome: StepOutcome.Passed, pageScript }, isDone: true };
+            }
+            const code =
+                !field.ok &&
+                step.assert.kind !== BackendAssertionKind.Present &&
+                step.assert.kind !== BackendAssertionKind.Absent
+                    ? "field-missing"
+                    : "assertion-failed";
+            // The parser lets only a read script stand in a check; a write one is never run twice all the same.
+            return {
+                outcome: failedWith(code, pageScript),
+                isDone: script.value.effect === CallEffect.Write,
+            };
+        },
+    );
+    return last.outcome;
 }

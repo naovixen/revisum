@@ -1,6 +1,7 @@
 // What every port of one document works with, and the rules they share for time and failure.
 import {
-    PageReadFailureCode, failure,
+    PageReadFailureCode,
+    failure,
     success,
     type DriverError,
     DriverErrorCode,

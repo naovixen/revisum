@@ -8,32 +8,38 @@
 //   - one --project per declared project.
 // The runner runs the vector without a shell, so no argument is ever read as shell syntax. The
 // suite's timeout is the runner's to enforce.
-import type { EvidenceSuiteDeclaration } from '@revisum/contracts';
+import type { EvidenceSuiteDeclaration } from "@revisum/contracts";
 
 // The report's file name, at the top of Revisum's output folder.
-export const SUITE_REPORT_FILE = 'report.json';
+export const SUITE_REPORT_FILE = "report.json";
 // The folder, inside Revisum's output folder, where Playwright writes traces and attachments.
-const SUITE_RESULTS_FOLDER = 'test-results';
-const REPORT_PATH_VARIABLE = 'PLAYWRIGHT_JSON_OUTPUT_NAME';
+const SUITE_RESULTS_FOLDER = "test-results";
+const REPORT_PATH_VARIABLE = "PLAYWRIGHT_JSON_OUTPUT_NAME";
 // What is read back as a suite's evidence, so nothing older may be there when it runs. The rest of the
 // output folder is left alone: it is the only place a setup command can leave work for the suite,
 // since the checkout is read-only and each command gets a new container.
 export const SUITE_EVIDENCE_PATHS: readonly string[] = [SUITE_REPORT_FILE, SUITE_RESULTS_FOLDER];
 
 export type SuiteArguments = {
-  readonly argv: readonly string[];
-  readonly environment: Readonly<Record<string, string>>;
+    readonly argv: readonly string[];
+    readonly environment: Readonly<Record<string, string>>;
 };
 
 // `outputDirectory` is where the suite's process sees Revisum's output folder.
-export function suiteArguments(suite: EvidenceSuiteDeclaration, outputDirectory: string): SuiteArguments {
-  const folder = outputDirectory.replace(/\/+$/, '');
-  return {
-    argv: [
-      ...suite.command,
-      '--retries=0', '--reporter=json', '--trace=on', `--output=${folder}/${SUITE_RESULTS_FOLDER}`,
-      ...suite.projects.map((project) => `--project=${project}`),
-    ],
-    environment: { [REPORT_PATH_VARIABLE]: `${folder}/${SUITE_REPORT_FILE}` },
-  };
+export function suiteArguments(
+    suite: EvidenceSuiteDeclaration,
+    outputDirectory: string,
+): SuiteArguments {
+    const folder = outputDirectory.replace(/\/+$/, "");
+    return {
+        argv: [
+            ...suite.command,
+            "--retries=0",
+            "--reporter=json",
+            "--trace=on",
+            `--output=${folder}/${SUITE_RESULTS_FOLDER}`,
+            ...suite.projects.map((project) => `--project=${project}`),
+        ],
+        environment: { [REPORT_PATH_VARIABLE]: `${folder}/${SUITE_REPORT_FILE}` },
+    };
 }

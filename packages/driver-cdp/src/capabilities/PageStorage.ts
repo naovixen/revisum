@@ -2,7 +2,8 @@
 // DOMStorage domain, so no script runs in the page. An entry belongs to one origin: a write or a
 // read while the page is on another origin fails with storage-origin-mismatch and touches nothing.
 import {
-    DriverErrorCode, failure,
+    DriverErrorCode,
+    failure,
     success,
     type DriverError,
     type Origin,
@@ -86,7 +87,9 @@ export class PageStorage implements StoragePort {
                     detail: "the page is not on the storage entry's origin",
                 });
             }
-            return success(await use({ securityOrigin: origin, isLocalStorage: area === StorageArea.Local }));
+            return success(
+                await use({ securityOrigin: origin, isLocalStorage: area === StorageArea.Local }),
+            );
         } catch (error) {
             if (error instanceof PageHeldByDialog) {
                 return failure({ code: DriverErrorCode.DialogOpen, detail: errorText(error) });

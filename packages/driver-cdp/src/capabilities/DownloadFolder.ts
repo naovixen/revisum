@@ -9,7 +9,8 @@
 // begins after the press was sent, in the frame the press acted in, and the press could start
 // something at all, so a file a page's timer starts on a press with a handler still passes.
 import {
-    DriverErrorCode, failure,
+    DriverErrorCode,
+    failure,
     success,
     type DownloadedFile,
     type DriverError,
@@ -296,7 +297,10 @@ export class DownloadFolder implements DownloadCapture {
             }
             if (Date.now() >= finishBy) {
                 await this.#discard(claimed.downloadId);
-                return failure({ code: DriverErrorCode.Timeout, detail: "the download did not finish in time" });
+                return failure({
+                    code: DriverErrorCode.Timeout,
+                    detail: "the download did not finish in time",
+                });
             }
             await pause(POLL_INTERVAL_MILLISECONDS);
         }

@@ -1,6 +1,8 @@
 // A dialog step: answering the dialog the page has open.
 import {
-    DialogAction, DriverErrorCode, failure,
+    DialogAction,
+    DriverErrorCode,
+    failure,
     success,
     type ActionGuard,
     type DriverError,
@@ -25,7 +27,10 @@ async function dialogText<Handle>(
             return failure(CRASHED);
         }
         if (Date.now() >= stepDeadline) {
-            return failure({ code: DriverErrorCode.NotFound, detail: `no dialog opened within ${timeout} ms` });
+            return failure({
+                code: DriverErrorCode.NotFound,
+                detail: `no dialog opened within ${timeout} ms`,
+            });
         }
         await pause(POLL_INTERVAL_MILLISECONDS);
         text = events.openDialog();

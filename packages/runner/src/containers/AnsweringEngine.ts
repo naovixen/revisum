@@ -3,7 +3,12 @@
 // already did, or to reach its removals; the removals and the short reads are bounded too. Starting a
 // container, making a network and running a command keep the time they need.
 import { failure, type Failure } from "@revisum/contracts";
-import { ImageAnswerKind, NetworkFailureKind, type ContainerEngine, type EngineProblem } from "./ContainerEngine.ts";
+import {
+    ImageAnswerKind,
+    NetworkFailureKind,
+    type ContainerEngine,
+    type EngineProblem,
+} from "./ContainerEngine.ts";
 import { withinReadBound } from "./WithinReadBound.ts";
 
 const thrownDetail = (thrown: unknown): string =>

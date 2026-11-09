@@ -1,6 +1,7 @@
 // A second tab in the session's own browser context, so it shares cookies and storage.
 import {
-    DriverErrorCode, failure,
+    DriverErrorCode,
+    failure,
     success,
     type DriverError,
     type Result,

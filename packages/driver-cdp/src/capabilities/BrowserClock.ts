@@ -10,7 +10,8 @@
 //   - The callbacks every frame fires count against one limit; past it the advance fails with
 //     clock-runaway. Nothing here waits for real time.
 import {
-    DriverErrorCode, CLOCK_CONTROLLER_KEY,
+    DriverErrorCode,
+    CLOCK_CONTROLLER_KEY,
     failure,
     success,
     virtualClockScript,

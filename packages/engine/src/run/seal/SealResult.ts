@@ -1,7 +1,8 @@
 // Sealing a plan run's result: the run mode, the guarantee statement, the unsafe label (for a plan
 // using unsafe features), the approval label (for an approved plan) and the result's two hashes.
 import {
-    GuaranteeLevel, RunMode,
+    GuaranteeLevel,
+    RunMode,
     type GuaranteeStatement,
     type PlanDeniedResult,
     type PlanDeniedThenErroredResult,

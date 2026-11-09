@@ -1,6 +1,7 @@
 // The only entry point for untrusted input, such as a plan an AI proposed.
 import {
-    PolicyVerdictKind, RejectedState,
+    PolicyVerdictKind,
+    RejectedState,
     TerminalState,
     UnavailableReason,
     type Plan,

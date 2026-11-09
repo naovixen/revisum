@@ -3,17 +3,25 @@
 // a plan, and planJsonSchema() reads the same tables to build the published JSON Schema, so the two
 // cannot drift apart.
 import {
-  DOM_CHECK_KINDS, DOWNLOAD_SIZE_KINDS, DOWNLOAD_TEXT_KINDS, ELEMENT_STATE_KINDS, ELEMENT_TEXT_KINDS, SEMANTIC_LOCATOR_KINDS, PAGE_TEXT_KINDS,
-  PLAN_VERSION, STRUCTURAL_LOCATOR_KINDS,
-  type StructuralLocatorKind, UnsafeFeature,
-} from '@revisum/contracts';
+    DOM_CHECK_KINDS,
+    DOWNLOAD_SIZE_KINDS,
+    DOWNLOAD_TEXT_KINDS,
+    ELEMENT_STATE_KINDS,
+    ELEMENT_TEXT_KINDS,
+    SEMANTIC_LOCATOR_KINDS,
+    PAGE_TEXT_KINDS,
+    PLAN_VERSION,
+    STRUCTURAL_LOCATOR_KINDS,
+    type StructuralLocatorKind,
+    UnsafeFeature,
+} from "@revisum/contracts";
 
 // The one version text a plan may declare. Anything else is refused, so no plan partly runs.
 export const CURRENT_PLAN_VERSION: `${number}.${number}` = `${PLAN_VERSION.major}.${PLAN_VERSION.minor}`;
 
 // The field every assertion step carries: the acceptance criterion it checks. A missing one makes
 // the assertion vacuous rather than merely incomplete, so the parser reports it as such.
-export const CRITERION_FIELD = 'criterionId';
+export const CRITERION_FIELD = "criterionId";
 
 // A remember step's source and a relative day's anchor are both written `from`. The name is
 // spelt once, here, as a template literal, since the import checks take that word followed by a
@@ -24,36 +32,42 @@ export const FROM_FIELD = `from`;
 // The one table of what needs which feature: the parser refuses a construct whose feature the
 // project leaves off, and unsafeFeaturesOf names a plan's features, both from these.
 
-export const LOCATOR_FEATURES: { readonly [Kind in StructuralLocatorKind]: UnsafeFeature } = { css: UnsafeFeature.CssLocator, xpath: UnsafeFeature.XpathLocator };
+export const LOCATOR_FEATURES: { readonly [Kind in StructuralLocatorKind]: UnsafeFeature } = {
+    css: UnsafeFeature.CssLocator,
+    xpath: UnsafeFeature.XpathLocator,
+};
 // DOM checks and remembering an attribute.
-export const DOM_CHECKS_FEATURE: UnsafeFeature = 'dom-checks';
+export const DOM_CHECKS_FEATURE: UnsafeFeature = "dom-checks";
 // A named script needs page-script; an inline one needs inline-page-script, which a project can
 // enable only together with page-script.
-export const NAMED_SCRIPT_FEATURE: UnsafeFeature = 'page-script';
-export const INLINE_SCRIPT_FEATURE: UnsafeFeature = 'inline-page-script';
-export const DATABASE_COMMAND_FEATURE: UnsafeFeature = 'database-command';
+export const NAMED_SCRIPT_FEATURE: UnsafeFeature = "page-script";
+export const INLINE_SCRIPT_FEATURE: UnsafeFeature = "inline-page-script";
+export const DATABASE_COMMAND_FEATURE: UnsafeFeature = "database-command";
 
 // The fields of each locator kind, in the order they are written. All are required.
 export const LOCATOR_FIELDS = {
-  role: ['by', 'role', 'name'],
-  label: ['by', 'label'],
-  text: ['by', 'text'],
-  testId: ['by', 'testId'],
-  css: ['by', 'selector'],
-  xpath: ['by', 'expression'],
+    role: ["by", "role", "name"],
+    label: ["by", "label"],
+    text: ["by", "text"],
+    testId: ["by", "testId"],
+    css: ["by", "selector"],
+    xpath: ["by", "expression"],
 } as const;
 // The fields a locator may add.
 export const OPTIONAL_LOCATOR_FIELDS = {
-  role: ['position'],
-  label: ['position'],
-  text: ['position'],
-  testId: ['attribute', 'position'],
-  css: ['hasText', 'inside', 'position'],
-  xpath: ['hasText', 'inside', 'position'],
+    role: ["position"],
+    label: ["position"],
+    text: ["position"],
+    testId: ["attribute", "position"],
+    css: ["hasText", "inside", "position"],
+    xpath: ["hasText", "inside", "position"],
 } as const;
 export type LocatorKind = keyof typeof LOCATOR_FIELDS;
 // Every locator kind.
-export const ALL_LOCATOR_KINDS: readonly LocatorKind[] = [...SEMANTIC_LOCATOR_KINDS, ...STRUCTURAL_LOCATOR_KINDS];
+export const ALL_LOCATOR_KINDS: readonly LocatorKind[] = [
+    ...SEMANTIC_LOCATOR_KINDS,
+    ...STRUCTURAL_LOCATOR_KINDS,
+];
 // How many `inside` links a css or XPath locator may chain: the fourth is refused.
 export const MAXIMUM_INSIDE_DEPTH = 3;
 // A css selector or XPath expression: literal plan text of at most this many characters, on one
@@ -62,15 +76,31 @@ export const MAXIMUM_INSIDE_DEPTH = 3;
 export const MAXIMUM_SELECTOR_LENGTH = 512;
 export const SELECTOR_FORBIDDEN_CHARACTERS = /[{};@]/;
 
-export const PLAN_FIELDS = ['version', 'meta', 'targets', 'steps'] as const;
+export const PLAN_FIELDS = ["version", "meta", "targets", "steps"] as const;
 // Top-level fields a plan may leave out: storageState names saved browser storage state, values
 // names the values generated for each run, clock sets the page's frozen clock, and cleanup lists
 // the calls that run after the steps, whatever the outcome.
-export const OPTIONAL_PLAN_FIELDS = ['storageState', 'values', 'clock', 'cleanup'] as const;
-export const META_FIELDS = ['featureId', 'specReference', 'title'] as const;
-export const PAGE_KINDS = [...PAGE_TEXT_KINDS, 'url', 'urlPathStartsWith', 'metaContent', 'canonicalUrl'] as const;
-export const ELEMENT_KINDS = [...ELEMENT_STATE_KINDS, ...ELEMENT_TEXT_KINDS, 'countEquals', 'hrefEquals', ...DOM_CHECK_KINDS] as const;
-export const DOWNLOAD_KINDS = [...DOWNLOAD_TEXT_KINDS, 'mediaTypeEquals', ...DOWNLOAD_SIZE_KINDS] as const;
+export const OPTIONAL_PLAN_FIELDS = ["storageState", "values", "clock", "cleanup"] as const;
+export const META_FIELDS = ["featureId", "specReference", "title"] as const;
+export const PAGE_KINDS = [
+    ...PAGE_TEXT_KINDS,
+    "url",
+    "urlPathStartsWith",
+    "metaContent",
+    "canonicalUrl",
+] as const;
+export const ELEMENT_KINDS = [
+    ...ELEMENT_STATE_KINDS,
+    ...ELEMENT_TEXT_KINDS,
+    "countEquals",
+    "hrefEquals",
+    ...DOM_CHECK_KINDS,
+] as const;
+export const DOWNLOAD_KINDS = [
+    ...DOWNLOAD_TEXT_KINDS,
+    "mediaTypeEquals",
+    ...DOWNLOAD_SIZE_KINDS,
+] as const;
 
 export const FEATURE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 export const CAPTURE_NAME = /^[a-z0-9][a-z0-9-]{0,63}$/;
@@ -95,7 +125,7 @@ export const EMAIL_LOCAL_PREFIX = /^[A-Za-z0-9._+-]{1,53}$/;
 
 // How a URL in a plan is written: a path starting with "/", or an absolute http or https URL in
 // lower case. A URL parser would also forgive other spellings, such as a leading space.
-export const WRITTEN_URL_PATTERN = '^(/|https?://)';
+export const WRITTEN_URL_PATTERN = "^(/|https?://)";
 export const WRITTEN_URL = new RegExp(WRITTEN_URL_PATTERN);
 
 // The characters plan and project text may not hold, as regular expression source for a character
@@ -104,7 +134,8 @@ export const WRITTEN_URL = new RegExp(WRITTEN_URL_PATTERN);
 // mark, interlinear annotation marks) or break the line where nothing shows (U+2028, U+2029). The
 // zero width non-joiner and joiner (U+200C, U+200D) stay allowed, because emoji and Persian and
 // Indic text need them, and so does the soft hyphen, because pages hold it and a plan may quote them.
-export const UNSAFE_TEXT_CHARACTERS = '\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb';
+export const UNSAFE_TEXT_CHARACTERS =
+    "\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb";
 
 // Fixed text lengths that do not depend on the project's limits.
 export const MAXIMUM_URL_LENGTH = 2048;
