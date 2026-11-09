@@ -2,8 +2,8 @@
 // of literal secret with literal_secret, giving the path but never the text:
 //   - literal text filled into a field whose locator names a sensitive field, such as a password,
 //     passcode, token, secret or API key, in English, German or French;
-//   - text anywhere in the plan shaped like a credential: a JSON Web Token, a "Bearer" header
-//     value, or a key with a well-known issuer prefix.
+//   - text anywhere in the plan shaped like a credential: a JSON Web Token, a "Bearer" or "Basic"
+//     header value, a url holding a user name and password, or a key with a well-known issuer prefix.
 import {
     StructuralLocatorKind,
     SemanticLocatorKind,
@@ -14,10 +14,13 @@ import {
 // Words that name a field holding a credential.
 const SENSITIVE_FIELD_WORDS: readonly RegExp[] = [
     // English. "pass" may stand apart from the rest once a code-style name is split ("passWord").
-    /pass\s?(?:word|code|phrase)/i,
-    /\btokens?\b/i,
-    /\bsecrets?\b/i,
-    /\bapi[\s_-]?keys?\b/i,
+    // Sites also abbreviate these names, number them or run their words together ("clientsecret"),
+    // so a word boundary alone would miss them; "#tokenizer" and "#author" must still not match.
+    /pass\s?(?:word|code|phrase|wd)/i,
+    /\bpwd\d*\b/i,
+    /\b(?:auth|access|refresh|session|api|id|csrf|xsrf)?tokens?\d*\b/i,
+    /\b(?:client|app|api|shared)?secrets?\d*\b/i,
+    /\bapi[\s_-]?keys?\d*\b/i,
     /\bprivate[\s_-]?keys?\b/i,
     // German: Passwort, Kennwort, Geheimnis, Geheimcode, Zugangsschlüssel, API-Schlüssel
     /pass\s?wort/i,
@@ -26,7 +29,7 @@ const SENSITIVE_FIELD_WORDS: readonly RegExp[] = [
     /zugangs?schl[üu]ssel/i,
     /\bapi[\s_-]?schl[üu]ssel/i,
     // French: mot de passe, code secret, jeton, clé API, clé d'API
-    /mot\s+de\s+passe/i,
+    /mot\s*de\s*passe/i,
     /\bjetons?\b/i,
     /\bcl[ée]s?\s+(?:d['’]\s*)?api\b/i,
     /\bcl[ée]\s+secr[èe]te/i,
@@ -51,10 +54,24 @@ const CREDENTIAL_SHAPES: readonly RegExp[] = [
     /\bglpat-[A-Za-z0-9_-]{20,}/,
     /\bAIza[A-Za-z0-9_-]{35}/,
     /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
+    // A url holding a user name and a password. A port is followed by "/", not "@", so it passes.
+    /:\/\/[^\s/?#:@]+:[^\s/?#@]+@/,
 ];
 
+const BASIC_HEADER_VALUE = /\bbasic\s+([A-Za-z0-9+/]{8,}={0,2})(?![A-Za-z0-9+/=])/gi;
+const PRINTABLE_ASCII_WITH_A_COLON = /^[\x20-\x7e]*:[\x20-\x7e]*$/;
+
+// "Basic" is an ordinary word and may be followed by a long one, so the value has to decode to the
+// "user:password" text such a header holds. Prose read as base64 does not decode to printable text.
+const holdsBasicCredentials = (text: string): boolean =>
+    [...text.matchAll(BASIC_HEADER_VALUE)].some(
+        ([, encoded = ""]) =>
+            encoded.length % 4 === 0 &&
+            PRINTABLE_ASCII_WITH_A_COLON.test(Buffer.from(encoded, "base64").toString("latin1")),
+    );
+
 export const looksLikeCredential = (text: string): boolean =>
-    CREDENTIAL_SHAPES.some((shape) => shape.test(text));
+    CREDENTIAL_SHAPES.some((shape) => shape.test(text)) || holdsBasicCredentials(text);
 
 // The text a locator finds its element by, as the plan writes it: a value reference has no text
 // until the run, so it names no field here. A css selector or XPath expression names a field by

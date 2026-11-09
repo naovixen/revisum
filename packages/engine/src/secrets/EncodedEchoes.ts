@@ -16,6 +16,16 @@ export function foldCase(text: string): string {
     return folded;
 }
 
+// The other ways a case change can write a value, when a character in it changes length with its
+// case: "ß" upper-cases to "SS". foldCase leaves such a character alone to keep positions true, so a
+// folded search cannot find these and each has to be looked for as a value of its own.
+export function caseChangedSpellings(value: string): readonly string[] {
+    const folded = foldCase(value);
+    return [...new Set([value.toUpperCase(), value.toLowerCase()])].filter(
+        (spelling) => foldCase(spelling) !== folded,
+    );
+}
+
 export const escapeForPattern = (text: string): string =>
     text.replace(/[\\^$.*+?()[\]{}|/-]/g, "\\$&");
 

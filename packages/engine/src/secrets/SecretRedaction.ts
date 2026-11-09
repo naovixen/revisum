@@ -25,6 +25,7 @@ import { normalise } from "../run/outcome/Verdict.ts";
 import {
     BASE64_ALPHABETS,
     base64Pattern,
+    caseChangedSpellings,
     encodedEchoes,
     foldCase,
     fragmentRuns,
@@ -40,6 +41,7 @@ import {
     type EncodedEcho,
     type Range,
 } from "./EncodedEchoes.ts";
+import { encodedPrefixRuns } from "./EncodedPrefixRuns.ts";
 import { htmlWritings, jsonWritings } from "./JsonWritings.ts";
 
 // What replaces an echo of a secret in kept text.
@@ -80,6 +82,7 @@ function withoutEncodedEchoes(
     value: string,
     echoes: readonly EncodedEcho[],
     fragmentsIn: (foldedText: string) => readonly Range[],
+    encodedPrefixesIn: (text: string) => readonly Range[],
 ): string {
     if (needsPieces(value)) {
         return replaceRanges(
@@ -87,6 +90,7 @@ function withoutEncodedEchoes(
             mergedRanges([
                 ...echoes.flatMap((echo) => echo.rangesIn(text)),
                 ...fragmentsIn(foldCase(text)),
+                ...encodedPrefixesIn(text),
             ]),
         );
     }
@@ -94,17 +98,19 @@ function withoutEncodedEchoes(
     for (const echo of echoes) {
         redacted = echo.withoutEchoes(redacted, SECRET_PLACEHOLDER);
     }
-    return redacted;
+    return replaceRanges(redacted, encodedPrefixesIn(redacted));
 }
 
-// A function that replaces every echo of one value: its encoded forms, then the value in any case,
-// then any prefix of it at least the minimum secret length long, and, for a long value, any part of
-// it that long from anywhere within it. A search that cannot be built or run
+// A function that replaces every echo of one value: its encoded forms and any encoded prefix of it,
+// then the value in any case, then any prefix of it at least the minimum secret length long, and, for
+// a long value, any part of it that long from anywhere within it. A search that cannot be built or run
 // says nothing about what a text holds, so the whole text goes rather than a value that may be in it.
 function valueRedaction(value: string): (text: string) => string {
     let echoes: readonly EncodedEcho[];
+    let encodedPrefixesIn: (text: string) => readonly Range[];
     try {
         echoes = encodedEchoes(value);
+        encodedPrefixesIn = encodedPrefixRuns(value);
     } catch {
         return () => SECRET_PLACEHOLDER;
     }
@@ -112,7 +118,13 @@ function valueRedaction(value: string): (text: string) => string {
     const fragmentsIn = needsPieces(value) ? fragmentRuns(foldedValue) : () => [];
     return (text) => {
         try {
-            let redacted = withoutEncodedEchoes(text, value, echoes, fragmentsIn);
+            let redacted = withoutEncodedEchoes(
+                text,
+                value,
+                echoes,
+                fragmentsIn,
+                encodedPrefixesIn,
+            );
             redacted = replaceRanges(redacted, occurrences(foldCase(redacted), foldedValue));
             return replaceRanges(redacted, prefixRuns(foldCase(redacted), foldedValue));
         } catch {
@@ -127,7 +139,10 @@ function valueRedaction(value: string): (text: string) => string {
 export function secretRedaction(secrets: readonly Secret[]): (text: string) => string {
     const redactions = [
         ...new Set(
-            secrets.filter((secret) => redactionModeOf(secret) === RedactionMode.Value).map(reveal),
+            secrets
+                .filter((secret) => redactionModeOf(secret) === RedactionMode.Value)
+                .map(reveal)
+                .flatMap((value) => [value, ...caseChangedSpellings(value)]),
         ),
     ]
         .sort((left, right) => right.length - left.length)
@@ -173,7 +188,21 @@ export function echoFormsIn(text: string, secret: Secret): readonly LeakForm[] {
     }
 }
 
+// A spelling a case change gave the value is the value in another case, however it is found.
 function echoFormsOfValueIn(text: string, value: string): readonly LeakForm[] {
+    const forms = new Set(echoFormsOfSpellingIn(text, value));
+    for (const spelling of caseChangedSpellings(value)) {
+        for (const form of echoFormsOfSpellingIn(text, spelling)) {
+            forms.add(form === LeakForm.Raw ? LeakForm.Case : form);
+        }
+    }
+    if (forms.has(LeakForm.Raw) || forms.has(LeakForm.Case)) {
+        forms.delete(LeakForm.Prefix);
+    }
+    return [...forms];
+}
+
+function echoFormsOfSpellingIn(text: string, value: string): readonly LeakForm[] {
     const foldedText = foldCase(text);
     const foldedValue = foldCase(value);
     const forms = new Set<LeakForm>();
@@ -211,7 +240,9 @@ function echoFormsOfValueIn(text: string, value: string): readonly LeakForm[] {
         hasItsWords ||
         prefixRuns(foldedText, foldedValue).length > 0 ||
         (needsPieces(value) && fragmentRuns(foldedValue)(foldedText).length > 0);
-    if (!wholeInAnyCase && hasPartOfIt) {
+    // Every whole encoded echo is also a prefix of itself, so this counts only when nothing else did.
+    const isOnlyAnEncodedPrefix = forms.size === 0 && encodedPrefixRuns(value)(text).length > 0;
+    if (!wholeInAnyCase && (hasPartOfIt || isOnlyAnEncodedPrefix)) {
         forms.add("prefix");
     }
     return [...forms];
@@ -315,11 +346,13 @@ export type SecretEcho = {
     readonly approximate?: true;
 };
 
-// A value searched for in a reply: a secret's own, or a header value made from it.
+// A value searched for in a reply: a secret's own, or a header value made from it, or either as a
+// case change respelled it (isRespelled), which goes back as typed like any approximate echo.
 type EchoCandidate = {
     readonly secretName: SecretName;
     readonly value: string;
     readonly scheme?: WrappingScheme;
+    readonly isRespelled?: true;
 };
 
 // What a reply's text becomes once every echo is cut out.
@@ -354,7 +387,16 @@ function echoCandidates(secrets: readonly Secret[]): EchoCandidate[] {
         seen.add(candidate.value);
         return true;
     });
-    return distinct.sort((left, right) => right.value.length - left.value.length);
+    return distinct
+        .flatMap((candidate): EchoCandidate[] => [
+            candidate,
+            ...caseChangedSpellings(candidate.value).map((value): EchoCandidate => ({
+                ...candidate,
+                value,
+                isRespelled: true,
+            })),
+        ])
+        .sort((left, right) => right.value.length - left.value.length);
 }
 
 // How `echo` writes the first characters of `value`, one letter per character (see SecretEcho),
@@ -517,7 +559,8 @@ function echoesOf(text: string, candidate: EchoCandidate): Found[] {
             return written;
         }
     }
-    return prefixEchoes(text, candidate);
+    const prefixes = prefixEchoes(text, candidate);
+    return prefixes.length > 0 ? prefixes : encodedPrefixEchoes(text, candidate);
 }
 
 const prefixEchoes = (text: string, candidate: EchoCandidate): Found[] =>
@@ -526,6 +569,36 @@ const prefixEchoes = (text: string, candidate: EchoCandidate): Found[] =>
         end: run.end,
         echo: spellingEcho(text.slice(run.start, run.end), candidate, true),
     }));
+
+// A prefix written in an encoding: put back as typed, as long as it was written, so a replay of it
+// gives another result and is no pass.
+const encodedPrefixEchoes = (text: string, candidate: EchoCandidate): Found[] =>
+    encodedPrefixRuns(candidate.value)(text).map((range): Found => ({
+        ...range,
+        echo: {
+            secretName: candidate.secretName,
+            ...(candidate.scheme === undefined ? {} : { scheme: candidate.scheme }),
+            form: LeakForm.Prefix,
+            characters: [...text.slice(range.start, range.end)].length,
+            approximate: true,
+        },
+    }));
+
+// The echoes of `candidate`, marked as approximate when a case change respelled it: the fields of
+// an echo can only describe a change of case that keeps the value's length.
+function echoesOfCandidate(text: string, candidate: EchoCandidate): Found[] {
+    const found = echoesOf(text, candidate);
+    return candidate.isRespelled === true
+        ? found.map((one): Found => ({
+              ...one,
+              echo: {
+                  ...one.echo,
+                  form: one.echo.form === LeakForm.Raw ? LeakForm.Case : one.echo.form,
+                  approximate: true,
+              },
+          }))
+        : found;
+}
 
 // The same search for a value too long for one pattern. Its base64 and the value as typed are found
 // as plain text and go back exactly. What is left is found piece by piece, and goes back as the whole
@@ -561,6 +634,10 @@ function echoesOfLongValue(text: string, candidate: EchoCandidate): Found[] {
     const prefixes = prefixEchoes(text, candidate);
     if (prefixes.length > 0) {
         return prefixes;
+    }
+    const encodedPrefixes = encodedPrefixEchoes(text, candidate);
+    if (encodedPrefixes.length > 0) {
+        return encodedPrefixes;
     }
     return fragmentRuns(foldCase(candidate.value))(foldCase(text)).map((range): Found => ({
         ...range,
@@ -608,7 +685,7 @@ function cutEchoesOf(text: string, candidates: readonly EchoCandidate[]): CutTex
                 if (!("kept" in piece)) {
                     return [piece];
                 }
-                const found = echoesOf(piece.kept, candidate);
+                const found = echoesOfCandidate(piece.kept, candidate);
                 if (found.length === 0) {
                     return [piece];
                 }
