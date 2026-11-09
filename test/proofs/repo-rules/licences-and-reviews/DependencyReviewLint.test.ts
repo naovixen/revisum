@@ -63,16 +63,16 @@ const developmentDependencyEdits = {
   }),
 };
 
-// Replaces the first quoted `from` result that follows `component` in the reviews source.
+// Replaces the first `from` result that follows `component` in the reviews source.
 function replaceResultAfter(component: string, from: string, to: string): (text: string) => string {
   return (text) => {
     const start = text.indexOf(component);
     if (start < 0) throw new Error(`${REVIEWS_PATH} does not mention ${component}`);
     const rest = text.slice(start);
-    const match = new RegExp(`(['"])${from}\\1`).exec(rest);
-    if (match === null) throw new Error(`no '${from}' result follows ${component} in ${REVIEWS_PATH}`);
-    const quote = match[1] ?? "'";
-    return text.slice(0, start) + rest.slice(0, match.index) + `${quote}${to}${quote}` + rest.slice(match.index + match[0].length);
+    const result = `DependencyCheckResult.${from}`;
+    const index = rest.indexOf(result);
+    if (index < 0) throw new Error(`no ${result} follows ${component} in ${REVIEWS_PATH}`);
+    return text.slice(0, start) + rest.slice(0, index) + `DependencyCheckResult.${to}` + rest.slice(index + result.length);
   };
 }
 
@@ -93,12 +93,12 @@ test('counter-example: the same package as a development dependency needs no rev
 // ---- A failing check on the default path --------------------------------------------------------
 
 test('the lint fails when the default axe-core review is given a failing check', { timeout: TIMEOUT }, () => {
-  const outcome = lintWithEdits(scratch, { [REVIEWS_PATH]: replaceResultAfter('axe-core', 'pass', 'fail') }, ONLY_THE_RULE);
+  const outcome = lintWithEdits(scratch, { [REVIEWS_PATH]: replaceResultAfter('axe-core', 'Pass', 'Fail') }, ONLY_THE_RULE);
   assertLintFails(outcome, ['axe-core']);
 });
 
 test('counter-example: a partial result on the default path passes', { timeout: TIMEOUT }, () => {
-  assertLintPasses(lintWithEdits(scratch, { [REVIEWS_PATH]: replaceResultAfter('axe-core', 'pass', 'partial') }));
+  assertLintPasses(lintWithEdits(scratch, { [REVIEWS_PATH]: replaceResultAfter('axe-core', 'Pass', 'Partial') }));
 });
 
 // ---- The review matches what is installed, and its evidence exists ------------------------------
