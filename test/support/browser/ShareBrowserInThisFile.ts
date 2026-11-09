@@ -19,8 +19,8 @@ import { launchSharedBrowser } from "@revisum/driver-cdp/testing";
 import { CLOSE_THE_BROWSER, LIST_CONTEXTS } from "./TestCommand.ts";
 import { success, type ClosedSession, type SessionEnvironment, type Target } from "@revisum/engine";
 import { startBrowserWatchdog, type BrowserWatchdog } from "./BrowserWatchdog.ts";
-import type { EgressSourceForTest, SessionEgressForTest } from "./SessionEgressForTest.ts";
-import { driverWith, sessionWith } from "./WrappingSessions.ts";
+import type { EgressSourceForTest, SessionEgressForTest } from "./driver/SessionEgressForTest.ts";
+import { driverWith, sessionWith } from "./driver/WrappingSessions.ts";
 
 const CONTROL_TIMEOUT_MILLISECONDS = 5_000;
 const EXIT_POLL_MILLISECONDS = 10;

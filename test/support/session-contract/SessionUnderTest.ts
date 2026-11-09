@@ -16,8 +16,8 @@ import {
     type SessionTab,
     type Step,
 } from "@revisum/engine";
-import { testProject } from "../../unit/engine/plan-examples.ts";
-import { accepted, parserFor, planOf } from "../../unit/engine/run-value-examples.ts";
+import { testProject } from "../../unit/engine/plan/examples/GoldenPlan.ts";
+import { accepted, parserFor, planOf } from "../../unit/engine/run/values/examples/RunPlan.ts";
 import { label, navigate, role, testId, type JsonRecord } from "../browser/RawPlan.ts";
 import {
     performableActionOf,

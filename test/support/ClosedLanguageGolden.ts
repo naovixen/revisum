@@ -1,14 +1,14 @@
-// What golden/closed-language/hashes.json holds, computed the way its test computes it: the plan
+// What test/golden/closed-language/hashes.json holds, computed the way its test computes it: the plan
 // hash of each golden plan, and the state and hashes of a few runs on the recording driver.
-// tools/RecordGoldens.ts runs this file and writes what it prints.
+// tools/test-runner/RecordGoldens.ts runs this file and writes what it prints.
 import { planHash } from "@revisum/engine";
-import { defaultParser, goldenPlan, goldenPlanNames } from "../unit/engine/plan-examples.ts";
+import { defaultParser, goldenPlan, goldenPlanNames } from "../unit/engine/plan/examples/GoldenPlan.ts";
 import {
     OPEN_ORDERS,
     planOf,
     runPlan,
     type JsonRecord,
-} from "../unit/engine/run-value-examples.ts";
+} from "../unit/engine/run/values/examples/RunPlan.ts";
 
 export const RECORDED_RUNS: Readonly<Record<string, () => JsonRecord>> = {
     "open-orders": () => planOf([OPEN_ORDERS]),

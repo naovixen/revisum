@@ -1,6 +1,6 @@
 // Which tests a run covers. Every push runs the core tests once; repetition and secondary targets
 // run weekly, on demand and at each milestone exit, with REVISUM_TEST_TIER=full. Leak scans, egress,
-// approval, policy and every test tools/guarantee-map.ts names stay on push.
+// approval, policy and every test tools/metrics/GuaranteeMap.ts names stay on push.
 import { BrowserTarget } from "./browser/BrowserTarget.ts";
 
 export const TestTier = {

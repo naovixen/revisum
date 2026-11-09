@@ -2,12 +2,12 @@
 // folders guarded. On a throw-away Git repository whose defect log holds rows 3 and 7.
 import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
-import { checkGoldenChanges } from "../../tools/CheckGoldenChanges.ts";
+import { checkGoldenChanges } from "../../tools/repo-rules/commits/CheckGoldenChanges.ts";
 import {
     createGitRepository,
     type FixtureCommit,
     type GitRepository,
-} from "../support/git-repository.ts";
+} from "../support/repository/GitRepository.ts";
 
 const DEFECT_LOG = `# Defects
 

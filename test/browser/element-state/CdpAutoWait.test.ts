@@ -1,0 +1,86 @@
+// Auto-wait on the own CDP driver. A button that is added late, hidden, moving, disabled or
+// covered by another element for its first 400 ms gets exactly one click, after it has become
+// actionable, and no click lands anywhere else. A button that never becomes actionable fails the
+// click with not-actionable within the step timeout plus 1,500 ms, and gets no click.
+// Each case is its own fixture page (test/fixtures/sites/capability-app/auto-wait-<case>.html) whose result
+// line counts the clicks; one browser serves every case of a target, with a fresh page load each.
+import assert from 'node:assert/strict';
+import { after, before, describe, test } from 'node:test';
+import type { DriverSession } from '@revisum/driver-cdp';
+import { allowEveryAction } from '#test-support/browser/AllowEveryAction.ts';
+import { isTargetRunning, onTarget } from '#test-support/TestTier.ts';
+import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
+import { click, role } from '#test-support/browser/RawPlan.ts';
+import { capabilityHarness, shownText, type CapabilityHarness } from '#test-support/browser/harnesses/CapabilityHarness.ts';
+import { shareBrowserInThisFile } from '#test-support/browser/ShareBrowserInThisFile.ts';
+import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
+
+shareBrowserInThisFile();
+
+const STEP_TIMEOUT_MILLISECONDS = 2000;
+const NEVER_ACTIONABLE_ALLOWANCE_MILLISECONDS = 1500;
+const LANDED_ONCE = 'clicks=1 early=0 stray=0 overlay=0';
+const NOTHING_LANDED = 'clicks=0 early=0 stray=0 overlay=0';
+
+// Each page, and how its button is not actionable for its first 400 ms.
+const ACTIONABLE_AFTER_400_MILLISECONDS = [
+  ['late', 'missing from the page'], ['hidden', 'hidden'], ['moving', 'moving'], ['disabled', 'disabled'], ['covered', 'covered by another element'],
+] as const;
+const NEVER_ACTIONABLE = ['never', 'never-covered'] as const;
+
+let capability: CapabilityHarness;
+before(async () => { capability = await capabilityHarness(STEP_TIMEOUT_MILLISECONDS); });
+after(async () => { await capability.close(); });
+
+for (const targetId of Object.values(BrowserTarget)) {
+  describe(`auto-wait: ${targetId}`, () => {
+    let session: DriverSession;
+    // A hook runs even when every test is skipped, so it opens a browser only where the tests use it.
+    before(async () => {
+      if (isTargetRunning(targetId)) {
+        session = await capability.openOwn(targetId);
+      }
+    });
+    after(async () => {
+      if (isTargetRunning(targetId)) {
+        await session.close();
+      }
+    });
+
+    const clickContinue = async (scenario: string) => {
+      assert.ok((await session.navigate(capability.url(`/auto-wait-${scenario}.html`), scriptsEnabled)).ok, `the ${scenario} page loads`);
+      const started = Date.now();
+      const acted = await session.act(capability.actionStep(click(role('button', 'Continue'))), allowEveryAction);
+      return { acted, elapsed: Date.now() - started, shown: await shownText(capability, session, 'result') };
+    };
+
+    for (const [scenario, description] of ACTIONABLE_AFTER_400_MILLISECONDS) {
+      test(`a button ${description} for its first 400 ms gets one click, after it is ready`, onTarget(targetId), async () => {
+        const { acted, shown } = await clickContinue(scenario);
+        assert.ok(acted.ok, acted.ok ? '' : `${acted.error.code}: ${acted.error.detail}`);
+        assert.equal(shown, LANDED_ONCE);
+      });
+    }
+
+    for (const scenario of NEVER_ACTIONABLE) {
+      test(`a button that is ${scenario === 'never' ? 'never enabled' : 'always covered'} fails with not-actionable within the timeout plus 1,500 ms`, onTarget(targetId), async () => {
+        const { acted, elapsed, shown } = await clickContinue(scenario);
+        assert.equal(acted.ok ? 'passed' : acted.error.code, 'not-actionable');
+        assert.ok(elapsed <= STEP_TIMEOUT_MILLISECONDS + NEVER_ACTIONABLE_ALLOWANCE_MILLISECONDS, `took ${elapsed} ms`);
+        assert.equal(shown, NOTHING_LANDED);
+      });
+    }
+
+    // Counter-example: the result line does count a click that lands too early, so the checks
+    // above can fail. A page script clicks the button while it is still moving.
+    test('counter-example: a click while the button still moves is counted as early', onTarget(targetId), async () => {
+      assert.ok((await session.navigate(capability.url('/auto-wait-moving.html'), scriptsEnabled)).ok);
+      const early = await session.evaluate(() => {
+        const button = [...document.querySelectorAll('button')].find((candidate) => candidate.textContent === 'Continue');
+        button?.click();
+        return document.querySelector('[data-testid="result"]')?.textContent ?? '';
+      });
+      assert.equal(early, 'clicks=1 early=1 stray=0 overlay=0');
+    });
+  });
+}

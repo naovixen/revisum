@@ -1,11 +1,11 @@
 import { unwiredPorts, type BrowserDriver, type RunPorts } from "@revisum/engine";
-import { fakeArtifactStore } from "./FakeArtifactStore.ts";
-import { fakeClock } from "./FakeClock.ts";
-import { fakeDriver } from "./FakeDriver.ts";
-import { fakeEventSink } from "./FakeEventSink.ts";
-import { fakeRedactor } from "./FakeRedactor.ts";
-import { fakeRunEventSink } from "./FakeRunEventSink.ts";
-import { fakeRunIsolation } from "./FakeRunIsolation.ts";
+import { fakeArtifactStore } from "./ports/FakeArtifactStore.ts";
+import { fakeClock } from "./session/FakeClock.ts";
+import { fakeDriver } from "./session/FakeDriver.ts";
+import { fakeEventSink } from "./ports/FakeEventSink.ts";
+import { fakeRedactor } from "./ports/FakeRedactor.ts";
+import { fakeRunEventSink } from "./ports/FakeRunEventSink.ts";
+import { fakeRunIsolation } from "./session/FakeRunIsolation.ts";
 
 // The drivers a run looks up, by each driver's own adapter id.
 export const driversOf = (

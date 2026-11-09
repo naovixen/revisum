@@ -14,28 +14,28 @@ import {
     type SessionEnvironment,
     type Target,
 } from "@revisum/engine";
-import { fakeAdapterRegistry } from "#test-support/fakes/FakeAdapterRegistry.ts";
-import { fakeDraftPlanner } from "#test-support/fakes/FakeDraftPlanner.ts";
+import { fakeAdapterRegistry } from "#test-support/fakes/services/FakeAdapterRegistry.ts";
+import { fakeDraftPlanner } from "#test-support/fakes/services/FakeDraftPlanner.ts";
 import {
     fakeDriver,
     fakeDriverNeverLaunching,
     fakeDriverOpening,
-} from "#test-support/fakes/FakeDriver.ts";
+} from "#test-support/fakes/session/FakeDriver.ts";
 import { driversOf, fakePorts } from "#test-support/fakes/FakePorts.ts";
-import { fakeEventSink } from "#test-support/fakes/FakeEventSink.ts";
-import { fakeLeakScanner } from "#test-support/fakes/FakeLeakScanner.ts";
-import { fakeRandom } from "#test-support/fakes/FakeRandom.ts";
-import { FAKE_PAGE, fakeSession } from "#test-support/fakes/FakeSession.ts";
-import { fakeStoragePort } from "#test-support/fakes/FakeStoragePort.ts";
-import { baseUrlOf, clearRun, trustedProjectFrom } from "#test-support/policy-clearance.ts";
+import { fakeEventSink } from "#test-support/fakes/ports/FakeEventSink.ts";
+import { fakeLeakScanner } from "#test-support/fakes/services/FakeLeakScanner.ts";
+import { fakeRandom } from "#test-support/fakes/ports/FakeRandom.ts";
+import { FAKE_PAGE, fakeSession } from "#test-support/fakes/session/FakeSession.ts";
+import { fakeStoragePort } from "#test-support/fakes/ports/FakeStoragePort.ts";
+import { baseUrlOf, clearRun, trustedProjectFrom } from "#test-support/builders/ClearRun.ts";
 import {
     finalState,
     guardedDriver,
     onlyRun,
     parserFor,
     runBase,
-} from "../engine/guarded-driver.ts";
-import { testProject } from "../engine/plan-examples.ts";
+} from "../engine/run/examples/GuardedDriver.ts";
+import { testProject } from "../engine/plan/examples/GoldenPlan.ts";
 import {
     ALLOWED_UNNAMED_TEST_ID,
     OPEN_ACCOUNT_PAGE,
@@ -43,7 +43,7 @@ import {
     planOf as planOnThePolicyProject,
     testId,
     withPolicy,
-} from "../engine/policy-examples.ts";
+} from "../engine/policy/examples/Policy.ts";
 import {
     DEFAULT_CLOCK_START,
     DEFAULT_SEED,
@@ -53,7 +53,7 @@ import {
     planOf,
     projectFileWith,
     projectWith,
-} from "../engine/run-value-examples.ts";
+} from "../engine/run/values/examples/RunPlan.ts";
 import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 
 const PORT_MEMBERS: readonly (keyof Session)[] = [

@@ -25,7 +25,7 @@ import {
     type Step,
     type Target,
 } from "@revisum/engine";
-import { startFixtureServer, type FixtureRoute, type FixtureServer } from "../fixture-server.ts";
+import { startFixtureServer, type FixtureRoute, type FixtureServer } from "../builders/FixtureServer.ts";
 import {
     memoryArtifactStore,
     memoryEventSink,
@@ -33,11 +33,11 @@ import {
     systemClock,
     type MemoryArtifactStore,
     type MemoryEventSink,
-} from "../memory-ports.ts";
-import { baseUrlOf, clearRun, trustedProjectFrom } from "../policy-clearance.ts";
+} from "../builders/MemoryEventSink.ts";
+import { baseUrlOf, clearRun, trustedProjectFrom } from "../builders/ClearRun.ts";
 import { BrowserTarget } from "./BrowserTarget.ts";
 import { navigate, testId, visible, type JsonRecord } from "./RawPlan.ts";
-import { runningAtClose } from "./WrappingSessions.ts";
+import { runningAtClose } from "./driver/WrappingSessions.ts";
 import { expectRead } from "../ExpectRead.ts";
 import { performableActionOf, resolvedLocatorOf } from "../PerformableActionOf.ts";
 import { realRunPorts } from "../RealRunPorts.ts";

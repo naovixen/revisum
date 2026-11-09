@@ -14,10 +14,10 @@ import {
     type ResolvedElement,
 } from "@revisum/engine";
 import { performableActionOf, resolvedDownloadOf } from "#test-support/PerformableActionOf.ts";
-import { FAKE_DOWNLOAD, fakeSession } from "#test-support/fakes/FakeSession.ts";
+import { FAKE_DOWNLOAD, fakeSession } from "#test-support/fakes/session/FakeSession.ts";
 import { isHeldByADialog } from "#test-support/IsHeldByADialog.ts";
 import { failureCode as failureCodeOf } from "#test-support/session-contract/SessionUnderTest.ts";
-import { testProject } from "../engine/plan-examples.ts";
+import { testProject } from "../engine/plan/examples/GoldenPlan.ts";
 import {
     OPEN_ACCOUNT_PAGE,
     acceptDialog,
@@ -29,7 +29,7 @@ import {
     stepAt,
     testId,
     type JsonRecord,
-} from "../engine/policy-examples.ts";
+} from "../engine/policy/examples/Policy.ts";
 
 const ALLOW: GuardVerdict = { kind: "allow" };
 const DENY: GuardVerdict = { kind: "deny", rule: "irreversible-action", stepIndex: 1 };

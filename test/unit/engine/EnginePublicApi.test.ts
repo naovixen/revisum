@@ -13,7 +13,7 @@ import type {
     TextWarning,
     readLockfile,
 } from "@revisum/engine";
-import { engineFunction } from "./replay-examples.ts";
+import { engineFunction } from "./replay/examples/ManifestUnderTest.ts";
 
 const isLockfileReaderAsynchronous: ReturnType<typeof readLockfile> extends Promise<unknown>
     ? true

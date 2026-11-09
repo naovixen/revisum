@@ -1,7 +1,7 @@
-// What golden/replay/windows-signup/ holds: the sign-up plan on the CDP driver, without its capture
+// What test/golden/replay/windows-signup/ holds: the sign-up plan on the CDP driver, without its capture
 // steps so the result holds no screenshot, and the manifest and hashes of a real browser run of it.
-// tools/RecordGoldens.ts runs this file, on Windows x64 only, and writes what it prints.
-import { signupHarness, signupPlan } from "./signup-harness.ts";
+// tools/test-runner/RecordGoldens.ts runs this file, on Windows x64 only, and writes what it prints.
+import { signupHarness, signupPlan } from "./browser/harnesses/SignupHarness.ts";
 
 const TARGET_ID = "cdp-chromium";
 const FOLDER = "replay/windows-signup";
