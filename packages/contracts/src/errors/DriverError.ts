@@ -19,7 +19,8 @@
 // script-failed: a page script threw, its promise rejected, or its source is not one function.
 // script-timeout: a page script did not settle within its timeout.
 // script-result-invalid: a page script's result is not JSON: undefined, a function, or a cyclic value.
-// page-unreadable: a read of the page threw or got no answer in time, so nothing is known of it.
+// page-unreadable: a read of the page threw, so nothing is known of it. Where a port says a read
+// that gets no answer answers timeout, as a screenshot does, timeout is what it answers.
 // dialog-open: a dialog holds the page, so a step could not act on it or read it. Only a dialog step can free it.
 export const DriverErrorCode = {
     NotFound: "not-found",
