@@ -48,8 +48,8 @@ export const planStepActs = session.act(planStep, guard);
 // @ts-expect-error a dialog step whose expected text may be a value reference cannot reach a driver
 export const planDialogActs = session.act(planDialog, guard);
 
-// @ts-expect-error a fill naming a secret it does not carry cannot reach a driver
 export const secretReferenceFillActs = session.act(
+    // @ts-expect-error a fill naming a secret it does not carry cannot reach a driver
     { type: "fill", locator: resolvedLocator, value: { kind: "secret", secretName } },
     guard,
 );

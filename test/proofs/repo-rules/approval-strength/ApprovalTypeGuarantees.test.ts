@@ -68,7 +68,7 @@ test(
     "an approval written as an object literal cannot be passed to a gate",
     { timeout: TIMEOUT },
     () => {
-        assertMutantFails("proofKind: 'agent-lockdown-merge'");
+        assertMutantFails("agent-lockdown-merge");
     },
 );
 

@@ -82,21 +82,21 @@ export const factsNameTheirOwnFields: {
     stubArguments: "arguments",
 };
 
-// @ts-expect-error a navigate fact cannot require a field only other steps have
 export const navigateRequiringLocator: StepFact<FieldOf<"navigate">> = {
     ...STEP_FACTS.navigate,
+    // @ts-expect-error a navigate fact cannot require a field only other steps have
     fields: { required: ["type", "locator"], optional: [] },
 };
 
-// @ts-expect-error a navigate fact cannot allow a field only other steps have
 export const navigateAllowingSteps: StepFact<FieldOf<"navigate">> = {
     ...STEP_FACTS.navigate,
+    // @ts-expect-error a navigate fact cannot allow a field only other steps have
     fields: { required: ["type", "url"], optional: ["steps"] },
 };
 
-// @ts-expect-error the facts table cannot give a step type a field no step of it has
 export const tableWithMisnamedField: typeof STEP_FACTS = {
     ...STEP_FACTS,
+    // @ts-expect-error the facts table cannot give a step type a field no step of it has
     navigate: { ...STEP_FACTS.navigate, fields: { required: ["type", "href"], optional: [] } },
 };
 

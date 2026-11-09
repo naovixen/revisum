@@ -43,20 +43,20 @@ export const unclearedPlanRuns = createRunService(ports).run(parsed, inputs);
 // @ts-expect-error an authorised plan alone is not a cleared run: it names no project, target or standing
 export const authorisedPlanRuns = createRunService(ports).run(authorised, inputs);
 
-// @ts-expect-error a cleared run written by hand is not one: only the policy gate makes one
 export const handMadeClearedRunRuns = createRunService(ports).run(
+    // @ts-expect-error a cleared run written by hand is not one: only the policy gate makes one
     { plan: authorised, project: otherProject, targetId: otherTarget, standing: otherStanding },
     inputs,
 );
 
-// @ts-expect-error a spread copy of a cleared run under another project is not one
 export const clearedRunUnderAnotherProject = createRunService(ports).run(
+    // @ts-expect-error a spread copy of a cleared run under another project is not one
     { ...cleared, project: otherProject },
     inputs,
 );
 
-// @ts-expect-error a spread copy of a cleared run under another standing is not one
 export const clearedRunUnderAnotherStanding = createRunService(ports).run(
+    // @ts-expect-error a spread copy of a cleared run under another standing is not one
     { ...cleared, standing: otherStanding },
     inputs,
 );

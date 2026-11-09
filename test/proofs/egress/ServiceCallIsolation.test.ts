@@ -148,7 +148,7 @@ function revealAllowList(): string[] {
     const source = readFileSync(join(REPOSITORY_ROOT, REVEAL_CHECK), "utf8");
     const list = /REVEAL_ALLOWED_MODULES[^=]*=\s*\[([^\]]*)\]/.exec(source);
     assert.ok(list?.[1] !== undefined, `${REVEAL_CHECK} has no REVEAL_ALLOWED_MODULES list`);
-    return [...list[1].matchAll(/'([^']+)'/g)].map((match) => match[1] ?? "");
+    return [...list[1].matchAll(/["']([^"']+)["']/g)].map((match) => match[1] ?? "");
 }
 
 test("the reveal allow-list gains exactly one module, and it is in runner", () => {

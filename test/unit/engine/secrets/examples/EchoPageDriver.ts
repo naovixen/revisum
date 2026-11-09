@@ -50,9 +50,7 @@ function typedText(value: FillValue, page: EchoPage): string {
     }
 }
 
-export function echoPageDriver(
-    page: EchoPage,
-): BrowserDriver & {
+export function echoPageDriver(page: EchoPage): BrowserDriver & {
     readonly calls: EchoPageCalls;
     readonly fieldValues: ReadonlyMap<string, string>;
 } {

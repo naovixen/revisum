@@ -83,10 +83,10 @@ lifecycle.transition("Planned", "Running");
 cdpDriver({ executablePath: "chrome", egress }); // allowed
 // @ts-expect-error a driver with no egress source could open a session that no proxy watches
 cdpDriver({ executablePath: "chrome" });
-// @ts-expect-error a session's proxy comes from its egress source, never from the driver's options
 cdpDriver({
     executablePath: "chrome",
     egress,
+    // @ts-expect-error a session's proxy comes from its egress source, never from the driver's options
     proxy: { server: "http://127.0.0.1:1", includeLoopback: true },
 });
 

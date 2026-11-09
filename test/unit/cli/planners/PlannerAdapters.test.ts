@@ -146,16 +146,14 @@ for (const wire of WIRE_FORMATS) {
             const bodyMark = "REFUSAL-BODY-MARK-2W8";
             const echoingRefusal: Answer = (received, response) => {
                 const sentKey = headerValue(received, KEY_HEADERS[wire].name) ?? "";
-                response
-                    .writeHead(401, { "content-type": "application/json" })
-                    .end(
-                        JSON.stringify({
-                            error: {
-                                type: "authentication_error",
-                                message: `${bodyMark}: invalid key ${sentKey}`,
-                            },
-                        }),
-                    );
+                response.writeHead(401, { "content-type": "application/json" }).end(
+                    JSON.stringify({
+                        error: {
+                            type: "authentication_error",
+                            message: `${bodyMark}: invalid key ${sentKey}`,
+                        },
+                    }),
+                );
             };
             await withPlannedRun(
                 { ...recordedSetup(wire, secrets.variables), answer: echoingRefusal },
