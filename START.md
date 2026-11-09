@@ -44,7 +44,14 @@ Architecture refactor:
     - [x] Re-run the trust-path break test; a break that goes uncaught becomes a finding to fix. At `3c01fcd`, of 115 planted defects, 106 were caught, including the 3 missed earlier. The other 9 were gaps in the tests, not bugs: rows 433 to 441, each now with a fast unit test proven to fail with its defect planted (`3793f06`).
     - [x] Close phase 3: at `2d0f5a6`, `npm run check:linux` is green (77 minutes, serial: 6,996 unit and contract tests, 1,390 browser tests with 60 skipped, proofs, replay, gates) and `npm run check:containers` is green (168 of 170, 2 skipped). `npm run check:push` was green on Windows one fix earlier, at `bb7a7bf`. The Linux check found a real race: a tab the driver closed could leave a command unanswered until its deadline (row 442, fixed).
   - [ ] The founder pushes, and CI takes 10 minutes or less. Waits for the end of the refactor (founder, 2026-11-08), so it doesn't hold up phase 4. Not yet measured.
-- [ ] Phase 4: move files, constants for magic strings, formatting. **Resume here.**
+- [ ] Phase 4: move files, constants for magic strings, formatting. **Resume here.** The move map and its risks are in `C:\Users\naomi\.claude\projects\E--revisum\phase-4\` (`move-map.tsv`, `move-map-summary.md`): 1,882 files.
+  - [x] Golden check tolerates a move: tests, then code, keeping the old and new globs and updating ignore files
+  - [ ] Move packages, tools, config and docs (tests are red from here to the next item)
+  - [ ] Move test data, tests and helpers, with their imports and paths
+  - [ ] Verify the move: `npm run check`, `check:push`, `check:containers`; goldens rename-only; test count unchanged
+  - [ ] Sweeps, each its own commit pair: domain strings to constants, `curly`, Prettier; new ESLint rules on
+  - [ ] Carried findings: 193, 196, 245, 294, 320, 326, 332, 356
+  - [ ] After the founder pushes: drop the legacy `fixtures/` and `golden/` globs
 - [ ] Phase 5: docs and final trust-path review; the founder pushes
 - [ ] Phase 6: test titles and remaining suppressions (may run alongside M3)
 

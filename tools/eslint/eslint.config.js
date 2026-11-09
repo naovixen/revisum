@@ -83,6 +83,8 @@ export default defineConfig([
         "**/*.d.ts",
         "fixtures/**",
         "golden/**",
+        "test/fixtures/**",
+        "test/golden/**",
         "temp/**",
         ".browsers/**",
     ]),
