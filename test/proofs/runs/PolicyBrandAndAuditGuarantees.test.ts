@@ -1,6 +1,6 @@
 // Two guarantees around the policy gate, each proved by compiling a small file on its own:
-//   - Only the policy gate makes an Authorised plan. Adding the brand's own field to a parsed plan
-//     by hand must not type-check, while the plan the gate returns still does.
+//   - Only the policy gate makes a ClearedRun. Giving a parsed plan every field of a cleared run by
+//     hand must not type-check, while the cleared run the gate returns still does.
 //   - Every denial is recorded. A run either cannot be given ports without an audit sink (the
 //     port is required, so leaving it out does not type-check), or, if it can, it refuses to start
 //     without one rather than deny a plan with no record.
@@ -29,51 +29,55 @@ const TIMEOUT = 300_000;
 const compile = (name: string, lines: readonly string[]) =>
     compileFiles([{ name, source: [...lines, ""].join("\n") }]);
 
-// ---- Forging the Authorised brand --------------------------------------------------------------
+// ---- Forging a cleared run ------------------------------------------------------------------------
 
 const FORGERY_SETUP = [
-    "import type { Authorised, Plan } from '@revisum/engine';",
+    "import type { ClearedRun, Plan } from '@revisum/engine';",
     "declare const parsed: Plan;",
+    "declare const cleared: ClearedRun;",
 ];
 
+const CLEARED_RUN_FIELDS =
+    "kind: 'cleared' as const, plan: cleared.plan, project: cleared.project, target: cleared.target, targetId: cleared.targetId, standing: cleared.standing";
+
 test(
-    "control: the plan the policy gate returns compiles as Authorised",
+    "control: the cleared run the policy gate returns compiles as a ClearedRun",
     { timeout: TIMEOUT },
     () => {
         const compiled = compile("gate-output.ts", [
-            "import type { Authorised, Plan, PolicyGate, TargetId } from '@revisum/engine';",
+            "import type { ClearedRun, Plan, PolicyGate, TargetId } from '@revisum/engine';",
             "declare const gate: PolicyGate;",
             "declare const parsed: Plan;",
             "declare const targetId: TargetId;",
             "const decision = gate.clear(parsed, targetId);",
-            "export const cleared: Authorised | null = decision.kind === 'allow' ? decision.run.plan : null;",
+            "export const cleared: ClearedRun | null = decision.kind === 'allow' ? decision.run : null;",
         ]);
         assert.equal(compiled.passed, true, compiled.output);
     },
 );
 
 test(
-    "a parsed plan spread into an object with the brand's field added by hand does not compile as Authorised",
+    "a parsed plan spread into an object with every field of a cleared run added by hand does not compile as a ClearedRun",
     { timeout: TIMEOUT },
     () => {
         const compiled = compile("forged-by-spread.ts", [
             ...FORGERY_SETUP,
-            "export const forged: Authorised = { ...parsed, __authorisedBy: 'policy-gate' };",
+            `export const forged: ClearedRun = { ...parsed, ${CLEARED_RUN_FIELDS} };`,
         ]);
-        assert.equal(compiled.passed, false, "a hand-made Authorised plan compiled");
+        assert.equal(compiled.passed, false, "a hand-made ClearedRun compiled");
         assert.equal(compiled.errors.length, 1, compiled.output);
     },
 );
 
 test(
-    "a parsed plan given the brand's field by Object.assign does not compile as Authorised",
+    "a parsed plan given every field of a cleared run by Object.assign does not compile as a ClearedRun",
     { timeout: TIMEOUT },
     () => {
         const compiled = compile("forged-by-assign.ts", [
             ...FORGERY_SETUP,
-            "export const forged: Authorised = Object.assign({}, parsed, { __authorisedBy: 'policy-gate' as const });",
+            `export const forged: ClearedRun = Object.assign({}, parsed, { ${CLEARED_RUN_FIELDS} });`,
         ]);
-        assert.equal(compiled.passed, false, "a hand-made Authorised plan compiled");
+        assert.equal(compiled.passed, false, "a hand-made ClearedRun compiled");
         assert.equal(compiled.errors.length, 1, compiled.output);
     },
 );

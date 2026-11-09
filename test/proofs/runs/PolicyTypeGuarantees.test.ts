@@ -8,7 +8,7 @@ import { describe, test } from "node:test";
 import { REPOSITORY_ROOT } from "../../support/repository/RepositoryRoot.ts";
 import { compileFiles } from "../repo-rules/support/CompileFiles.ts";
 
-const GUARANTEE_FILE = join(REPOSITORY_ROOT, "test", "proofs", "runs", "AuthorisedIsARealType.ts");
+const GUARANTEE_FILE = join(REPOSITORY_ROOT, "test", "proofs", "runs", "IsClearedRunEmpty.ts");
 const EXPECTED_ERROR_LINE = /^\s*\/\/\s*@ts-expect-error\b/;
 const TIMEOUT = 300_000;
 
@@ -51,8 +51,8 @@ test(
     },
 );
 
-test("a copy of a parsed plan cannot pass as Authorised", { timeout: TIMEOUT }, () => {
-    assertMutantFails("forgedAuthorised");
+test("a copy of a parsed plan cannot pass as a cleared run", { timeout: TIMEOUT }, () => {
+    assertMutantFails("forgedClearedRun");
 });
 
 test("every expected-error marker in the policy guarantee file is checked by a test above", () => {
@@ -63,7 +63,7 @@ test("every expected-error marker in the policy guarantee file is checked by a t
 });
 
 const CLEARED_RUN_MUTANTS: readonly (readonly [string, string])[] = [
-    ["an authorised plan alone", "authorisedPlanRuns"],
+    ["the plan of a cleared run alone", "planOfAClearedRunRuns"],
     ["a cleared run written by hand", "handMadeClearedRunRuns"],
     ["a cleared run copied under another project", "clearedRunUnderAnotherProject"],
     ["a cleared run copied under another standing", "clearedRunUnderAnotherStanding"],
