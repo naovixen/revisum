@@ -20,7 +20,17 @@ export type NamingViolation = {
   readonly why: string;
 };
 
-export type TokenKind = 'identifier' | 'string' | 'template' | 'comment' | 'regex' | 'number' | 'punctuator';
+export const TokenKind = {
+  Identifier: 'identifier',
+  String: 'string',
+  Template: 'template',
+  Comment: 'comment',
+  Regex: 'regex',
+  Number: 'number',
+  Punctuator: 'punctuator',
+} as const;
+
+export type TokenKind = (typeof TokenKind)[keyof typeof TokenKind];
 export type Token = { readonly kind: TokenKind; readonly text: string; readonly line: number };
 
 const CODE_EXTENSIONS = ['.ts', '.mts', '.cts', '.js', '.mjs', '.cjs'];
@@ -149,7 +159,7 @@ export function tokenize(source: string): Token[] {
   const lastSignificant = (): Token | undefined => {
     for (let index = tokens.length - 1; index >= 0; index--) {
       const token = tokens[index];
-      if (token !== undefined && token.kind !== 'comment') return token;
+      if (token !== undefined && token.kind !== TokenKind.Comment) return token;
     }
     return undefined;
   };
@@ -167,20 +177,20 @@ export function tokenize(source: string): Token[] {
       }
       if (character === '`') {
         position += 1;
-        tokens.push({ kind: 'template', text, line: startLine });
+        tokens.push({ kind: TokenKind.Template, text, line: startLine });
         return;
       }
       if (character === '$' && source[position + 1] === '{') {
         position += 2;
         braces.push(true);
-        tokens.push({ kind: 'template', text, line: startLine });
+        tokens.push({ kind: TokenKind.Template, text, line: startLine });
         return;
       }
       if (character === '\n') line += 1;
       text += character;
       position += 1;
     }
-    tokens.push({ kind: 'template', text, line: startLine });
+    tokens.push({ kind: TokenKind.Template, text, line: startLine });
   };
 
   while (position < source.length) {
@@ -195,13 +205,13 @@ export function tokenize(source: string): Token[] {
     } else if (character === '/' && next === '/') {
       const end = source.indexOf('\n', position);
       const stop = end === -1 ? source.length : end;
-      tokens.push({ kind: 'comment', text: source.slice(position, stop), line });
+      tokens.push({ kind: TokenKind.Comment, text: source.slice(position, stop), line });
       position = stop;
     } else if (character === '/' && next === '*') {
       const end = source.indexOf('*/', position + 2);
       const stop = end === -1 ? source.length : end + 2;
       const text = source.slice(position, stop);
-      tokens.push({ kind: 'comment', text, line });
+      tokens.push({ kind: TokenKind.Comment, text, line });
       line += text.split('\n').length - 1;
       position = stop;
     } else if (character === '"' || character === "'") {
@@ -209,7 +219,7 @@ export function tokenize(source: string): Token[] {
       while (index < source.length && source[index] !== character && source[index] !== '\n') {
         index += source[index] === '\\' ? 2 : 1;
       }
-      tokens.push({ kind: 'string', text: source.slice(position + 1, index), line });
+      tokens.push({ kind: TokenKind.String, text: source.slice(position + 1, index), line });
       position = index + 1;
     } else if (character === '`') {
       position += 1;
@@ -230,26 +240,26 @@ export function tokenize(source: string): Token[] {
       }
       index += 1;
       while (index < source.length && /[a-z]/i.test(source[index] ?? '')) index += 1;
-      tokens.push({ kind: 'regex', text: source.slice(position, index), line });
+      tokens.push({ kind: TokenKind.Regex, text: source.slice(position, index), line });
       position = index;
     } else if (/[A-Za-z_$]/.test(character)) {
       const match = /^[\w$]+/.exec(source.slice(position)) ?? [''];
-      tokens.push({ kind: 'identifier', text: match[0], line });
+      tokens.push({ kind: TokenKind.Identifier, text: match[0], line });
       position += match[0].length;
     } else if (/\d/.test(character)) {
       const match = /^[\w.]+/.exec(source.slice(position)) ?? [''];
-      tokens.push({ kind: 'number', text: match[0], line });
+      tokens.push({ kind: TokenKind.Number, text: match[0], line });
       position += match[0].length;
     } else if (character === '{') {
       braces.push(false);
-      tokens.push({ kind: 'punctuator', text: character, line });
+      tokens.push({ kind: TokenKind.Punctuator, text: character, line });
       position += 1;
     } else if (character === '}') {
       position += 1;
       if (braces.pop() === true) readTemplateText();
-      else tokens.push({ kind: 'punctuator', text: character, line });
+      else tokens.push({ kind: TokenKind.Punctuator, text: character, line });
     } else {
-      tokens.push({ kind: 'punctuator', text: character, line });
+      tokens.push({ kind: TokenKind.Punctuator, text: character, line });
       position += 1;
     }
   }
@@ -258,8 +268,8 @@ export function tokenize(source: string): Token[] {
 
 function startsExpression(previous: Token | undefined): boolean {
   if (previous === undefined) return true;
-  if (previous.kind === 'identifier') return KEYWORDS_BEFORE_EXPRESSION.has(previous.text);
-  if (previous.kind === 'punctuator') return ![')', ']', '}'].includes(previous.text);
+  if (previous.kind === TokenKind.Identifier) return KEYWORDS_BEFORE_EXPRESSION.has(previous.text);
+  if (previous.kind === TokenKind.Punctuator) return ![')', ']', '}'].includes(previous.text);
   return false;
 }
 
@@ -284,16 +294,16 @@ function lintComment(checker: Checker, file: string, line: number, comment: stri
 
 function lintCode(checker: Checker, file: string, source: string, violations: NamingViolation[]): void {
   const tokens = tokenize(source);
-  const significant = tokens.filter((token) => token.kind !== 'comment');
+  const significant = tokens.filter((token) => token.kind !== TokenKind.Comment);
   let insideExportList = false;
 
   // A run of "//" lines with no code between them is one comment.
   const comments: Token[] = [];
   tokens.forEach((token, index) => {
-    if (token.kind !== 'comment') return;
+    if (token.kind !== TokenKind.Comment) return;
     const previous = tokens[index - 1];
     const last = comments.at(-1);
-    const continuesRun = last !== undefined && previous?.kind === 'comment' && previous.text.startsWith('//')
+    const continuesRun = last !== undefined && previous?.kind === TokenKind.Comment && previous.text.startsWith('//')
       && token.text.startsWith('//') && token.line === previous.line + 1;
     if (continuesRun) comments[comments.length - 1] = { ...last, text: `${last.text}\n${token.text}` };
     else comments.push(token);
@@ -306,24 +316,24 @@ function lintCode(checker: Checker, file: string, source: string, violations: Na
     const before = significant[index - 1];
     const twoBefore = significant[index - 2];
 
-    if (token.kind === 'punctuator' && token.text === '{' && before?.text === 'export') insideExportList = true;
-    if (token.kind === 'punctuator' && token.text === '}') insideExportList = false;
+    if (token.kind === TokenKind.Punctuator && token.text === '{' && before?.text === 'export') insideExportList = true;
+    if (token.kind === TokenKind.Punctuator && token.text === '}') insideExportList = false;
 
-    if (token.kind === 'string' || token.kind === 'template') {
+    if (token.kind === TokenKind.String || token.kind === TokenKind.Template) {
       if (checker.config.specReferencePattern.test(token.text)) {
         if (isSpecReferenceBanned(checker, file, token.text)) {
           violations.push({ file, line: token.line, name: token.text, why: SPEC_REFERENCE_WHY });
         }
         continue;
       }
-      const problems = token.kind === 'string' && isNameLike(token.text) && !checker.config.allowedStringValues.includes(token.text)
+      const problems = token.kind === TokenKind.String && isNameLike(token.text) && !checker.config.allowedStringValues.includes(token.text)
         ? nameProblems(checker, token.text, false)
         : [firstMatch(checker.config.bannedText, token.text)].filter((why) => why !== undefined);
       for (const why of problems) violations.push({ file, line: token.line, name: token.text, why });
       continue;
     }
 
-    if (token.kind !== 'identifier') continue;
+    if (token.kind !== TokenKind.Identifier) continue;
     // A name after "." belongs to whatever object it is read from; ours are checked where declared.
     const isMemberAccess = before?.text === '.' && twoBefore?.text !== '.';
     if (isMemberAccess) continue;

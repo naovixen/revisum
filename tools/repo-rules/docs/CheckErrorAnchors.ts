@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import type { Token } from '../naming/LintRepository.ts';
 import { codeTokens, isIdentifier, isPunctuator } from '../ListSourceFiles.ts';
 import { reportProblems } from '../ReadWorkspacePackages.ts';
+import { TokenKind } from '../naming/LintRepository.ts';
 
 export const ERRORS_PAGE = 'docs/errors.md';
 
@@ -82,9 +83,9 @@ export function readDeclaredCodes(tokens: readonly Token[], name: string): Decla
     if (isPunctuator(token, '{') || isPunctuator(token, '[') || isPunctuator(token, '(')) depth += 1;
     else if (isPunctuator(token, '}') || isPunctuator(token, ']') || isPunctuator(token, ')')) depth -= 1;
     else if (isPunctuator(token, ';') && depth === 0) break;
-    else if (token.kind === 'string') codes.push(token.text);
+    else if (token.kind === TokenKind.String) codes.push(token.text);
     // `typeof Set.Member` names the set, not `typeof`.
-    else if (token.kind === 'identifier' && token.text !== 'typeof' && namesBorrowedSet(tokens, index)) {
+    else if (token.kind === TokenKind.Identifier && token.text !== 'typeof' && namesBorrowedSet(tokens, index)) {
       borrowedSets.add(token.text);
     }
   }

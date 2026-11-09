@@ -3,7 +3,7 @@
 // version-unsupported: a newer engine may have recorded an input this one would silently ignore.
 // A known field of the wrong shape is a replay-mismatch at its JSON path. Nothing is guessed.
 import {
-  UNSAFE_FEATURES, failure, isPlainObject, success,
+  PlanErrorCode, UNSAFE_FEATURES, failure, isPlainObject, success,
   type EvidenceManifestRecord, type FixtureReference, type HostInfo, type PlanRunManifest, type Result, type RunManifest, type RunVersions, type SecretRecord,
   type StorageStateRecord, type UnsafeDeclarationRecord,
 } from '@revisum/contracts';
@@ -40,18 +40,18 @@ const MAXIMUM_LIST_LENGTH = 100_000;
 // Issues as a decode error: an unknown key anywhere means another version; otherwise the first
 // field of the wrong shape.
 export function decodeErrorOf(issues: Issues): DecodeError {
-  const unknown = issues.find((issue) => issue.code === 'unknown_field');
+  const unknown = issues.find((issue) => issue.code === PlanErrorCode.UnknownField);
   if (unknown !== undefined) return { code: ReplayErrorCode.VersionUnsupported, path: unknown.path };
   return { code: ReplayErrorCode.ReplayMismatch, path: issues[0]?.path ?? '$' };
 }
 
 export function readString(input: unknown, path: string, issues: Issues, maximumLength = MAXIMUM_TEXT_LENGTH): Parsed<string> {
-  if (typeof input !== 'string' || input.length > maximumLength) { issues.push({ code: 'wrong_type', path }); return INVALID; }
+  if (typeof input !== 'string' || input.length > maximumLength) { issues.push({ code: PlanErrorCode.WrongType, path }); return INVALID; }
   return input;
 }
 
 export function readSha256(input: unknown, path: string, issues: Issues): Parsed<string> {
-  if (typeof input !== 'string' || !SHA256_HEX.test(input)) { issues.push({ code: 'wrong_type', path }); return INVALID; }
+  if (typeof input !== 'string' || !SHA256_HEX.test(input)) { issues.push({ code: PlanErrorCode.WrongType, path }); return INVALID; }
   return input;
 }
 

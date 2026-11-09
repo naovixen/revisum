@@ -6,6 +6,7 @@ export { PRODUCT } from './product/Product.ts';
 export type { Brand } from './foundation/Brand.ts';
 export { failure, success, type Failure, type Result, type Success } from './foundation/Result.ts';
 export * from './ports/Target.ts';
+export * from './ports/WorkloadOutcomeKind.ts';
 export * from './plan/Plan.ts';
 export * from './plan/TextOrValue.ts';
 export type * from './plan/CriterionId.ts';

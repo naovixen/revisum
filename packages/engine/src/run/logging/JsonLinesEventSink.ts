@@ -3,12 +3,12 @@
 // that what it wrote stays as written.
 import { createHash, type Hash } from 'node:crypto';
 import { appendFileSync, readFileSync } from 'node:fs';
-import { failure, success, type DerivedActor, type EventInput, type EventSink, type Result, type SinkError } from '@revisum/contracts';
+import { SinkErrorCode, failure, success, type DerivedActor, type EventInput, type EventSink, type Result, type SinkError } from '@revisum/contracts';
 import { sha256 } from '../../foundation/Sha256.ts';
 
 const NEWLINE = 0x0a;
-const NOT_APPEND_ONLY: SinkError = { code: 'not-append-only' };
-const WRITE_FAILED: SinkError = { code: 'write-failed' };
+const NOT_APPEND_ONLY: SinkError = { code: SinkErrorCode.NotAppendOnly };
+const WRITE_FAILED: SinkError = { code: SinkErrorCode.WriteFailed };
 
 function readCurrent(path: string): Result<Buffer, SinkError> {
   try {

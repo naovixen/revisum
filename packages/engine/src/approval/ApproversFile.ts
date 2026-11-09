@@ -2,6 +2,7 @@
 // coding agent's deny-rules file and holdouts.json. Each is outside input until decoded here.
 import type { AgentLockdown, AgentLockdownAction } from '@revisum/contracts';
 import { INVALID, allValid, readList, readOneOf, readRecord, type Issues, type Parsed } from '../plan/parse/ReadRecord.ts';
+import { PlanErrorCode } from '@revisum/contracts';
 
 type SigningKey = { readonly keyId: string; readonly publicKey: string };
 export type ApproversFile = { readonly agentLockdown: AgentLockdown | null; readonly signingKeys: readonly SigningKey[] };
@@ -11,8 +12,8 @@ const LOCKDOWN_ACTIONS: readonly AgentLockdownAction[] = ['commit', 'push', 'mer
 export const REQUIRED_DENIED_ACTIONS: readonly AgentLockdownAction[] = ['push', 'merge', 'approve-pull-request'];
 
 function readString(input: unknown, path: string, issues: Issues): Parsed<string> {
-  if (typeof input !== 'string') { issues.push({ code: 'wrong_type', path }); return INVALID; }
-  if (input.length === 0) { issues.push({ code: 'empty', path }); return INVALID; }
+  if (typeof input !== 'string') { issues.push({ code: PlanErrorCode.WrongType, path }); return INVALID; }
+  if (input.length === 0) { issues.push({ code: PlanErrorCode.Empty, path }); return INVALID; }
   return input;
 }
 
@@ -27,7 +28,7 @@ function readLockdown(input: unknown, issues: Issues): Parsed<AgentLockdown | nu
   const maintainer = readString(fields['maintainer'], `${path}.maintainer`, issues);
   const agentDenyRulesPath = readString(fields['agentDenyRulesPath'], `${path}.agentDenyRulesPath`, issues);
   const credentials = fields['agentHasGithubCredentials'];
-  if (typeof credentials !== 'boolean') issues.push({ code: 'wrong_type', path: `${path}.agentHasGithubCredentials` });
+  if (typeof credentials !== 'boolean') issues.push({ code: PlanErrorCode.WrongType, path: `${path}.agentHasGithubCredentials` });
   if (rawActions === INVALID || maintainer === INVALID || agentDenyRulesPath === INVALID || typeof credentials !== 'boolean'
     || !allValid(deniedActions)) return INVALID;
   return { maintainer, agentDenyRulesPath, deniedActions, agentHasGithubCredentials: credentials };

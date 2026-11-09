@@ -10,6 +10,7 @@ import {
     type PageReadFailure,
 } from "@revisum/contracts";
 import type { Logger } from "./logging/LoggingManifest.ts";
+import { EventKind } from "./logging/LoggingManifest.ts";
 
 export const errorText = (error: unknown): string =>
     (error instanceof Error ? error.message : String(error)).slice(0, 200);
@@ -18,7 +19,7 @@ export const errorText = (error: unknown): string =>
 // a throw from anything else cannot say the page died.
 export function codeForThrow(error: unknown, document: DocumentSession, logger: Logger): StepCode {
     const code = document.crashed() ? StepCode.TargetCrashed : StepCode.AdapterError;
-    logger.log({ kind: "step.end", outcome: "failed", code, detail: errorText(error) });
+    logger.log({ kind: EventKind.StepEnd, outcome: "failed", code, detail: errorText(error) });
     return code;
 }
 
@@ -35,7 +36,7 @@ type FailedReadCode = (typeof STEP_CODE_OF_FAILED_READ)[PageReadFailureCode];
 export function codeOfFailedRead(readFailure: PageReadFailure, logger: Logger): FailedReadCode {
     const code = STEP_CODE_OF_FAILED_READ[readFailure.code];
     if (code === StepCode.AdapterError) {
-        logger.log({ kind: "step.end", outcome: "failed", code, detail: readFailure.detail });
+        logger.log({ kind: EventKind.StepEnd, outcome: "failed", code, detail: readFailure.detail });
     }
     return code;
 }

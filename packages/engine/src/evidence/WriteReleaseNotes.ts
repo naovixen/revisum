@@ -2,7 +2,7 @@
 // always give the same bytes. An AI may only add a suggestion stored beside the draft, never
 // replace it, and never containing typed or expected values.
 import {
-  literalText, referencedValueName, RememberElementRead, RequestCountKind, StepOutcome, TerminalState,
+  ResponseFieldTextKind, ResponseFieldPresenceKind, ResponseAssertionKind, ResponseRead, ClockAdvanceMode, StubAction, DialogAction, ScriptMode, StepType, StructuralLocatorKind, SemanticLocatorKind, literalText, referencedValueName, RememberElementRead, RequestCountKind, StepOutcome, TerminalState,
   type AiWriter, type ArtifactReference, type ArtifactStore, type ClipboardAssertion, type ClockAdvance, type Locator, type Plan,
   type RememberedElementSource, type RememberRead, type RememberSource, type REQUEST_COUNT_KINDS, type RequestCount, type ResponseAssertion, type ScriptChoice, type Step, type StorageAssertion,
   type TextOrValue, type PlanErrorCode, type PlanRunResult,
@@ -44,13 +44,13 @@ const plainText = (text: TextOrValue): string => literalText(text) ?? `{${refere
 
 function describeLocator(locator: Locator): string {
   switch (locator.by) {
-    case 'role': return `the "${markdownEscape(plainText(locator.name))}" ${locator.role}`;
-    case 'label': return `the "${markdownEscape(plainText(locator.label))}" field`;
-    case 'text': return `the text "${markdownEscape(plainText(locator.text))}"`;
-    case 'testId': return `the \`${codeSpanText(plainText(locator.testId))}\` element`;
+    case SemanticLocatorKind.Role: return `the "${markdownEscape(plainText(locator.name))}" ${locator.role}`;
+    case SemanticLocatorKind.Label: return `the "${markdownEscape(plainText(locator.label))}" field`;
+    case SemanticLocatorKind.Text: return `the text "${markdownEscape(plainText(locator.text))}"`;
+    case SemanticLocatorKind.TestId: return `the \`${codeSpanText(plainText(locator.testId))}\` element`;
     // The selector or expression is the plan's own literal text, never a value.
-    case 'css': return `the element found by CSS \`${codeSpanText(locator.selector)}\``;
-    case 'xpath': return `the element found by XPath \`${codeSpanText(locator.expression)}\``;
+    case StructuralLocatorKind.Css: return `the element found by CSS \`${codeSpanText(locator.selector)}\``;
+    case StructuralLocatorKind.Xpath: return `the element found by XPath \`${codeSpanText(locator.expression)}\``;
   }
 }
 
@@ -63,38 +63,38 @@ function describeNavigation(url: Extract<Step, { type: 'navigate' }>['url']): st
 // One plain-English line per step. Values typed or expected are never included.
 export function describeStep(step: Step): string {
   switch (step.type) {
-    case 'navigate': return `Opened \`${codeSpanText(describeNavigation(step.url))}\`${step.scripts === 'disabled' ? ' with scripts off' : ''}`;
-    case 'click': return `Clicked ${describeLocator(step.locator)}`;
-    case 'download': return `Downloaded a file from ${describeLocator(step.locator)} as "${step.name}"`;
-    case 'hover': return `Hovered over ${describeLocator(step.locator)}`;
-    case 'fill': return `Filled in ${describeLocator(step.locator)}`;
-    case 'select': return `Chose an option in ${describeLocator(step.locator)}`;
-    case 'upload': return `Uploaded a fixture file to ${describeLocator(step.locator)}`;
-    case 'press': return `Pressed ${[...(step.modifiers ?? []), step.key].join('+')} on ${describeLocator(step.locator)}`;
-    case 'frame': return `Inside ${describeLocator(step.locator)}: ${step.steps.map(describeStep).join('; ')}`;
-    case 'dialog': return `${step.action === 'accept' ? 'Accepted' : 'Dismissed'} the next dialog`;
-    case 'expect': return `Checked that ${describeLocator(step.locator)} ${ASSERTION_TEXT[step.assert.kind]}`;
-    case 'expectPage': return `Checked the page ${PAGE_ASSERTION_TEXT[step.assert.kind]}`;
-    case 'expectDownload': return `Checked the ${DOWNLOAD_ASSERTION_TEXT[step.assert.kind]} of download "${step.download}"`;
-    case 'newTab': return `In a new tab at \`${codeSpanText(describeNavigation(step.url))}\`: ${step.steps.map(describeStep).join('; ')}`;
-    case 'a11yAudit': return `Ran automated accessibility rules (${step.mode} mode)`;
-    case 'capture': return `Captured screenshot "${step.name}"`;
-    case 'call': return `Called the declared \`${codeSpanText(step.call)}\` service call`;
-    case 'expectBackend': return `Checked that field "${markdownEscape(step.field)}" of \`${codeSpanText(step.call)}\` ${BACKEND_ASSERTION_TEXT[step.assert.kind]}`;
-    case 'remember': return `Remembered ${describeRememberSource(step.from)} as {${step.name}}`;
-    case 'stub': return `${step.action === 'start' ? 'Started' : 'Stopped'} the declared \`${codeSpanText(step.stub)}\` stub`;
-    case 'resetRequests': return `Reset the count of \`${codeSpanText(step.request)}\` requests`;
-    case 'expectRequests': return `Checked ${REQUEST_COUNT_TEXT[requestCountKind(step.count)]} of \`${codeSpanText(step.request)}\` requests`;
-    case 'expectResponse': return `Checked that the latest \`${codeSpanText(step.request)}\` response ${describeResponseAssertion(step.assert)}`;
-    case 'setStorage': return `Wrote the declared \`${codeSpanText(step.entry)}\` storage entry`;
-    case 'removeStorage': return `Removed the declared \`${codeSpanText(step.entry)}\` storage entry`;
-    case 'expectStorage': return `Checked that the \`${codeSpanText(step.entry)}\` storage entry ${STORAGE_ASSERTION_TEXT[step.assert.kind]}`;
-    case 'advanceClock': return `Advanced the page's clock by ${describeClockAdvance(step.by)}${step.mode === 'skipAhead' ? ', skipping ahead' : ''}`;
-    case 'expectClipboard': return `Checked that the clipboard ${CLIPBOARD_ASSERTION_TEXT[step.assert.kind]}`;
-    case 'evaluate': return `Ran ${describeScript(step.script)}`;
-    case 'expectScript': return `Checked that field "${markdownEscape(step.field)}" of ${describeScript(step.script)} ${BACKEND_ASSERTION_TEXT[step.assert.kind]}`;
-    case 'database': return `Ran the declared \`${codeSpanText(step.command)}\` database command`;
-    case 'expectDatabase': return `Checked that field "${markdownEscape(step.field)}" of \`${codeSpanText(step.command)}\` ${BACKEND_ASSERTION_TEXT[step.assert.kind]}`;
+    case StepType.Navigate: return `Opened \`${codeSpanText(describeNavigation(step.url))}\`${step.scripts === ScriptMode.Disabled ? ' with scripts off' : ''}`;
+    case StepType.Click: return `Clicked ${describeLocator(step.locator)}`;
+    case StepType.Download: return `Downloaded a file from ${describeLocator(step.locator)} as "${step.name}"`;
+    case StepType.Hover: return `Hovered over ${describeLocator(step.locator)}`;
+    case StepType.Fill: return `Filled in ${describeLocator(step.locator)}`;
+    case StepType.Select: return `Chose an option in ${describeLocator(step.locator)}`;
+    case StepType.Upload: return `Uploaded a fixture file to ${describeLocator(step.locator)}`;
+    case StepType.Press: return `Pressed ${[...(step.modifiers ?? []), step.key].join('+')} on ${describeLocator(step.locator)}`;
+    case StepType.Frame: return `Inside ${describeLocator(step.locator)}: ${step.steps.map(describeStep).join('; ')}`;
+    case StepType.Dialog: return `${step.action === DialogAction.Accept ? 'Accepted' : 'Dismissed'} the next dialog`;
+    case StepType.Expect: return `Checked that ${describeLocator(step.locator)} ${ASSERTION_TEXT[step.assert.kind]}`;
+    case StepType.ExpectPage: return `Checked the page ${PAGE_ASSERTION_TEXT[step.assert.kind]}`;
+    case StepType.ExpectDownload: return `Checked the ${DOWNLOAD_ASSERTION_TEXT[step.assert.kind]} of download "${step.download}"`;
+    case StepType.NewTab: return `In a new tab at \`${codeSpanText(describeNavigation(step.url))}\`: ${step.steps.map(describeStep).join('; ')}`;
+    case StepType.A11yAudit: return `Ran automated accessibility rules (${step.mode} mode)`;
+    case StepType.Capture: return `Captured screenshot "${step.name}"`;
+    case StepType.Call: return `Called the declared \`${codeSpanText(step.call)}\` service call`;
+    case StepType.ExpectBackend: return `Checked that field "${markdownEscape(step.field)}" of \`${codeSpanText(step.call)}\` ${BACKEND_ASSERTION_TEXT[step.assert.kind]}`;
+    case StepType.Remember: return `Remembered ${describeRememberSource(step.from)} as {${step.name}}`;
+    case StepType.Stub: return `${step.action === StubAction.Start ? 'Started' : 'Stopped'} the declared \`${codeSpanText(step.stub)}\` stub`;
+    case StepType.ResetRequests: return `Reset the count of \`${codeSpanText(step.request)}\` requests`;
+    case StepType.ExpectRequests: return `Checked ${REQUEST_COUNT_TEXT[requestCountKind(step.count)]} of \`${codeSpanText(step.request)}\` requests`;
+    case StepType.ExpectResponse: return `Checked that the latest \`${codeSpanText(step.request)}\` response ${describeResponseAssertion(step.assert)}`;
+    case StepType.SetStorage: return `Wrote the declared \`${codeSpanText(step.entry)}\` storage entry`;
+    case StepType.RemoveStorage: return `Removed the declared \`${codeSpanText(step.entry)}\` storage entry`;
+    case StepType.ExpectStorage: return `Checked that the \`${codeSpanText(step.entry)}\` storage entry ${STORAGE_ASSERTION_TEXT[step.assert.kind]}`;
+    case StepType.AdvanceClock: return `Advanced the page's clock by ${describeClockAdvance(step.by)}${step.mode === ClockAdvanceMode.SkipAhead ? ', skipping ahead' : ''}`;
+    case StepType.ExpectClipboard: return `Checked that the clipboard ${CLIPBOARD_ASSERTION_TEXT[step.assert.kind]}`;
+    case StepType.Evaluate: return `Ran ${describeScript(step.script)}`;
+    case StepType.ExpectScript: return `Checked that field "${markdownEscape(step.field)}" of ${describeScript(step.script)} ${BACKEND_ASSERTION_TEXT[step.assert.kind]}`;
+    case StepType.Database: return `Ran the declared \`${codeSpanText(step.command)}\` database command`;
+    case StepType.ExpectDatabase: return `Checked that field "${markdownEscape(step.field)}" of \`${codeSpanText(step.command)}\` ${BACKEND_ASSERTION_TEXT[step.assert.kind]}`;
   }
 }
 
@@ -125,7 +125,7 @@ function describeRememberSource(from: RememberSource): string {
   }
   if ('clipboard' in from) return "the clipboard's text";
   const field = `field "${markdownEscape(from.field)}" of the latest \`${codeSpanText(from.response)}\` response`;
-  return from.read === 'text' ? field : `the length of ${field}`;
+  return from.read === ResponseRead.Text ? field : `the length of ${field}`;
 }
 
 const REQUEST_COUNT_TEXT: { readonly [Kind in (typeof REQUEST_COUNT_KINDS)[number]]: string } = {
@@ -140,11 +140,11 @@ function requestCountKind(count: RequestCount): RequestCountKind {
 
 function describeResponseAssertion(assertion: ResponseAssertion): string {
   switch (assertion.kind) {
-    case 'statusEquals': return 'has the expected status';
-    case 'fieldPresent': return `has field "${markdownEscape(assertion.field)}"`;
-    case 'fieldAbsent': return `has no field "${markdownEscape(assertion.field)}"`;
-    case 'fieldEquals': return `has the expected text in field "${markdownEscape(assertion.field)}"`;
-    case 'fieldContains': return `contains the expected text in field "${markdownEscape(assertion.field)}"`;
+    case ResponseAssertionKind.StatusEquals: return 'has the expected status';
+    case ResponseFieldPresenceKind.FieldPresent: return `has field "${markdownEscape(assertion.field)}"`;
+    case ResponseFieldPresenceKind.FieldAbsent: return `has no field "${markdownEscape(assertion.field)}"`;
+    case ResponseFieldTextKind.FieldEquals: return `has the expected text in field "${markdownEscape(assertion.field)}"`;
+    case ResponseFieldTextKind.FieldContains: return `contains the expected text in field "${markdownEscape(assertion.field)}"`;
   }
 }
 

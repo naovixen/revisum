@@ -4,7 +4,7 @@
 // value; it is written inside a string only for types that cannot hold quotes, spaces or
 // separators. Text is never spliced into the request, so no argument can change its shape.
 import {
-  failure, isSecret, success,
+  ParameterKind, failure, isSecret, success,
   type CallArgument, type CallArguments, type CallDeclaration, type JsonTemplate, type Origin, type ParameterName, type ParameterType, type Result,
   type JsonBodyWithSecrets, type Secret, type SecretStore, type ServiceRequest, type ServiceRequestHeader,
 } from '@revisum/contracts';
@@ -67,11 +67,11 @@ export function bodyOf(value: JsonWithSecrets): JsonBodyWithSecrets {
 function fill(type: ParameterType, argument: CallArgument | undefined, values: RunValues, secrets: SecretStore): Built<Filled> {
   if (argument === undefined) return failure('parameter-invalid');
   if (typeof argument === 'object' && 'secretName' in argument) {
-    if (type.kind !== 'secret') return failure('parameter-invalid');
+    if (type.kind !== ParameterKind.Secret) return failure('parameter-invalid');
     const secret = secrets.resolve(argument.secretName);
-    return secret === null ? failure('secret-missing') : success({ kind: 'secret', secret });
+    return secret === null ? failure('secret-missing') : success({ kind: ParameterKind.Secret, secret });
   }
-  if (type.kind === 'secret') return failure('parameter-invalid');
+  if (type.kind === ParameterKind.Secret) return failure('parameter-invalid');
   if (typeof argument === 'object') {
     // The parameter's type holds the value to its own length, so no other limit applies here.
     const text = resolveText(argument, values, Number.POSITIVE_INFINITY);

@@ -9,7 +9,7 @@
 //     straight after, and reads through an isolated world, so the page's scripts can neither see
 //     the read nor change what it returns.
 import {
-    failure,
+    DriverErrorCode, failure,
     success,
     type ClipboardPort,
     type DriverError,
@@ -61,7 +61,7 @@ export const SHARED_BROWSER_CLIPBOARD: ClipboardPort = {
     readText: () =>
         Promise.resolve(
             failure({
-                code: "clipboard-unavailable",
+                code: DriverErrorCode.ClipboardUnavailable,
                 detail: "a browser shared between sessions has one clipboard for all of them, so it is never read",
             }),
         ),
@@ -92,14 +92,14 @@ export class RunClipboard implements ClipboardPort {
 
     async readText(maximumCharacters: number): Promise<Result<string, DriverError>> {
         if (this.#crashed()) {
-            return failure({ code: "target-crashed", detail: "the page's renderer died" });
+            return failure({ code: DriverErrorCode.TargetCrashed, detail: "the page's renderer died" });
         }
         try {
             const { frameTree } = await this.#command(GET_FRAME_TREE, {});
             const origin = frameTree.frame.securityOrigin;
             if (!isWebOrigin(origin)) {
                 return failure({
-                    code: "clipboard-unavailable",
+                    code: DriverErrorCode.ClipboardUnavailable,
                     detail: "the page has no web origin to read the clipboard for",
                 });
             }
@@ -123,20 +123,20 @@ export class RunClipboard implements ClipboardPort {
             const text = called.result.value;
             if (called.exceptionDetails !== undefined || typeof text !== "string") {
                 return failure({
-                    code: "clipboard-unavailable",
+                    code: DriverErrorCode.ClipboardUnavailable,
                     detail: "the browser did not give its clipboard's text",
                 });
             }
             return success(text);
         } catch (error) {
             if (this.#crashed()) {
-                return failure({ code: "target-crashed", detail: "the page's renderer died" });
+                return failure({ code: DriverErrorCode.TargetCrashed, detail: "the page's renderer died" });
             }
             if (error instanceof PageHeldByDialog) {
-                return failure({ code: "dialog-open", detail: errorText(error) });
+                return failure({ code: DriverErrorCode.DialogOpen, detail: errorText(error) });
             }
             return failure({
-                code: "clipboard-unavailable",
+                code: DriverErrorCode.ClipboardUnavailable,
                 detail: `the clipboard could not be read: ${errorText(error)}`,
             });
         }

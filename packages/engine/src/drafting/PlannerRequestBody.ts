@@ -3,7 +3,7 @@
 // plannerReplyText decodes a reply, which is outside input, by hand and takes out its text, still
 // typed unknown, for parseAiText to bound. A reply that holds no text, such as a tool call, has
 // nothing to draft from.
-import { failure, isNonArrayObject, success, type PlannerWire, type Result } from '@revisum/contracts';
+import { failure, isNonArrayObject, success, PlannerWire, type Result } from '@revisum/contracts';
 import type { PlannerPrompt } from './PlannerPrompt.ts';
 
 // The draft is deterministic as far as the planner allows, and short: a plan is never long.
@@ -19,12 +19,12 @@ export const ANTHROPIC_API_VERSION = '2023-06-01';
 // quoted as written there.
 export function plannerRequestBody(wire: PlannerWire, model: string, prompt: PlannerPrompt): string {
   switch (wire) {
-    case 'anthropic-messages':
+    case PlannerWire.AnthropicMessages:
       return JSON.stringify({
         model, 'max_tokens': MAXIMUM_OUTPUT_TOKENS, temperature: TEMPERATURE, system: prompt.instructions,
         messages: [{ role: 'user', content: prompt.message }],
       });
-    case 'openai-chat':
+    case PlannerWire.OpenaiChat:
       return JSON.stringify({
         model, 'max_tokens': MAXIMUM_OUTPUT_TOKENS, temperature: TEMPERATURE,
         messages: [{ role: 'system', content: prompt.instructions }, { role: 'user', content: prompt.message }],
@@ -71,6 +71,6 @@ function openAiText(json: Readonly<Record<string, unknown>>): unknown {
 export function plannerReplyText(wire: PlannerWire, reply: unknown): Result<unknown, PlannerReplyError> {
   const json = replyJson(reply);
   if (!isNonArrayObject(json)) return failure({ code: 'reply-not-json' });
-  const text = wire === 'anthropic-messages' ? anthropicText(json) : openAiText(json);
+  const text = wire === PlannerWire.AnthropicMessages ? anthropicText(json) : openAiText(json);
   return text === undefined ? failure({ code: 'no-text' }) : success(text);
 }

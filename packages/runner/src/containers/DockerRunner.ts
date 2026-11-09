@@ -10,9 +10,9 @@
 // Nothing reaches the containers from the host's environment: each environment is built from an
 // empty list, and only the code, dependencies and browsers the run needs are mounted, read-only.
 import {
-  PRODUCT, failure, success,
+  RunnerErrorCode, PRODUCT, failure, success,
   type AppliedRewrite, type DeclaredService, type EgressPolicy, type FinalRunFacts, type FinishedRun, type ImageDigest, type ProxyDecision, type Result, type Runner, type RunnerError, type RunnerHandle,
-  type GuaranteeLevel,
+  GuaranteeLevel,
 } from '@revisum/contracts';
 import { join } from 'node:path';
 import { answeringEngine } from './AnsweringEngine.ts';
@@ -27,6 +27,7 @@ import { SERVICE_PROXY_VARIABLE } from '../egress/StartRecordKeeping.ts';
 import { RUN_IMAGE_TAG } from '../image/RunImage.ts';
 import { safeLog } from './SafeLog.ts';
 import { proxyUnreachableDetail, startProxyContainer } from '../egress/StartProxyContainer.ts';
+import { MountKind, ImageAnswerKind } from './ContainerEngine.ts';
 
 export type RunnerLogEntry = { readonly code: 'egress-unenforceable' | 'start-failed' | 'cleanup-failed'; readonly detail: string };
 
@@ -65,13 +66,13 @@ type RunContainerIds = { readonly runId: string; readonly proxyId: string; reado
 async function pinRunImage(engine: ContainerEngine, image: ImageDigest, log: RunnerLog): Promise<RunnerError | null> {
   const local = await engine.imageId(RUN_IMAGE_TAG);
   switch (local.kind) {
-    case 'found':
-      return local.id === image ? null : { code: 'image-digest-mismatch' };
-    case 'absent':
-      return { code: 'image-missing' };
-    case 'unanswered':
+    case ImageAnswerKind.Found:
+      return local.id === image ? null : { code: RunnerErrorCode.ImageDigestMismatch };
+    case ImageAnswerKind.Absent:
+      return { code: RunnerErrorCode.ImageMissing };
+    case ImageAnswerKind.Unanswered:
       log({ code: 'start-failed', detail: `Docker did not answer: ${local.problem.detail}` });
-      return { code: 'start-failed' };
+      return { code: RunnerErrorCode.StartFailed };
   }
 }
 
@@ -113,7 +114,7 @@ function openRun(setup: RunSetup, ids: RunContainerIds, startingLevel: Guarantee
   let level = startingLevel;
   let hasEnded = false;
   const fallToHost = (detail: string): void => {
-    if (level === 'isolated') {
+    if (level === GuaranteeLevel.Isolated) {
       level = 'host';
       log({ code: 'egress-unenforceable', detail });
     }
@@ -162,7 +163,7 @@ async function startRunInScope(setup: RunSetup, scope: ContainerScope): Promise<
   const { engine, root, log, image, inputs, ownMounts } = setup;
   const refuse = (detail: string): Result<OpenRun, RunnerError> => {
     log({ code: 'start-failed', detail });
-    return failure({ code: 'start-failed' });
+    return failure({ code: RunnerErrorCode.StartFailed });
   };
   // Where Docker cannot make a network with no route out, the run goes ahead on an ordinary one, at the host level.
   const whyNotEnforced = scope.networkKind === NetworkKind.Internal
@@ -179,8 +180,8 @@ async function startRunInScope(setup: RunSetup, scope: ContainerScope): Promise<
 
   const runMounts: ContainerMount[] = [
     ...ownMounts,
-    { kind: 'folder', source: join(root, '.browsers'), target: `${WORKSPACE}/.browsers` },
-    ...inputs.map((input): ContainerMount => ({ kind: 'folder', source: join(root, input), target: `${WORKSPACE}/${input}` })),
+    { kind: MountKind.Folder, source: join(root, '.browsers'), target: `${WORKSPACE}/.browsers` },
+    ...inputs.map((input): ContainerMount => ({ kind: MountKind.Folder, source: join(root, input), target: `${WORKSPACE}/${input}` })),
   ];
   const runContainer = await scope.startContainer(runImageContainer(root, {
     name: `${scope.runId}-run`, image, networks: [scope.network], environment: runContainerEnvironment(proxy.value.name), mounts: runMounts, command: ['sleep', 'infinity'],
@@ -236,7 +237,7 @@ export function dockerRunner(options: DockerRunnerOptions): Runner {
       }
       const inputs = repositoryInputs(options.inputs ?? [], log);
       if (inputs === null) {
-        return failure({ code: 'start-failed' });
+        return failure({ code: RunnerErrorCode.StartFailed });
       }
       const setup: RunSetup = { engine, root, log, image, policy, services: options.services, inputs, ownMounts };
       const scoped = await withContainerScope(
@@ -250,7 +251,7 @@ export function dockerRunner(options: DockerRunnerOptions): Runner {
       );
       if (!scoped.ok) {
         log({ code: 'start-failed', detail: `Docker could not create the run's network: ${scoped.error.detail}` });
-        return failure({ code: 'start-failed' });
+        return failure({ code: RunnerErrorCode.StartFailed });
       }
       return scoped.value;
     },

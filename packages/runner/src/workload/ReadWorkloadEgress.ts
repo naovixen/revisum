@@ -11,6 +11,7 @@ import {
 import type { CheckedWorkloadRequest } from "./CheckWorkloadRequest.ts";
 import { processEvents } from "./output/ProcessEvents.ts";
 import type { WorkloadLog } from "./WorkloadRefusal.ts";
+import { EgressChannel } from "@revisum/contracts";
 
 type WorkloadEgressRecord = {
     readonly events: readonly EgressEvent[];
@@ -26,7 +27,7 @@ function relayEvents(
         .filter((decision) => relayedOrigins.has(decision.origin))
         .map((decision): EgressEvent => ({
             origin: decision.origin,
-            channel: "process",
+            channel: EgressChannel.Process,
             decision: decision.decision,
         }));
 }

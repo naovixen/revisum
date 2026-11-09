@@ -4,7 +4,7 @@
 // format version, and a version this decoder does not know is refused as trace-unsupported, never
 // guessed at. What is kept is what a test did: the title of each action, in the order it started,
 // and what the trace says about its own Playwright and browser, which Revisum cannot check.
-import { failure, success, type EvidenceLimits, type Result, type SuiteDecodeError } from '@revisum/contracts';
+import { SuiteDecodeErrorCode, failure, success, type EvidenceLimits, type Result, type SuiteDecodeError } from '@revisum/contracts';
 import { brand } from '../foundation/Brand.ts';
 import type { SuiteTrace } from './SuiteReport.ts';
 import { readZip } from './ReadZip.ts';
@@ -52,18 +52,18 @@ function actionTitle(event: Event): string | null {
 function readTraceFile(text: string, path: string): Result<ReadEvents, SuiteDecodeError> {
   const lines = text.split('\n').filter((line) => line.trim() !== '');
   const first = lines[0] === undefined ? null : readEvent(lines[0]);
-  if (first === null || first['type'] !== CONTEXT_OPTIONS || typeof first['version'] !== 'number') return failure({ code: 'trace-invalid', path });
+  if (first === null || first['type'] !== CONTEXT_OPTIONS || typeof first['version'] !== 'number') return failure({ code: SuiteDecodeErrorCode.TraceInvalid, path });
   const version = first['version'];
-  if (!SUPPORTED_TRACE_VERSIONS.includes(version)) return failure({ code: 'trace-unsupported', path });
+  if (!SUPPORTED_TRACE_VERSIONS.includes(version)) return failure({ code: SuiteDecodeErrorCode.TraceUnsupported, path });
   const actions: { start: number; title: string }[] = [];
   for (const [index, line] of lines.entries()) {
     const event = readEvent(line);
-    if (event === null) return failure({ code: 'trace-invalid', path: `${path}.lines[${index}]` });
+    if (event === null) return failure({ code: SuiteDecodeErrorCode.TraceInvalid, path: `${path}.lines[${index}]` });
     if (event['type'] !== ACTION_START) continue;
     const title = actionTitle(event);
     const start = event['startTime'];
     if (title !== null && actions.length === MAXIMUM_TRACE_ACTIONS) {
-      return failure({ code: 'too-large', path });
+      return failure({ code: SuiteDecodeErrorCode.TooLarge, path });
     }
     if (title !== null) actions.push({ start: typeof start === 'number' && Number.isFinite(start) ? start : actions.length, title });
   }
@@ -80,9 +80,9 @@ function readTraceFile(text: string, path: string): Result<ReadEvents, SuiteDeco
 // folder, so the result builder can find the test it belongs to.
 export function parseSuiteTrace(archive: Uint8Array, limits: EvidenceLimits, attachmentPath = ''): Result<SuiteTrace, SuiteDecodeError> {
   const read = readZip(archive, { maximumEntries: limits.maximumTraceEntries, maximumTotalBytes: limits.maximumTraceBytes });
-  if (!read.ok) return failure({ code: read.error.code === 'too-large' ? 'too-large' : 'trace-invalid', path: read.error.path });
+  if (!read.ok) return failure({ code: read.error.code === 'too-large' ? SuiteDecodeErrorCode.TooLarge : SuiteDecodeErrorCode.TraceInvalid, path: read.error.path });
   const traceFiles = read.value.flatMap((entry, index) => (TRACE_ENTRY.test(entry.name) ? [{ entry, index }] : []));
-  if (traceFiles.length === 0) return failure({ code: 'trace-invalid', path: '$' });
+  if (traceFiles.length === 0) return failure({ code: SuiteDecodeErrorCode.TraceInvalid, path: '$' });
   const actions: { start: number; title: string }[] = [];
   let browserName: string | undefined;
   let playwrightVersion: string | undefined;
@@ -91,13 +91,13 @@ export function parseSuiteTrace(archive: Uint8Array, limits: EvidenceLimits, att
     try {
       text = new TextDecoder('utf-8', { fatal: true }).decode(entry.data);
     } catch {
-      return failure({ code: 'trace-invalid', path: `$.entries[${index}]` });
+      return failure({ code: SuiteDecodeErrorCode.TraceInvalid, path: `$.entries[${index}]` });
     }
     const events = readTraceFile(text, `$.entries[${index}]`);
     if (!events.ok) return events;
     for (const action of events.value.actions) {
       if (actions.length === MAXIMUM_TRACE_ACTIONS) {
-        return failure({ code: 'too-large', path: `$.entries[${index}]` });
+        return failure({ code: SuiteDecodeErrorCode.TooLarge, path: `$.entries[${index}]` });
       }
       actions.push(action);
     }

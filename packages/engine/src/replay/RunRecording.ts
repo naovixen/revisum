@@ -12,7 +12,7 @@
 //     reply never used is a mismatch at its position.
 // Stderr and egress events are dropped: the engine reads neither.
 import {
-  LEAK_FORMS, failure, isPlainObject, isSecret, success,
+  PlanErrorCode, WorkloadOutcomeKind, LEAK_FORMS, failure, isPlainObject, isSecret, success,
   type DatabaseCommandRequest, type DatabaseCommandRunner, type Result, type Secret, type SecretStore, type ServiceCallErrorCode,
   type ServiceCaller, type ServiceRequest, type ServiceResponse, type WorkloadErrorCode, type WorkloadOutcome,
 } from '@revisum/contracts';
@@ -159,7 +159,7 @@ export function recordingPorts(ports: RepliedPorts, runSecrets: readonly Secret[
         ? {
           requestSha256,
           outcome: {
-            exitCode: reply.value.kind === 'exited' ? reply.value.exitCode : STOPPED_COMMAND_EXIT_CODE, timedOut: reply.value.kind === 'timed-out',
+            exitCode: reply.value.kind === WorkloadOutcomeKind.Exited ? reply.value.exitCode : STOPPED_COMMAND_EXIT_CODE, timedOut: reply.value.kind === WorkloadOutcomeKind.TimedOut,
             stdout: recordedBytes(reply.value.stdout.bytes, secrets), truncated: reply.value.stdout.truncated,
           },
         }
@@ -280,10 +280,10 @@ function readEcho(input: unknown, path: string, issues: Issues): Parsed<SecretEc
   const scheme = fields['scheme'] === undefined ? undefined : readOneOf(fields['scheme'], `${path}.scheme`, issues, ['bearer', 'basic'] as const);
   const characters = fields['characters'] === undefined ? undefined : readInteger(fields['characters'], `${path}.characters`, issues, 1, MAXIMUM_BYTES_TEXT);
   const spelling = fields['spelling'] === undefined ? undefined : readString(fields['spelling'], `${path}.spelling`, issues, MAXIMUM_BYTES_TEXT);
-  if (spelling !== undefined && spelling !== INVALID && !SPELLING.test(spelling)) issues.push({ code: 'unknown_value', path: `${path}.spelling` });
+  if (spelling !== undefined && spelling !== INVALID && !SPELLING.test(spelling)) issues.push({ code: PlanErrorCode.UnknownValue, path: `${path}.spelling` });
   const alignment = fields['alignment'] === undefined ? undefined : readInteger(fields['alignment'], `${path}.alignment`, issues, 0, 2);
   const approximate = fields['approximate'];
-  if (approximate !== undefined && approximate !== true) issues.push({ code: 'wrong_type', path: `${path}.approximate` });
+  if (approximate !== undefined && approximate !== true) issues.push({ code: PlanErrorCode.WrongType, path: `${path}.approximate` });
   if (offset === INVALID || secretName === INVALID || form === INVALID || scheme === INVALID || characters === INVALID
     || spelling === INVALID || alignment === INVALID || (spelling !== undefined && !SPELLING.test(spelling))
     || (approximate !== undefined && approximate !== true)) return INVALID;
@@ -299,10 +299,10 @@ function readBytes(input: unknown, path: string, issues: Issues): Parsed<Recorde
   const fields = readRecord(input, path, issues, ['text', 'base64', 'secretEchoes'], []);
   if (fields === INVALID) return INVALID;
   const hasText = Object.hasOwn(fields, 'text');
-  if (hasText === Object.hasOwn(fields, 'base64')) { issues.push({ code: 'missing_field', path: `${path}.${hasText ? 'base64' : 'text'}` }); return INVALID; }
+  if (hasText === Object.hasOwn(fields, 'base64')) { issues.push({ code: PlanErrorCode.MissingField, path: `${path}.${hasText ? 'base64' : 'text'}` }); return INVALID; }
   const raw = hasText ? readString(fields['text'], `${path}.text`, issues, MAXIMUM_BYTES_TEXT) : readString(fields['base64'], `${path}.base64`, issues, MAXIMUM_BYTES_TEXT);
   if (raw === INVALID) return INVALID;
-  if (!hasText && !BASE64.test(raw)) { issues.push({ code: 'wrong_type', path: `${path}.base64` }); return INVALID; }
+  if (!hasText && !BASE64.test(raw)) { issues.push({ code: PlanErrorCode.WrongType, path: `${path}.base64` }); return INVALID; }
   const length = hasText ? raw.length : Buffer.from(raw, 'base64').length;
   let echoes: readonly SecretEcho[] | undefined;
   if (fields['secretEchoes'] !== undefined) {
@@ -312,7 +312,7 @@ function readBytes(input: unknown, path: string, issues: Issues): Parsed<Recorde
     if (!allValid(read)) return INVALID;
     // Each echo goes back at or after the one before it, inside the kept text.
     const misplaced = read.findIndex((echo, index) => echo.offset > length || echo.offset < (read[index - 1]?.offset ?? 0));
-    if (misplaced !== -1) { issues.push({ code: 'unknown_value', path: `${path}.secretEchoes[${misplaced}].offset` }); return INVALID; }
+    if (misplaced !== -1) { issues.push({ code: PlanErrorCode.UnknownValue, path: `${path}.secretEchoes[${misplaced}].offset` }); return INVALID; }
     echoes = read;
   }
   const secretEchoes = echoes === undefined ? {} : { secretEchoes: echoes };
@@ -351,8 +351,8 @@ function readCommandReply(input: unknown, path: string, issues: Issues): Parsed<
   const exitCode = readInteger(outcome['exitCode'], `${path}.outcome.exitCode`, issues, -(2 ** 31), 2 ** 32);
   const timedOut = outcome['timedOut'];
   const truncated = outcome['truncated'];
-  if (typeof timedOut !== 'boolean') issues.push({ code: 'wrong_type', path: `${path}.outcome.timedOut` });
-  if (typeof truncated !== 'boolean') issues.push({ code: 'wrong_type', path: `${path}.outcome.truncated` });
+  if (typeof timedOut !== 'boolean') issues.push({ code: PlanErrorCode.WrongType, path: `${path}.outcome.timedOut` });
+  if (typeof truncated !== 'boolean') issues.push({ code: PlanErrorCode.WrongType, path: `${path}.outcome.truncated` });
   const stdout = readBytes(outcome['stdout'], `${path}.outcome.stdout`, issues);
   if (exitCode === INVALID || stdout === INVALID || typeof timedOut !== 'boolean' || typeof truncated !== 'boolean') return INVALID;
   return { requestSha256, outcome: { exitCode, timedOut, stdout, truncated } };

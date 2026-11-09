@@ -4,9 +4,9 @@
 // policy gate applies, written by a person. AI output never reaches this type. The person declares
 // every target; the engine never invents one.
 import {
-  COLOR_SCHEMES, DEFAULT_TEST_ID_ATTRIBUTE, DEVICE_PROFILES, ENGINES, FIDELITIES, MOTION_PREFERENCES, PLANNER_WIRES, isPlainObject, originOfUrl, success, failure,
+  PlanErrorCode, COLOR_SCHEMES, DEFAULT_TEST_ID_ATTRIBUTE, DEVICE_PROFILES, ENGINES, FIDELITIES, MOTION_PREFERENCES, PLANNER_WIRES, isPlainObject, originOfUrl, success, failure,
   type Brand, type CallDeclaration, type CallName, type DeclaredService, type DeviceProfileId, type FixtureName, type IrreversiblePatterns, type Locale, type Origin, type Result,
-  type EmailDomain, type EvidenceMode, type PlannerAddress, type PlannerEndpoint, type PlannerEndpointKind, type PlannerUrl, type SafeText, type SecretName, type Target, type TestIdAttribute, type TimeZone,
+  type EmailDomain, type EvidenceMode, type PlannerAddress, type PlannerEndpoint, PlannerEndpointKind, type PlannerUrl, type SafeText, type SecretName, type Target, type TestIdAttribute, type TimeZone,
   type ObservedRequestDeclaration, type RequestName, type StorageEntryDeclaration, type StorageEntryName, type StubDeclaration, type StubName,
   type UnsafeFeaturesDeclaration, type VendorExtensionKey, type PlanError,
 } from '@revisum/contracts';
@@ -161,24 +161,24 @@ const DEFAULT_EMAIL_DOMAIN = 'example.com';
 
 // A lowercase id such as a target or adapter id.
 export function readId<Name extends string>(input: unknown, path: string, issues: Issues): Parsed<Brand<string, Name>> {
-  if (typeof input !== 'string') { issues.push({ code: 'wrong_type', path }); return INVALID; }
-  if (!LOWERCASE_ID.test(input)) { issues.push({ code: 'unknown_value', path }); return INVALID; }
+  if (typeof input !== 'string') { issues.push({ code: PlanErrorCode.WrongType, path }); return INVALID; }
+  if (!LOWERCASE_ID.test(input)) { issues.push({ code: PlanErrorCode.UnknownValue, path }); return INVALID; }
   return brand<string, Name>(input);
 }
 
 function readLocale(input: unknown, path: string, issues: Issues): Parsed<Locale> {
-  if (typeof input !== 'string') { issues.push({ code: 'wrong_type', path }); return INVALID; }
+  if (typeof input !== 'string') { issues.push({ code: PlanErrorCode.WrongType, path }); return INVALID; }
   try {
     if (Intl.getCanonicalLocales(input)[0] === input) return brand<string, 'Locale'>(input);
   } catch { /* not a language tag: reported below */ }
-  issues.push({ code: 'unknown_value', path });
+  issues.push({ code: PlanErrorCode.UnknownValue, path });
   return INVALID;
 }
 
 function readTimeZone(input: unknown, path: string, issues: Issues): Parsed<TimeZone> {
-  if (typeof input !== 'string') { issues.push({ code: 'wrong_type', path }); return INVALID; }
+  if (typeof input !== 'string') { issues.push({ code: PlanErrorCode.WrongType, path }); return INVALID; }
   if (input === 'UTC' || Intl.supportedValuesOf('timeZone').includes(input)) return brand<string, 'TimeZone'>(input);
-  issues.push({ code: 'unknown_value', path });
+  issues.push({ code: PlanErrorCode.UnknownValue, path });
   return INVALID;
 }
 
@@ -193,13 +193,13 @@ const MAXIMUM_VENDOR_EXTENSIONS = 32;
 const MAXIMUM_EXTENSION_DEPTH = 8;
 
 export function readBuildVersion(input: unknown, path: string, issues: Issues): Parsed<string> {
-  if (typeof input !== 'string') { issues.push({ code: 'wrong_type', path }); return INVALID; }
-  if (!BUILD_VERSION.test(input)) { issues.push({ code: 'unknown_value', path }); return INVALID; }
+  if (typeof input !== 'string') { issues.push({ code: PlanErrorCode.WrongType, path }); return INVALID; }
+  if (!BUILD_VERSION.test(input)) { issues.push({ code: PlanErrorCode.UnknownValue, path }); return INVALID; }
   return input;
 }
 
 function readBoolean(input: unknown, path: string, issues: Issues): Parsed<boolean> {
-  if (typeof input !== 'boolean') { issues.push({ code: 'wrong_type', path }); return INVALID; }
+  if (typeof input !== 'boolean') { issues.push({ code: PlanErrorCode.WrongType, path }); return INVALID; }
   return input;
 }
 
@@ -223,10 +223,10 @@ function readVendorExtensions(input: unknown, path: string, issues: Issues): Par
   const before = issues.length;
   const extensions: Record<VendorExtensionKey, unknown> = {};
   const keys = Object.keys(fields);
-  if (keys.length > MAXIMUM_VENDOR_EXTENSIONS) issues.push({ code: 'too_large', path });
+  if (keys.length > MAXIMUM_VENDOR_EXTENSIONS) issues.push({ code: PlanErrorCode.TooLarge, path });
   for (const key of keys) {
-    if (!isVendorExtensionKey(key)) { issues.push({ code: 'unknown_field', path: `${path}.${key}` }); continue; }
-    if (!isJsonValue(fields[key], 0)) { issues.push({ code: 'wrong_type', path: `${path}.${key}` }); continue; }
+    if (!isVendorExtensionKey(key)) { issues.push({ code: PlanErrorCode.UnknownField, path: `${path}.${key}` }); continue; }
+    if (!isJsonValue(fields[key], 0)) { issues.push({ code: PlanErrorCode.WrongType, path: `${path}.${key}` }); continue; }
     extensions[key] = fields[key];
   }
   return issues.length === before ? extensions : INVALID;
@@ -298,7 +298,7 @@ function readLimits(input: unknown, path: string, issues: Issues): Parsed<Limits
   }
   // One advance may not move the clock further than the whole plan may.
   if (valid && limits.maximumClockAdvanceMilliseconds > limits.maximumTotalClockAdvanceMilliseconds) {
-    issues.push({ code: 'too_large', path: `${path}.maximumClockAdvanceMilliseconds` });
+    issues.push({ code: PlanErrorCode.TooLarge, path: `${path}.maximumClockAdvanceMilliseconds` });
     return INVALID;
   }
   return valid ? limits : INVALID;
@@ -313,12 +313,12 @@ function readNameList<Name extends string>(
   if (raw === INVALID) return INVALID;
   const names = raw.map((value, index): Parsed<Brand<string, Name>> => {
     const at = `${path}[${index}]`;
-    if (typeof value !== 'string') { issues.push({ code: 'wrong_type', path: at }); return INVALID; }
-    if (!pattern.test(value) || !extraRule(value)) { issues.push({ code: 'unknown_value', path: at }); return INVALID; }
+    if (typeof value !== 'string') { issues.push({ code: PlanErrorCode.WrongType, path: at }); return INVALID; }
+    if (!pattern.test(value) || !extraRule(value)) { issues.push({ code: PlanErrorCode.UnknownValue, path: at }); return INVALID; }
     return brand<string, Name>(value);
   });
   if (!allValid(names)) return INVALID;
-  if (new Set(names).size !== names.length) { issues.push({ code: 'duplicate', path }); return INVALID; }
+  if (new Set(names).size !== names.length) { issues.push({ code: PlanErrorCode.Duplicate, path }); return INVALID; }
   return names;
 }
 
@@ -329,7 +329,7 @@ function readNameListOr<Name extends string>(
 ): Parsed<readonly Brand<string, Name>[]> {
   if (input === undefined) return [brand<string, Name>(fallback)];
   const names = readNameList<Name>(input, path, issues, pattern);
-  if (names !== INVALID && names.length === 0) { issues.push({ code: 'empty', path }); return INVALID; }
+  if (names !== INVALID && names.length === 0) { issues.push({ code: PlanErrorCode.Empty, path }); return INVALID; }
   return names;
 }
 
@@ -340,7 +340,7 @@ function readProductionOrigins(input: unknown, issues: Issues): Parsed<readonly 
   if (raw === INVALID) return INVALID;
   const origins = raw.map((origin, index) => readOrigin(origin, `$.productionOrigins[${index}]`, issues));
   if (!allValid(origins)) return INVALID;
-  if (new Set(origins).size !== origins.length) { issues.push({ code: 'duplicate', path: '$.productionOrigins' }); return INVALID; }
+  if (new Set(origins).size !== origins.length) { issues.push({ code: PlanErrorCode.Duplicate, path: '$.productionOrigins' }); return INVALID; }
   return origins;
 }
 
@@ -358,11 +358,11 @@ function readTextList(input: unknown, path: string, issues: Issues, maximumLengt
     const at = `${path}[${index}]`;
     const text = readUnscannedText(value, at, issues, maximumLength);
     // A blank pattern or name would match the spaces in any text, so it is refused outright.
-    if (text !== INVALID && text.trim() === '') { issues.push({ code: 'empty', path: at }); return INVALID; }
+    if (text !== INVALID && text.trim() === '') { issues.push({ code: PlanErrorCode.Empty, path: at }); return INVALID; }
     return text;
   });
   if (!allValid(texts)) return INVALID;
-  if (new Set(texts).size !== texts.length) { issues.push({ code: 'duplicate', path }); return INVALID; }
+  if (new Set(texts).size !== texts.length) { issues.push({ code: PlanErrorCode.Duplicate, path }); return INVALID; }
   return texts;
 }
 
@@ -393,13 +393,13 @@ function readDestructivePaths(input: unknown, path: string, issues: Issues): Par
     let url: URL | undefined;
     try { url = new URL(text, PATH_BASE); } catch { url = undefined; }
     if (url === undefined || !text.startsWith('/') || url.origin !== PATH_BASE.origin || url.search !== '' || url.hash !== '') {
-      issues.push({ code: 'invalid_url', path: at });
+      issues.push({ code: PlanErrorCode.InvalidUrl, path: at });
       return INVALID;
     }
     return url.pathname;
   });
   if (!allValid(paths)) return INVALID;
-  if (new Set(paths).size !== paths.length) { issues.push({ code: 'duplicate', path }); return INVALID; }
+  if (new Set(paths).size !== paths.length) { issues.push({ code: PlanErrorCode.Duplicate, path }); return INVALID; }
   return paths;
 }
 
@@ -416,7 +416,7 @@ function readPolicy(input: unknown, path: string, issues: Issues, limits: Parsed
   const longestName = limits === INVALID ? DEFAULT_LIMITS.maximumTextLength : limits.maximumTextLength;
   // Present but null is not "absent": only true or false is a setting.
   const allowProduction = Object.hasOwn(fields, 'allowProductionForApprovedPlans') ? fields['allowProductionForApprovedPlans'] : false;
-  if (typeof allowProduction !== 'boolean') issues.push({ code: 'wrong_type', path: `${path}.allowProductionForApprovedPlans` });
+  if (typeof allowProduction !== 'boolean') issues.push({ code: PlanErrorCode.WrongType, path: `${path}.allowProductionForApprovedPlans` });
   const parts = [
     readIrreversiblePatterns(fields['irreversiblePatterns'], `${path}.irreversiblePatterns`, issues),
     readTextList(fields['allowedIrreversibleNames'], `${path}.allowedIrreversibleNames`, issues, longestName),
@@ -431,8 +431,8 @@ function readPolicy(input: unknown, path: string, issues: Issues, limits: Parsed
 
 // A secret's name, as the project declares it and a run manifest records it.
 export function readSecretName(input: unknown, path: string, issues: Issues): Parsed<SecretName> {
-  if (typeof input !== 'string') { issues.push({ code: 'wrong_type', path }); return INVALID; }
-  if (!SECRET_NAME.test(input)) { issues.push({ code: 'unknown_value', path }); return INVALID; }
+  if (typeof input !== 'string') { issues.push({ code: PlanErrorCode.WrongType, path }); return INVALID; }
+  if (!SECRET_NAME.test(input)) { issues.push({ code: PlanErrorCode.UnknownValue, path }); return INVALID; }
   return brand<string, 'SecretName'>(input);
 }
 
@@ -443,7 +443,7 @@ function readReplaySettings(input: unknown, issues: Issues): Parsed<ReplaySettin
   const fields = readRecord(input, path, issues, ['recordReplies']);
   if (fields === INVALID) return INVALID;
   const recordReplies = fields['recordReplies'];
-  if (typeof recordReplies !== 'boolean') { issues.push({ code: 'wrong_type', path: `${path}.recordReplies` }); return INVALID; }
+  if (typeof recordReplies !== 'boolean') { issues.push({ code: PlanErrorCode.WrongType, path: `${path}.recordReplies` }); return INVALID; }
   return { recordReplies };
 }
 
@@ -454,7 +454,7 @@ function readEvidence(input: unknown, path: string, issues: Issues): Parsed<Evid
   if (fields === INVALID) return INVALID;
   // Present but null is not "absent": only true or false is a setting.
   const keepDownloads = Object.hasOwn(fields, 'keepDownloads') ? fields['keepDownloads'] : DEFAULT_EVIDENCE.keepDownloads;
-  if (typeof keepDownloads !== 'boolean') { issues.push({ code: 'wrong_type', path: `${path}.keepDownloads` }); return INVALID; }
+  if (typeof keepDownloads !== 'boolean') { issues.push({ code: PlanErrorCode.WrongType, path: `${path}.keepDownloads` }); return INVALID; }
   return { keepDownloads };
 }
 
@@ -474,14 +474,14 @@ function readPlannerEndpoint(input: unknown, issues: Issues, secretNames: readon
   const kind = readOneOf(shape['kind'], `${path}.kind`, issues, PLANNER_KINDS);
   if (kind === INVALID) return INVALID;
   const keys = ['kind', 'url', 'model', 'wire', 'apiKey'];
-  const fields = readRecord(input, path, issues, keys, kind === 'customer-key' ? keys : ['kind', 'url', 'model', 'wire']);
+  const fields = readRecord(input, path, issues, keys, kind === PlannerEndpointKind.CustomerKey ? keys : ['kind', 'url', 'model', 'wire']);
   if (fields === INVALID) return INVALID;
   const address = readPlannerUrl(fields['url'], `${path}.url`, issues, kind);
   const model = readUnscannedText(fields['model'], `${path}.model`, issues, MAXIMUM_MODEL_LENGTH);
   const wire = readOneOf(fields['wire'], `${path}.wire`, issues, PLANNER_WIRES);
   const apiKey = fields['apiKey'] === undefined ? undefined : readPlannerKey(fields['apiKey'], `${path}.apiKey`, issues, secretNames);
   if (address === INVALID || model === INVALID || wire === INVALID || apiKey === INVALID) return INVALID;
-  if (kind === 'customer-key') {
+  if (kind === PlannerEndpointKind.CustomerKey) {
     // readRecord has already required the key, so it is present here.
     return apiKey === undefined ? INVALID : { kind, ...address, model, wire, apiKey };
   }
@@ -499,10 +499,10 @@ function readPlannerUrl(input: unknown, path: string, issues: Issues, kind: Plan
   const text = readUnscannedText(input, path, issues, MAXIMUM_URL_LENGTH);
   if (text === INVALID) return INVALID;
   let url: URL;
-  try { url = new URL(text); } catch { issues.push({ code: 'invalid_url', path }); return INVALID; }
-  if (url.protocol !== 'https:' && (kind === 'customer-key' || url.protocol !== 'http:')) { issues.push({ code: 'scheme_not_allowed', path }); return INVALID; }
-  if (url.username !== '' || url.password !== '' || url.hash !== '') { issues.push({ code: 'invalid_url', path }); return INVALID; }
-  if (kind === 'local' && !isLoopbackHost(url.hostname.toLowerCase())) { issues.push({ code: 'not_loopback', path }); return INVALID; }
+  try { url = new URL(text); } catch { issues.push({ code: PlanErrorCode.InvalidUrl, path }); return INVALID; }
+  if (url.protocol !== 'https:' && (kind === PlannerEndpointKind.CustomerKey || url.protocol !== 'http:')) { issues.push({ code: PlanErrorCode.SchemeNotAllowed, path }); return INVALID; }
+  if (url.username !== '' || url.password !== '' || url.hash !== '') { issues.push({ code: PlanErrorCode.InvalidUrl, path }); return INVALID; }
+  if (kind === PlannerEndpointKind.Local && !isLoopbackHost(url.hostname.toLowerCase())) { issues.push({ code: PlanErrorCode.NotLoopback, path }); return INVALID; }
   return {
     url: brand<string, 'PlannerUrl'>(text),
     origin: originOfUrl(url),
@@ -514,9 +514,9 @@ function readPlannerKey(input: unknown, path: string, issues: Issues, secretName
   const fields = readRecord(input, path, issues, ['secretName']);
   if (fields === INVALID) return INVALID;
   const at = `${path}.secretName`;
-  if (typeof fields['secretName'] !== 'string') { issues.push({ code: 'wrong_type', path: at }); return INVALID; }
+  if (typeof fields['secretName'] !== 'string') { issues.push({ code: PlanErrorCode.WrongType, path: at }); return INVALID; }
   const found = secretNames.find((name) => name === fields['secretName']);
-  if (found === undefined) { issues.push({ code: 'unknown_value', path: at }); return INVALID; }
+  if (found === undefined) { issues.push({ code: PlanErrorCode.UnknownValue, path: at }); return INVALID; }
   return { secretName: found };
 }
 
@@ -541,7 +541,7 @@ export function parseProject(input: unknown): Result<Project, readonly PlanError
   const origins = rawOrigins === INVALID ? [] : rawOrigins.map((origin, index) => readOrigin(origin, `$.origins[${index}]`, issues));
   const readOrigins = origins.filter((origin) => origin !== INVALID);
   if (new Set(readOrigins).size !== readOrigins.length) {
-    issues.push({ code: 'duplicate', path: '$.origins' });
+    issues.push({ code: PlanErrorCode.Duplicate, path: '$.origins' });
   }
   const productionOrigins = readProductionOrigins(fields['productionOrigins'], issues);
   const policy = readPolicy(fields['policy'], '$.policy', issues, limits);
@@ -581,7 +581,7 @@ export function parseProject(input: unknown): Result<Project, readonly PlanError
   const seen = new Set<string>();
   matrix.forEach((target, index) => {
     if (target === INVALID) return;
-    if (seen.has(target.id)) issues.push({ code: 'duplicate', path: `$.matrix[${index}].id` });
+    if (seen.has(target.id)) issues.push({ code: PlanErrorCode.Duplicate, path: `$.matrix[${index}].id` });
     seen.add(target.id);
   });
   if (issues.length > 0 || limits === INVALID || secretNames === INVALID || fixtures === INVALID

@@ -11,8 +11,8 @@
 // Field values, storage values and response bodies never reach the result or the log; a remembered
 // field is logged by its name and sha256 only.
 import {
-  failure, isSecret, stepFailed, StorageAssertionKind, success,
-  type StepCode, type StepOutcome, type CallArguments, type Clock, type FieldName, type JsonPointer, type ObservedExchange, type Plan, type RequestName, type ResolvedStub,
+  StorageAccess, StubAction, ResponseRead, ResponseFieldTextKind, ResponseFieldPresenceKind, ResponseAssertionKind, StepType, failure, isSecret, stepFailed, StorageAssertionKind, success,
+  StepCode, StepOutcome, type CallArguments, type Clock, type FieldName, type JsonPointer, type ObservedExchange, type Plan, type RequestName, type ResolvedStub,
   type ResolvedStubResponse, type ResponseAssertion, type Result, type SafeText, type SecretStore, type RememberedResponseSource, type Session, type Step, type StubDeclaration,
   type StubName, type StubResponseBody,
 } from '@revisum/contracts';
@@ -51,7 +51,7 @@ type NetworkStepOutcome =
   // Only a count, or "present", "absent" or "differs": never a value read from the page or a response.
   | { readonly outcome: typeof StepOutcome.Failed; readonly code: StepCode; readonly observed?: string };
 
-const passed: NetworkStepOutcome = { outcome: 'passed' };
+const passed: NetworkStepOutcome = { outcome: StepOutcome.Passed };
 const failedWith = (code: StepCode, observed?: string): NetworkStepOutcome =>
   ({ ...stepFailed(code), ...(observed === undefined ? {} : { observed }) });
 const UNSUPPORTED = failedWith('unsupported-step');
@@ -64,10 +64,10 @@ const declaredIn = <Declaration>(declarations: Readonly<Record<string, Declarati
 // ---- Observed requests ----------------------------------------------------------------------
 
 function requestNamedBy(step: Step): RequestName | undefined {
-  if (step.type === 'resetRequests' || step.type === 'expectRequests' || step.type === 'expectResponse') {
+  if (step.type === StepType.ResetRequests || step.type === StepType.ExpectRequests || step.type === StepType.ExpectResponse) {
     return step.request;
   }
-  return step.type === 'remember' && 'response' in step.from ? step.from.response : undefined;
+  return step.type === StepType.Remember && 'response' in step.from ? step.from.response : undefined;
 }
 
 // The requests a plan names, inside frames and second tabs too, in plan order and each once. Only
@@ -183,19 +183,19 @@ type Look = { readonly pass: boolean; readonly code: StepCode; readonly final?: 
 // Whether the latest exchange passes the check. Backend data is not rendered text, so a field is
 // compared exactly, spaces and case included.
 function judgeResponse(assertion: ResponseAssertion, exchange: ObservedExchange, request: RequestName, expected: SafeText | null, context: NetworkStepContext): Look {
-  if (assertion.kind === 'statusEquals') return { pass: exchange.status === assertion.value, code: 'assertion-failed' };
+  if (assertion.kind === ResponseAssertionKind.StatusEquals) return { pass: exchange.status === assertion.value, code: StepCode.AssertionFailed };
   const cap = declaredIn(context.project.observedRequests, request)?.maximumResponseBytes ?? 0;
   const field = readField(exchange, pointerOf(context.project, request, assertion.field), cap);
   if (!field.ok) return { pass: false, code: field.error };
   const found = field.value;
   switch (assertion.kind) {
-    case 'fieldPresent': return { pass: found !== undefined, code: 'assertion-failed' };
-    case 'fieldAbsent': return { pass: found === undefined, code: 'assertion-failed' };
-    case 'fieldEquals': case 'fieldContains': {
-      if (found === undefined) return { pass: false, code: 'field-missing' };
+    case ResponseFieldPresenceKind.FieldPresent: return { pass: found !== undefined, code: StepCode.AssertionFailed };
+    case ResponseFieldPresenceKind.FieldAbsent: return { pass: found === undefined, code: StepCode.AssertionFailed };
+    case ResponseFieldTextKind.FieldEquals: case ResponseFieldTextKind.FieldContains: {
+      if (found === undefined) return { pass: false, code: StepCode.FieldMissing };
       const text = fieldText(found.value);
-      const pass = text !== undefined && expected !== null && (assertion.kind === 'fieldEquals' ? text === expected : text.includes(expected));
-      return { pass, code: 'assertion-failed' };
+      const pass = text !== undefined && expected !== null && (assertion.kind === ResponseFieldTextKind.FieldEquals ? text === expected : text.includes(expected));
+      return { pass, code: StepCode.AssertionFailed };
     }
   }
 }
@@ -204,7 +204,7 @@ function judgeResponse(assertion: ResponseAssertion, exchange: ObservedExchange,
 export async function checkResponse(step: Extract<Step, { type: 'expectResponse' }>, context: NetworkStepContext): Promise<NetworkStepOutcome> {
   const assertion = step.assert;
   let expected: SafeText | null = null;
-  if (assertion.kind === 'fieldEquals' || assertion.kind === 'fieldContains') {
+  if (assertion.kind === ResponseFieldTextKind.FieldEquals || assertion.kind === ResponseAssertionKind.FieldContains) {
     const resolved = resolveText(assertion.value, context.values, context.project.limits.maximumTextLength);
     if (!resolved.ok) return failedWith(resolved.error);
     expected = resolved.value;
@@ -219,7 +219,7 @@ export async function checkResponse(step: Extract<Step, { type: 'expectResponse'
 // A response field as a run value's text: the field's own text, or the decimal length of an array.
 function rememberedText(found: { readonly value: unknown } | undefined, read: 'text' | 'arrayLength'): Result<string, StepCode> {
   if (found === undefined) return failure('field-missing');
-  if (read === 'arrayLength') return Array.isArray(found.value) ? success(String(found.value.length)) : failure('field-missing');
+  if (read === ResponseRead.ArrayLength) return Array.isArray(found.value) ? success(String(found.value.length)) : failure('field-missing');
   const text = fieldText(found.value);
   return text === undefined ? failure('field-missing') : success(text);
 }
@@ -240,7 +240,7 @@ export async function rememberFromResponse(
   if (!seen.text.ok) return failedWith(seen.text.error);
   if (seen.text.value === '') return failedWith('value-empty');
   const kept = context.remembered.remember(step.name, seen.text.value, index);
-  return kept.ok ? { outcome: 'passed', remembered: kept.value } : failedWith(kept.error);
+  return kept.ok ? { outcome: StepOutcome.Passed, remembered: kept.value } : failedWith(kept.error);
 }
 
 // ---- Stubs ----------------------------------------------------------------------------------
@@ -279,7 +279,7 @@ export async function runStubStep(step: Extract<Step, { type: 'stub' }>, context
   const network = context.session.network;
   const declaration = declaredIn(context.project.stubs, step.stub);
   if (declaration === undefined) return UNSUPPORTED;
-  if (step.action === 'stop') {
+  if (step.action === StubAction.Stop) {
     const stopped = await network.stopStub(step.stub);
     if (!stopped.ok) return failedWith(stopped.error.code);
     context.activeStubs.delete(step.stub);
@@ -305,8 +305,8 @@ export async function writeStorage(step: Extract<Step, { type: 'setStorage' | 'r
   const storage = context.session.storage;
   const declaration = declaredIn(context.project.storageEntries, step.entry);
   // The parser refuses a write to a read entry; a run under another project is refused here too.
-  if (declaration === undefined || declaration.access !== 'readWrite') return UNSUPPORTED;
-  if (step.type === 'removeStorage') {
+  if (declaration === undefined || declaration.access !== StorageAccess.ReadWrite) return UNSUPPORTED;
+  if (step.type === StepType.RemoveStorage) {
     const removed = await storage.remove(declaration.area, declaration.origin, declaration.key);
     return removed.ok ? passed : failedWith(removed.error.code);
   }
@@ -337,7 +337,7 @@ export async function checkStorage(step: Extract<Step, { type: 'expectStorage' }
   if (declaration === undefined) return UNSUPPORTED;
   const assertion = step.assert;
   let expected: SafeText | null = null;
-  if (assertion.kind === 'equals') {
+  if (assertion.kind === StorageAssertionKind.Equals) {
     const resolved = resolveText(assertion.value, context.values, context.project.limits.maximumTextLength);
     if (!resolved.ok) return failedWith(resolved.error);
     expected = resolved.value;
@@ -348,7 +348,7 @@ export async function checkStorage(step: Extract<Step, { type: 'expectStorage' }
     if (!read.ok) return { pass: false, final: true, error: read.error.code, observed: '' };
     const value = read.value;
     const pass = isStoredValueAsExpected(assertion.kind, value, expected);
-    const observed = assertion.kind === 'equals' && value !== null ? 'differs' : storageObservation(value);
+    const observed = assertion.kind === StorageAssertionKind.Equals && value !== null ? 'differs' : storageObservation(value);
     return { pass, error: null, observed };
   });
   if (seen.pass) return passed;

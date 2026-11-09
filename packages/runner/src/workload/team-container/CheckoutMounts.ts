@@ -6,6 +6,7 @@ import type { ContainerMount } from "../../containers/ContainerEngine.ts";
 import { isGitFolderName } from "../../containers/RunImageContainer.ts";
 import { isSafeInMountArgument } from "./IsSafeInMountArgument.ts";
 import type { WorkloadLog } from "../WorkloadRefusal.ts";
+import { MountKind } from "../../containers/ContainerEngine.ts";
 
 function checkoutEntries(checkout: string): Dirent[] | null {
     try {
@@ -38,7 +39,7 @@ export function checkoutMounts(checkout: string, log: WorkloadLog): ContainerMou
             continue;
         }
         mounts.push({
-            kind: entry.isDirectory() ? "folder" : "file",
+            kind: entry.isDirectory() ? MountKind.Folder : MountKind.File,
             source: join(checkout, entry.name),
             target: `${WORKLOAD_CHECKOUT_PATH}/${entry.name}`,
         });

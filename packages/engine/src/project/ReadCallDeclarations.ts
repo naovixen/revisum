@@ -5,7 +5,7 @@
 // a string, set a header that changes where or how a request travels, or read a field by a broken
 // pointer, so every declaration it accepts builds requests of one fixed shape.
 import {
-  CALL_EFFECTS, HEADER_SCHEMES, HTTP_METHODS, PARAMETER_KINDS, isNonArrayObject, isPlainObject,
+  ParameterKind, PlanErrorCode, CALL_EFFECTS, HEADER_SCHEMES, HTTP_METHODS, PARAMETER_KINDS, isNonArrayObject, isPlainObject,
   type Brand, type CallDeclaration, type CallEffect, type CallName, type DeclaredService, type FieldName, type HeaderValue, type JsonPointer, type JsonTemplate,
   type ParameterName, type ParameterType, type SafeText, type SecretName, type ServiceName,
 } from '@revisum/contracts';
@@ -69,12 +69,12 @@ export function readServices(input: unknown, issues: Issues): Parsed<readonly De
     if (fields === INVALID) return INVALID;
     const name = fields['name'];
     const readName = (): Parsed<ServiceName> => {
-      if (typeof name !== 'string') { issues.push({ code: 'wrong_type', path: `${path}.name` }); return INVALID; }
-      if (!SERVICE_NAME.test(name)) { issues.push({ code: 'unknown_value', path: `${path}.name` }); return INVALID; }
+      if (typeof name !== 'string') { issues.push({ code: PlanErrorCode.WrongType, path: `${path}.name` }); return INVALID; }
+      if (!SERVICE_NAME.test(name)) { issues.push({ code: PlanErrorCode.UnknownValue, path: `${path}.name` }); return INVALID; }
       return brand<string, 'ServiceName'>(name);
     };
     const isPrivate = fields['private'] ?? false;
-    if (typeof isPrivate !== 'boolean') issues.push({ code: 'wrong_type', path: `${path}.private` });
+    if (typeof isPrivate !== 'boolean') issues.push({ code: PlanErrorCode.WrongType, path: `${path}.private` });
     const port = Object.hasOwn(fields, 'port') ? readInteger(fields['port'], `${path}.port`, issues, 1, LARGEST_PORT) : undefined;
     const parts = [readName(), readOrigin(fields['origin'], `${path}.origin`, issues), typeof isPrivate === 'boolean' ? isPrivate : INVALID] as const;
     if (!allValid(parts) || port === INVALID) return INVALID;
@@ -82,7 +82,7 @@ export function readServices(input: unknown, issues: Issues): Parsed<readonly De
   });
   if (!allValid(services)) return INVALID;
   if (new Set(services.map((service) => service.name)).size !== services.length) {
-    issues.push({ code: 'duplicate', path: '$.services' });
+    issues.push({ code: PlanErrorCode.Duplicate, path: '$.services' });
     return INVALID;
   }
   return services;
@@ -113,7 +113,7 @@ export function readDeclarationSection<Name extends string, Declaration>(
   const fields = peekRecord(input, path, issues);
   if (fields === INVALID) return INVALID;
   const names = Object.keys(fields);
-  if (names.length > maximumCount) { issues.push({ code: 'too_large', path }); return INVALID; }
+  if (names.length > maximumCount) { issues.push({ code: PlanErrorCode.TooLarge, path }); return INVALID; }
   const entries = names.map((name): Parsed<readonly [Brand<string, Name>, Declaration]> => {
     const at = `${path}.${name}`;
     const declaredName = readName<Name>(name, at, issues, rule);
@@ -144,7 +144,7 @@ function readDeclaration(input: unknown, path: string, context: DeclarationConte
     ? readPendingStatuses(fields['pendingStatuses'], `${path}.pendingStatuses`, issues, effect, successStatuses) : undefined;
   const responseFields = Object.hasOwn(fields, 'fields') ? readFieldPointers(fields['fields'], `${path}.fields`, issues) : undefined;
   const allowInProposals = fields['allowInProposals'] ?? false;
-  if (typeof allowInProposals !== 'boolean') issues.push({ code: 'wrong_type', path: `${path}.allowInProposals` });
+  if (typeof allowInProposals !== 'boolean') issues.push({ code: PlanErrorCode.WrongType, path: `${path}.allowInProposals` });
   const timeoutMilliseconds = Object.hasOwn(fields, 'timeoutMilliseconds')
     ? readInteger(fields['timeoutMilliseconds'], `${path}.timeoutMilliseconds`, issues, 1, MAXIMUM_CALL_TIMEOUT_MILLISECONDS) : undefined;
   const maximumResponseBytes = Object.hasOwn(fields, 'maximumResponseBytes')
@@ -176,9 +176,9 @@ function readDeclaration(input: unknown, path: string, context: DeclarationConte
 }
 
 function readServiceName(input: unknown, path: string, context: DeclarationContext): Parsed<ServiceName> {
-  if (typeof input !== 'string') { context.issues.push({ code: 'wrong_type', path }); return INVALID; }
+  if (typeof input !== 'string') { context.issues.push({ code: PlanErrorCode.WrongType, path }); return INVALID; }
   const found = context.services.find((service) => service.name === input);
-  if (found === undefined) { context.issues.push({ code: 'unknown_value', path }); return INVALID; }
+  if (found === undefined) { context.issues.push({ code: PlanErrorCode.UnknownValue, path }); return INVALID; }
   return found.name;
 }
 
@@ -186,7 +186,7 @@ function readServiceName(input: unknown, path: string, context: DeclarationConte
 function readName<Name extends string>(
   name: string, path: string, issues: Issues, rule: DeclaredNameRule = DECLARED_NAME_RULE,
 ): Parsed<Brand<string, Name>> {
-  if (!rule.pattern.test(name) || rule.allowed?.(name) === false) { issues.push({ code: 'unknown_value', path }); return INVALID; }
+  if (!rule.pattern.test(name) || rule.allowed?.(name) === false) { issues.push({ code: PlanErrorCode.UnknownValue, path }); return INVALID; }
   return brand<string, Name>(name);
 }
 
@@ -195,7 +195,7 @@ function readStatuses(input: unknown, path: string, issues: Issues): Parsed<read
   if (raw === INVALID) return INVALID;
   const statuses = raw.map((status, index) => readInteger(status, `${path}[${index}]`, issues, 100, 599));
   if (!allValid(statuses)) return INVALID;
-  if (new Set(statuses).size !== statuses.length) { issues.push({ code: 'duplicate', path }); return INVALID; }
+  if (new Set(statuses).size !== statuses.length) { issues.push({ code: PlanErrorCode.Duplicate, path }); return INVALID; }
   return statuses;
 }
 
@@ -205,7 +205,7 @@ function readPendingStatuses(
   input: unknown, path: string, issues: Issues, effect: Parsed<CallEffect>, successStatuses: Parsed<readonly number[]>,
 ): Parsed<readonly number[]> {
   if (effect === 'write') {
-    issues.push({ code: 'unknown_value', path });
+    issues.push({ code: PlanErrorCode.UnknownValue, path });
     return INVALID;
   }
   const statuses = readStatuses(input, path, issues);
@@ -213,7 +213,7 @@ function readPendingStatuses(
     return INVALID;
   }
   if (successStatuses !== INVALID && statuses.some((status) => successStatuses.includes(status))) {
-    issues.push({ code: 'duplicate', path });
+    issues.push({ code: PlanErrorCode.Duplicate, path });
     return INVALID;
   }
   return statuses;
@@ -226,8 +226,8 @@ export function readFieldPointers(input: unknown, path: string, issues: Issues):
     const at = `${path}.${key}`;
     const name = readName<'FieldName'>(key, at, issues);
     if (name === INVALID) return INVALID;
-    if (typeof pointer !== 'string') { issues.push({ code: 'wrong_type', path: at }); return INVALID; }
-    if (!JSON_POINTER.test(pointer)) { issues.push({ code: 'unknown_value', path: at }); return INVALID; }
+    if (typeof pointer !== 'string') { issues.push({ code: PlanErrorCode.WrongType, path: at }); return INVALID; }
+    if (!JSON_POINTER.test(pointer)) { issues.push({ code: PlanErrorCode.UnknownValue, path: at }); return INVALID; }
     return [name, brand<string, 'JsonPointer'>(pointer)];
   });
   return allValid(entries) ? Object.fromEntries(entries) : INVALID;
@@ -240,14 +240,14 @@ function readHeaders(input: unknown, path: string, context: DeclarationContext):
   const seen = new Set<string>();
   const entries = Object.entries(fields).map(([name, value]): Parsed<readonly [string, HeaderValue]> => {
     const at = `${path}.${name}`;
-    if (!HEADER_NAME.test(name)) { issues.push({ code: 'unknown_value', path: at }); return INVALID; }
+    if (!HEADER_NAME.test(name)) { issues.push({ code: PlanErrorCode.UnknownValue, path: at }); return INVALID; }
     const lower = name.toLowerCase();
     if (FORBIDDEN_HEADERS.includes(lower) || lower.startsWith(FORBIDDEN_HEADER_PREFIX)) {
-      issues.push({ code: 'header_not_allowed', path: at });
+      issues.push({ code: PlanErrorCode.HeaderNotAllowed, path: at });
       return INVALID;
     }
     // Header names are case-insensitive, so "Accept" and "accept" are one header set twice.
-    if (seen.has(lower)) { issues.push({ code: 'duplicate', path: at }); return INVALID; }
+    if (seen.has(lower)) { issues.push({ code: PlanErrorCode.Duplicate, path: at }); return INVALID; }
     seen.add(lower);
     const header = readHeaderValue(value, at, context);
     return header === INVALID ? INVALID : [name, header];
@@ -270,9 +270,9 @@ function readHeaderValue(input: unknown, path: string, context: DeclarationConte
   const secretName = fields['secretName'];
   const readSecret = (): Parsed<SecretName> => {
     const at = `${path}.secretName`;
-    if (typeof secretName !== 'string') { issues.push({ code: 'wrong_type', path: at }); return INVALID; }
+    if (typeof secretName !== 'string') { issues.push({ code: PlanErrorCode.WrongType, path: at }); return INVALID; }
     const found = context.secretNames.find((name) => name === secretName);
-    if (found === undefined) { issues.push({ code: 'unknown_value', path: at }); return INVALID; }
+    if (found === undefined) { issues.push({ code: PlanErrorCode.UnknownValue, path: at }); return INVALID; }
     return found;
   };
   const parts = [readSecret(), readOneOf(fields['scheme'], `${path}.scheme`, issues, HEADER_SCHEMES)] as const;
@@ -284,7 +284,7 @@ function readHeaderValue(input: unknown, path: string, context: DeclarationConte
 export function readParameters(input: unknown, path: string, issues: Issues): Parsed<Readonly<Record<ParameterName, ParameterType>>> {
   const fields = peekRecord(input, path, issues);
   if (fields === INVALID) return INVALID;
-  if (Object.keys(fields).length > MAXIMUM_PARAMETERS) { issues.push({ code: 'too_large', path }); return INVALID; }
+  if (Object.keys(fields).length > MAXIMUM_PARAMETERS) { issues.push({ code: PlanErrorCode.TooLarge, path }); return INVALID; }
   const entries = Object.entries(fields).map(([key, type]): Parsed<readonly [ParameterName, ParameterType]> => {
     const at = `${path}.${key}`;
     const name = readName<'ParameterName'>(key, at, issues);
@@ -300,29 +300,29 @@ function readParameterType(input: unknown, path: string, issues: Issues): Parsed
   const kind = readOneOf(head['kind'], `${path}.kind`, issues, PARAMETER_KINDS);
   if (kind === INVALID) return INVALID;
   switch (kind) {
-    case 'text': {
+    case ParameterKind.Text: {
       if (readRecord(input, path, issues, ['kind', 'maximumLength']) === INVALID) return INVALID;
       const maximumLength = readInteger(head['maximumLength'], `${path}.maximumLength`, issues, 1, MAXIMUM_TEXT_PARAMETER_LENGTH);
       return maximumLength === INVALID ? INVALID : { kind, maximumLength };
     }
-    case 'integer': {
+    case ParameterKind.Integer: {
       if (readRecord(input, path, issues, ['kind', 'minimum', 'maximum']) === INVALID) return INVALID;
       const minimum = readInteger(head['minimum'], `${path}.minimum`, issues, Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER);
       const maximum = readInteger(head['maximum'], `${path}.maximum`, issues, Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER);
       if (minimum === INVALID || maximum === INVALID) return INVALID;
-      if (maximum < minimum) { issues.push({ code: 'unknown_value', path: `${path}.maximum` }); return INVALID; }
+      if (maximum < minimum) { issues.push({ code: PlanErrorCode.UnknownValue, path: `${path}.maximum` }); return INVALID; }
       return { kind, minimum, maximum };
     }
-    case 'oneOf': {
+    case ParameterKind.OneOf: {
       if (readRecord(input, path, issues, ['kind', 'values']) === INVALID) return INVALID;
       const raw = readList(head['values'], `${path}.values`, issues, MAXIMUM_ONE_OF_VALUES);
       if (raw === INVALID) return INVALID;
       const values = raw.map((value, index): Parsed<SafeText> => readUnscannedText(value, `${path}.values[${index}]`, issues, MAXIMUM_TEXT_PARAMETER_LENGTH));
       if (!allValid(values)) return INVALID;
-      if (new Set(values).size !== values.length) { issues.push({ code: 'duplicate', path: `${path}.values` }); return INVALID; }
+      if (new Set(values).size !== values.length) { issues.push({ code: PlanErrorCode.Duplicate, path: `${path}.values` }); return INVALID; }
       return { kind, values };
     }
-    case 'identifier': case 'boolean': case 'email': case 'yearMonthDay': case 'secret':
+    case ParameterKind.Identifier: case ParameterKind.Boolean: case ParameterKind.Email: case ParameterKind.YearMonthDay: case ParameterKind.Secret:
       return readRecord(input, path, issues, ['kind']) === INVALID ? INVALID : { kind };
   }
 }
@@ -342,20 +342,20 @@ function declaredParameter(input: unknown, context: TemplateContext): readonly [
 // "//" and be read as another host. A secret never goes into a URL.
 function readRequestPath(input: unknown, path: string, context: TemplateContext): Parsed<string> {
   const { issues } = context;
-  if (typeof input !== 'string') { issues.push({ code: 'wrong_type', path }); return INVALID; }
-  if (input.length > MAXIMUM_PATH_LENGTH || !input.startsWith('/')) { issues.push({ code: 'unknown_value', path }); return INVALID; }
+  if (typeof input !== 'string') { issues.push({ code: PlanErrorCode.WrongType, path }); return INVALID; }
+  if (input.length > MAXIMUM_PATH_LENGTH || !input.startsWith('/')) { issues.push({ code: PlanErrorCode.UnknownValue, path }); return INVALID; }
   const segments = input.slice(1).split('/');
   for (const [index, segment] of segments.entries()) {
     const placeholder = PATH_PLACEHOLDER.exec(segment);
     if (placeholder !== null) {
       const parameter = declaredParameter(placeholder[1], context);
-      if (parameter === undefined) { issues.push({ code: 'unknown_value', path }); return INVALID; }
-      if (parameter[1].kind === 'secret') { issues.push({ code: 'unsafe_interpolation', path }); return INVALID; }
+      if (parameter === undefined) { issues.push({ code: PlanErrorCode.UnknownValue, path }); return INVALID; }
+      if (parameter[1].kind === ParameterKind.Secret) { issues.push({ code: PlanErrorCode.UnsafeInterpolation, path }); return INVALID; }
       continue;
     }
     const lastAndEmpty = segment === '' && index === segments.length - 1;
     if (!lastAndEmpty && (!LITERAL_SEGMENT.test(segment) || segment === '.' || segment === '..')) {
-      issues.push({ code: 'unknown_value', path });
+      issues.push({ code: PlanErrorCode.UnknownValue, path });
       return INVALID;
     }
   }
@@ -368,7 +368,7 @@ function readQuery(input: unknown, path: string, context: TemplateContext): Pars
   if (fields === INVALID) return INVALID;
   const entries = Object.entries(fields).map(([key, value]): Parsed<readonly [string, JsonTemplate]> => {
     const at = `${path}.${key}`;
-    if (!QUERY_KEY.test(key)) { context.issues.push({ code: 'unknown_value', path: at }); return INVALID; }
+    if (!QUERY_KEY.test(key)) { context.issues.push({ code: PlanErrorCode.UnknownValue, path: at }); return INVALID; }
     const template = readTemplate(value, at, context, 'query', 0);
     return template === INVALID ? INVALID : [key, template];
   });
@@ -386,25 +386,25 @@ export const readJsonTemplate = (
 // for a placeholder or reach the service unseen.
 function readTemplate(input: unknown, path: string, context: TemplateContext, where: 'body' | 'query', depth: number): Parsed<JsonTemplate> {
   const { issues } = context;
-  if (depth > MAXIMUM_TEMPLATE_DEPTH) { issues.push({ code: 'too_large', path }); return INVALID; }
+  if (depth > MAXIMUM_TEMPLATE_DEPTH) { issues.push({ code: PlanErrorCode.TooLarge, path }); return INVALID; }
   if (typeof input === 'string' || typeof input === 'boolean') return input;
   if (typeof input === 'number') {
-    if (!Number.isFinite(input)) { issues.push({ code: 'wrong_type', path }); return INVALID; }
+    if (!Number.isFinite(input)) { issues.push({ code: PlanErrorCode.WrongType, path }); return INVALID; }
     return input;
   }
   if (input === null || Array.isArray(input)) {
-    if (where === 'query') { issues.push({ code: 'wrong_type', path }); return INVALID; }
+    if (where === 'query') { issues.push({ code: PlanErrorCode.WrongType, path }); return INVALID; }
     if (input === null) return null;
     const items = input.map((item, index) => readTemplate(item, `${path}[${index}]`, context, where, depth + 1));
     return allValid(items) ? items : INVALID;
   }
-  if (!isPlainObject(input)) { issues.push({ code: 'wrong_type', path }); return INVALID; }
+  if (!isPlainObject(input)) { issues.push({ code: PlanErrorCode.WrongType, path }); return INVALID; }
   if (Object.hasOwn(input, '$parameter')) return readParameterPlaceholder(input, path, context, where);
   if (Object.hasOwn(input, '$interpolate')) return readInterpolatedString(input, path, context);
-  if (where === 'query') { issues.push({ code: 'wrong_type', path }); return INVALID; }
+  if (where === 'query') { issues.push({ code: PlanErrorCode.WrongType, path }); return INVALID; }
   const entries = Object.entries(input).map(([key, value]): Parsed<readonly [string, JsonTemplate]> => {
     const at = `${path}.${key}`;
-    if (key.startsWith('$')) { issues.push({ code: 'unknown_value', path: at }); return INVALID; }
+    if (key.startsWith('$')) { issues.push({ code: PlanErrorCode.UnknownValue, path: at }); return INVALID; }
     const template = readTemplate(value, at, context, where, depth + 1);
     return template === INVALID ? INVALID : [key, template];
   });
@@ -418,8 +418,8 @@ function readParameterPlaceholder(
 ): Parsed<JsonTemplate> {
   if (readRecord(input, path, context.issues, ['$parameter']) === INVALID) return INVALID;
   const parameter = declaredParameter(input['$parameter'], context);
-  if (parameter === undefined) { context.issues.push({ code: 'unknown_value', path }); return INVALID; }
-  if (where === 'query' && parameter[1].kind === 'secret') { context.issues.push({ code: 'unsafe_interpolation', path }); return INVALID; }
+  if (parameter === undefined) { context.issues.push({ code: PlanErrorCode.UnknownValue, path }); return INVALID; }
+  if (where === 'query' && parameter[1].kind === ParameterKind.Secret) { context.issues.push({ code: PlanErrorCode.UnsafeInterpolation, path }); return INVALID; }
   return { $parameter: parameter[0] };
 }
 
@@ -431,20 +431,20 @@ function readInterpolatedString(input: Readonly<Record<string, unknown>>, path: 
   const fields = readRecord(input, path, issues, ['$interpolate', 'parameters']);
   if (fields === INVALID) return INVALID;
   const template = fields['$interpolate'];
-  if (typeof template !== 'string') { issues.push({ code: 'wrong_type', path: `${path}.$interpolate` }); return INVALID; }
+  if (typeof template !== 'string') { issues.push({ code: PlanErrorCode.WrongType, path: `${path}.$interpolate` }); return INVALID; }
   const raw = readList(fields['parameters'], `${path}.parameters`, issues, MAXIMUM_PARAMETERS);
   if (raw === INVALID) return INVALID;
   const parameters = raw.map((name, index): Parsed<ParameterName> => {
     const parameter = declaredParameter(name, context);
-    if (parameter === undefined) { issues.push({ code: 'unknown_value', path: `${path}.parameters[${index}]` }); return INVALID; }
-    if (!isInterpolationSafe(parameter[1])) { issues.push({ code: 'unsafe_interpolation', path }); return INVALID; }
+    if (parameter === undefined) { issues.push({ code: PlanErrorCode.UnknownValue, path: `${path}.parameters[${index}]` }); return INVALID; }
+    if (!isInterpolationSafe(parameter[1])) { issues.push({ code: PlanErrorCode.UnsafeInterpolation, path }); return INVALID; }
     return parameter[0];
   });
   if (!allValid(parameters)) return INVALID;
-  if (new Set(parameters).size !== parameters.length) { issues.push({ code: 'duplicate', path: `${path}.parameters` }); return INVALID; }
+  if (new Set(parameters).size !== parameters.length) { issues.push({ code: PlanErrorCode.Duplicate, path: `${path}.parameters` }); return INVALID; }
   const placeholders = [...template.matchAll(STRING_PLACEHOLDER)].map((match) => match[1] ?? '');
   if (placeholders.some((name) => !parameters.some((parameter) => parameter === name))) {
-    issues.push({ code: 'unknown_value', path: `${path}.$interpolate` });
+    issues.push({ code: PlanErrorCode.UnknownValue, path: `${path}.$interpolate` });
     return INVALID;
   }
   return { $interpolate: template, parameters };

@@ -10,8 +10,8 @@
 //   - A remember from the clipboard keeps the text as a run value only when it passes the same
 //     rules as plan text; the result and the log keep its name and sha256 only.
 import {
-  stepFailed,
-  type AdvanceClockStep, type ClipboardAssertion, type Clock, type DriverError, type ExpectClipboardStep, type Result, type Session, type Step, type StepCode, type StepOutcome,
+  ClipboardAssertionKind, ClipboardRead as ClipboardReadKind, stepFailed,
+  type AdvanceClockStep, type ClipboardAssertion, type Clock, type DriverError, type ExpectClipboardStep, type Result, type Session, type Step, type StepCode, StepOutcome,
 } from '@revisum/contracts';
 import { clockAdvanceMilliseconds } from './ClockAdvanceMilliseconds.ts';
 import type { Project } from '../../../project/ParseProject.ts';
@@ -38,7 +38,7 @@ type ClockAndClipboardOutcome =
   // Only "empty" or "differs": never the clipboard's text.
   | { readonly outcome: typeof StepOutcome.Failed; readonly code: StepCode; readonly observed?: string };
 
-const passed: ClockAndClipboardOutcome = { outcome: 'passed' };
+const passed: ClockAndClipboardOutcome = { outcome: StepOutcome.Passed };
 const failedWith = (code: StepCode, observed?: string): ClockAndClipboardOutcome =>
   ({ ...stepFailed(code), ...(observed === undefined ? {} : { observed }) });
 
@@ -61,7 +61,7 @@ async function readClipboard(context: ClockAndClipboardContext): Promise<Clipboa
   const maximum = context.project.limits.maximumClipboardCharacters;
   const read: Result<string, DriverError> = await context.session.clipboard.readText(maximum);
   if (!read.ok) return { kind: 'error', error: read.error };
-  return read.value.length > maximum ? { kind: 'too-long' } : { kind: 'text', text: read.value };
+  return read.value.length > maximum ? { kind: 'too-long' } : { kind: ClipboardReadKind.Text, text: read.value };
 }
 
 // Reads the clipboard until `accept` takes what it holds, a read fails, or the step timeout runs
@@ -93,9 +93,9 @@ function expectedText(assertion: ClipboardAssertion, values: RunValues, project:
 // True when the clipboard's non-empty text passes the check.
 function holds(assertion: ClipboardAssertion, text: string, expected: string): boolean {
   switch (assertion.kind) {
-    case 'textEquals': return text === expected;
-    case 'textContains': return text.includes(expected);
-    case 'textExcludes': return !text.includes(expected);
+    case ClipboardAssertionKind.TextEquals: return text === expected;
+    case ClipboardAssertionKind.TextContains: return text.includes(expected);
+    case ClipboardAssertionKind.TextExcludes: return !text.includes(expected);
   }
 }
 
@@ -123,5 +123,5 @@ export async function rememberFromClipboard(
   if (read.kind === 'too-long') return failedWith('value-too-long');
   if (read.text === '') return failedWith('value-empty');
   const kept = context.remembered.remember(step.name, read.text, index);
-  return kept.ok ? { outcome: 'passed', remembered: kept.value } : failedWith(kept.error);
+  return kept.ok ? { outcome: StepOutcome.Passed, remembered: kept.value } : failedWith(kept.error);
 }

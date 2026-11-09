@@ -15,6 +15,7 @@ import { join } from 'node:path';
 import type { Token } from '../naming/LintRepository.ts';
 import { codeTokens, isIdentifier, isPunctuator, listSourceFiles } from '../ListSourceFiles.ts';
 import { reportProblems } from '../ReadWorkspacePackages.ts';
+import { TokenKind } from '../naming/LintRepository.ts';
 
 const VERIFIED_APPROVAL = 'VerifiedApproval';
 const STRENGTHS = new Set(['verified', 'declared']);
@@ -48,7 +49,7 @@ const strengthWithin = (tokens: readonly Token[], from: number, step: 1 | -1): b
     if (token === undefined) return false;
     if (isIdentifier(token, 'strength')) return true;
     // Stop at anything that cannot be part of a property access.
-    if (token.kind !== 'identifier' && !isPunctuator(token, '.') && !isPunctuator(token, '?')) return false;
+    if (token.kind !== TokenKind.Identifier && !isPunctuator(token, '.') && !isPunctuator(token, '?')) return false;
   }
   return false;
 };
@@ -95,7 +96,7 @@ function innermostOpenings(tokens: readonly Token[]): (number | undefined)[] {
 // an approval narrowed to one strength by hand, as in `Approval & { readonly strength: 'verified' }`.
 function narrowsStrength(tokens: readonly Token[], index: number, innermost: number | undefined): boolean {
   const token = tokens[index];
-  if (token?.kind !== 'string' || !STRENGTHS.has(token.text) || !isPunctuator(tokens[index - 1], ':')) return false;
+  if (token?.kind !== TokenKind.String || !STRENGTHS.has(token.text) || !isPunctuator(tokens[index - 1], ':')) return false;
   const named = isIdentifier(tokens[index - 2], 'strength') || (isPunctuator(tokens[index - 2], '?') && isIdentifier(tokens[index - 3], 'strength'));
   return named && innermost !== undefined && opensJoinedTypeLiteral(tokens, innermost);
 }
@@ -109,7 +110,7 @@ function typeAliases(tokens: readonly Token[]): TypeAlias[] {
   const aliases: TypeAlias[] = [];
   tokens.forEach((token, index) => {
     const name = tokens[index + 1];
-    if (!isIdentifier(token, 'type') || isPunctuator(tokens[index - 1], '.') || name?.kind !== 'identifier') return;
+    if (!isIdentifier(token, 'type') || isPunctuator(tokens[index - 1], '.') || name?.kind !== TokenKind.Identifier) return;
     let start = index + 2;
     if (isPunctuator(tokens[start], '<')) {
       while (start < tokens.length && !isPunctuator(tokens[start], '=')) start += 1;
@@ -124,7 +125,7 @@ function typeAliases(tokens: readonly Token[]): TypeAlias[] {
       if (isOpening(part)) depth += 1;
       else if (isClosing(part)) depth -= 1;
       if (depth < 0) break;
-      if (part?.kind === 'identifier') mentions.add(part.text);
+      if (part?.kind === TokenKind.Identifier) mentions.add(part.text);
       if (narrowsStrength(tokens, position, innermost[position])) narrowed = true;
     }
     aliases.push({ name: name.text, narrowed, mentions });
@@ -153,7 +154,7 @@ function strengthTypeNames(aliases: readonly TypeAlias[]): Set<string> {
 type StrengthLocal = { readonly name: string; readonly from: number; readonly until: number };
 
 const holdsStrength = (locals: readonly StrengthLocal[], token: Token | undefined, index: number): boolean =>
-  token?.kind === 'identifier' && locals.some((local) => local.name === token.text && local.from < index && index <= local.until);
+  token?.kind === TokenKind.Identifier && locals.some((local) => local.name === token.text && local.from < index && index <= local.until);
 
 const isAssignmentAt = (tokens: readonly Token[], index: number): boolean =>
   isPunctuator(tokens[index], '=') && !isPunctuator(tokens[index + 1], '=') && !isPunctuator(tokens[index + 1], '>')
@@ -181,17 +182,17 @@ function localSetToStrength(tokens: readonly Token[], index: number): string | u
   }
   const target = tokens[start - 2];
   const annotated = isPunctuator(tokens[start - 3], ':') ? tokens[start - 4] : undefined;
-  if (target?.kind !== 'identifier' || isPunctuator(tokens[start - 3], '.')) {
+  if (target?.kind !== TokenKind.Identifier || isPunctuator(tokens[start - 3], '.')) {
     return undefined;
   }
-  return annotated?.kind === 'identifier' ? annotated.text : target.text;
+  return annotated?.kind === TokenKind.Identifier ? annotated.text : target.text;
 }
 
 // The local that `const { strength: level } = approval` sets, when the `strength` at `index` is that
 // pattern's key.
 function localRenamedFromStrength(tokens: readonly Token[], index: number, pattern: number | undefined): string | undefined {
   const local = tokens[index + 2];
-  if (pattern === undefined || !isPunctuator(tokens[pattern], '{') || !isPunctuator(tokens[index + 1], ':') || local?.kind !== 'identifier') {
+  if (pattern === undefined || !isPunctuator(tokens[pattern], '{') || !isPunctuator(tokens[index + 1], ':') || local?.kind !== TokenKind.Identifier) {
     return undefined;
   }
   return isAssignmentAt(tokens, closingIndex(tokens, pattern) + 1) ? local.text : undefined;
@@ -252,19 +253,19 @@ export function checkApprovalStrength(root: string): string[] {
     // Open brackets, innermost last, so a type written inside "( … )" is known to be in a parameter list.
     const open: string[] = [];
     tokens.forEach((token, index) => {
-      if (token.kind === 'punctuator') {
+      if (token.kind === TokenKind.Punctuator) {
         if (token.text === '(' || token.text === '[' || token.text === '{') open.push(token.text);
         else if (token.text === ')' || token.text === ']' || token.text === '}') open.pop();
       }
       const inParameters = open.includes('(');
-      if (token.kind === 'identifier' && strengthTypes.has(token.text) && inParameters) {
+      if (token.kind === TokenKind.Identifier && strengthTypes.has(token.text) && inParameters) {
         const what = token.text === VERIFIED_APPROVAL ? VERIFIED_APPROVAL : `${token.text}, a type that requires one approval strength,`;
         problems.push(`${path}:${token.line} takes a ${what} parameter; take Approval, so a declared approval passes exactly as a verified one`);
       }
       if (inParameters && narrowsStrength(tokens, index, innermost[index])) {
         problems.push(`${path}:${token.line} takes an approval narrowed to strength '${token.text}'; take Approval, so a declared approval passes exactly as a verified one`);
       }
-      if (token.kind === 'string' && STRENGTHS.has(token.text) && (comparesStrength(tokens, index) || comparesStrengthLocal(tokens, index, locals))) {
+      if (token.kind === TokenKind.String && STRENGTHS.has(token.text) && (comparesStrength(tokens, index) || comparesStrengthLocal(tokens, index, locals))) {
         problems.push(`${path}:${token.line} decides by comparing an approval's strength with '${token.text}'; strength may only choose a label, so test for an Approval instead`);
       }
       if (switchesOnStrength(tokens, index, locals)) {

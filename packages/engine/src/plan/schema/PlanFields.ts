@@ -5,7 +5,7 @@
 import {
   DOM_CHECK_KINDS, DOWNLOAD_SIZE_KINDS, DOWNLOAD_TEXT_KINDS, ELEMENT_STATE_KINDS, ELEMENT_TEXT_KINDS, SEMANTIC_LOCATOR_KINDS, PAGE_TEXT_KINDS,
   PLAN_VERSION, STRUCTURAL_LOCATOR_KINDS,
-  type StructuralLocatorKind, type UnsafeFeature,
+  type StructuralLocatorKind, UnsafeFeature,
 } from '@revisum/contracts';
 
 // The one version text a plan may declare. Anything else is refused, so no plan partly runs.
@@ -24,7 +24,7 @@ export const FROM_FIELD = `from`;
 // The one table of what needs which feature: the parser refuses a construct whose feature the
 // project leaves off, and unsafeFeaturesOf names a plan's features, both from these.
 
-export const LOCATOR_FEATURES: { readonly [Kind in StructuralLocatorKind]: UnsafeFeature } = { css: 'css-locator', xpath: 'xpath-locator' };
+export const LOCATOR_FEATURES: { readonly [Kind in StructuralLocatorKind]: UnsafeFeature } = { css: UnsafeFeature.CssLocator, xpath: UnsafeFeature.XpathLocator };
 // DOM checks and remembering an attribute.
 export const DOM_CHECKS_FEATURE: UnsafeFeature = 'dom-checks';
 // A named script needs page-script; an inline one needs inline-page-script, which a project can

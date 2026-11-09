@@ -5,15 +5,16 @@ import type { ContainerEngine, ImageAnswer } from "../containers/ContainerEngine
 import { RUN_IMAGE_TAG } from "../image/RunImage.ts";
 import type { CheckedWorkloadRequest } from "./CheckWorkloadRequest.ts";
 import { workloadRefused, type WorkloadRefusal } from "./WorkloadRefusal.ts";
+import { ImageAnswerKind } from "../containers/ContainerEngine.ts";
 
 // A daemon that does not answer says nothing about whether an image exists.
 function presentImage(answer: ImageAnswer, absent: string): Result<string, WorkloadRefusal> {
     switch (answer.kind) {
-        case "found":
+        case ImageAnswerKind.Found:
             return success(answer.id);
-        case "absent":
+        case ImageAnswerKind.Absent:
             return workloadRefused("image-missing", absent);
-        case "unanswered":
+        case ImageAnswerKind.Unanswered:
             return workloadRefused(
                 "workload-start-failed",
                 `Docker did not answer: ${answer.problem.detail}`,

@@ -2,12 +2,12 @@
 // DOMStorage domain, so no script runs in the page. An entry belongs to one origin: a write or a
 // read while the page is on another origin fails with storage-origin-mismatch and touches nothing.
 import {
-    failure,
+    DriverErrorCode, failure,
     success,
     type DriverError,
     type Origin,
     type Result,
-    type StorageArea,
+    StorageArea,
     type StoragePort,
 } from "@revisum/contracts";
 import { GET_FRAME_TREE, type BrowserCommand } from "../connection/BrowserCommand.ts";
@@ -82,19 +82,19 @@ export class PageStorage implements StoragePort {
             const shown = await this.#pageOrigin();
             if (shown !== origin) {
                 return failure({
-                    code: "storage-origin-mismatch",
+                    code: DriverErrorCode.StorageOriginMismatch,
                     detail: "the page is not on the storage entry's origin",
                 });
             }
-            return success(await use({ securityOrigin: origin, isLocalStorage: area === "local" }));
+            return success(await use({ securityOrigin: origin, isLocalStorage: area === StorageArea.Local }));
         } catch (error) {
             if (error instanceof PageHeldByDialog) {
-                return failure({ code: "dialog-open", detail: errorText(error) });
+                return failure({ code: DriverErrorCode.DialogOpen, detail: errorText(error) });
             }
             return failure(
                 this.#crashed()
-                    ? { code: "target-crashed", detail: "the page's renderer died" }
-                    : { code: "not-actionable", detail: errorText(error) },
+                    ? { code: DriverErrorCode.TargetCrashed, detail: "the page's renderer died" }
+                    : { code: DriverErrorCode.NotActionable, detail: errorText(error) },
             );
         }
     }

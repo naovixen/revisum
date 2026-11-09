@@ -11,7 +11,7 @@
 // gives it a TargetNotDeclared), and an adapter that is not registered, one whose `supports` says no
 // and a browser build other than the pinned one are found as the run opens its session.
 import {
-    failure,
+    RefusalCode, failure,
     isElementCheckNoDriverDecides,
     isWiredPort,
     success,
@@ -82,21 +82,21 @@ const refuseBaseUrlOffProject: PreflightCheck = (facts) => {
     const origin = new URL(facts.baseUrl).origin;
     return facts.cleared.project.origins.some((declared) => declared === origin)
         ? undefined
-        : { code: "origin-not-allowed", origin };
+        : { code: RefusalCode.OriginNotAllowed, origin };
 };
 
 const refuseProductionOrigin: PreflightCheck = (facts) => {
     const origin = isProductionAllowed(facts.cleared.standing, facts.cleared.project.policy)
         ? undefined
         : productionOriginReached(facts.cleared, facts.baseUrl);
-    return origin === undefined ? undefined : { code: "origin-not-allowed", origin };
+    return origin === undefined ? undefined : { code: RefusalCode.OriginNotAllowed, origin };
 };
 
 // A plan that needs one of the next four relies on it to mean anything: stopping part way would leave
 // test data behind or report on a run that never had what it declared.
 const refuseUnwiredServices: PreflightCheck = (facts) =>
     callsServices(facts.cleared.plan) && !isWiredPort(facts.services)
-        ? { code: "services-unavailable" }
+        ? { code: RefusalCode.ServicesUnavailable }
         : undefined;
 
 // A plan that names it relies on being signed in. Loading it comes with the driver's session
@@ -104,17 +104,17 @@ const refuseUnwiredServices: PreflightCheck = (facts) =>
 const refuseStorageState: PreflightCheck = (facts) =>
     facts.cleared.plan.storageState === undefined
         ? undefined
-        : { code: "storage-state-unsupported" };
+        : { code: RefusalCode.StorageStateUnsupported };
 
 const refuseElementCheckNoDriverDecides: PreflightCheck = (facts) =>
     everyPlanStep(facts.cleared.plan).some(isElementCheckNoDriverDecides)
-        ? { code: "element-check-unsupported" }
+        ? { code: RefusalCode.ElementCheckUnsupported }
         : undefined;
 
 // Cleanup counts too: with no way to run it, the steps would leave their test data behind.
 const refuseUnwiredDatabaseCommands: PreflightCheck = (facts) =>
     runsDatabaseCommands(facts.cleared.plan) && !isWiredPort(facts.databaseCommands)
-        ? { code: "database-commands-unavailable" }
+        ? { code: RefusalCode.DatabaseCommandsUnavailable }
         : undefined;
 
 // A result reports the first refusal, so this order is part of the behaviour: a base URL off the
@@ -158,7 +158,7 @@ function passedOrRefused(
         return failure(origin);
     }
     if (!secrets.ok) {
-        return failure({ code: "secret-missing", secretName: secrets.error });
+        return failure({ code: RefusalCode.SecretMissing, secretName: secrets.error });
     }
     // Without every source, the manifest could not record what would run.
     const scripts = namedScriptSources(
@@ -167,7 +167,7 @@ function passedOrRefused(
         facts.scriptSources,
     );
     if (!scripts.ok) {
-        return failure({ code: "script-source-missing", file: scripts.error });
+        return failure({ code: RefusalCode.ScriptSourceMissing, file: scripts.error });
     }
     const afterScripts = firstRefusal(CHECKS_AFTER_SCRIPTS, facts);
     if (afterScripts !== undefined) {

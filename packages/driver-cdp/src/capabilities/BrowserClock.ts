@@ -10,7 +10,7 @@
 //   - The callbacks every frame fires count against one limit; past it the advance fails with
 //     clock-runaway. Nothing here waits for real time.
 import {
-    CLOCK_CONTROLLER_KEY,
+    DriverErrorCode, CLOCK_CONTROLLER_KEY,
     failure,
     success,
     virtualClockScript,
@@ -44,7 +44,7 @@ type ClockPage = {
 type FrameAdvance = { readonly fired: number; readonly runaway: boolean };
 
 const CRASHED: DriverError = {
-    code: "target-crashed",
+    code: DriverErrorCode.TargetCrashed,
     detail: "the page's renderer died during the clock advance",
 };
 
@@ -99,7 +99,7 @@ export class BrowserClock implements ClockPort {
     ): Promise<Result<void, DriverError>> {
         if (!Number.isInteger(milliseconds) || milliseconds < 1) {
             return failure({
-                code: "unsupported-step",
+                code: DriverErrorCode.UnsupportedStep,
                 detail: "an advance is a whole number of milliseconds, at least 1",
             });
         }
@@ -127,7 +127,7 @@ export class BrowserClock implements ClockPort {
                     fired += advanced.fired;
                     if (advanced.runaway) {
                         return failure({
-                            code: "clock-runaway",
+                            code: DriverErrorCode.ClockRunaway,
                             detail: `the advance would fire more than ${maximumTimers} timer callbacks`,
                         });
                     }
@@ -137,7 +137,7 @@ export class BrowserClock implements ClockPort {
                     page.crashed()
                         ? CRASHED
                         : {
-                              code: "page-unreadable",
+                              code: DriverErrorCode.PageUnreadable,
                               detail: `the clock could not be advanced: ${errorText(error)}`,
                           },
                 );

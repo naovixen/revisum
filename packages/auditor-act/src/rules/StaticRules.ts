@@ -9,11 +9,12 @@ import {
   ARIA_ROLES, WIDGET_ROLES, accessibilityRole, actRuleMeta, actuallyDisabled, hasKnownPrimaryLanguage, implicitRole, inSequentialFocus,
   inert, parseStyleAttribute, pixels, presentational,
 } from './ActRuleMeta.ts';
+import { Outcome } from './Rule.ts';
 
 const elementsOf = (snapshot: PageSnapshot): SnapshotNode[] => snapshot.nodes.filter((node) => node.nodeType === 1);
-const passed = (node: SnapshotNode, message = ''): TargetResult => ({ node: node.index, outcome: 'passed', message });
-const failed = (node: SnapshotNode, message: string): TargetResult => ({ node: node.index, outcome: 'failed', message });
-const cantTell = (node: SnapshotNode, message: string): TargetResult => ({ node: node.index, outcome: 'cantTell', message });
+const passed = (node: SnapshotNode, message = ''): TargetResult => ({ node: node.index, outcome: Outcome.Passed, message });
+const failed = (node: SnapshotNode, message: string): TargetResult => ({ node: node.index, outcome: Outcome.Failed, message });
+const cantTell = (node: SnapshotNode, message: string): TargetResult => ({ node: node.index, outcome: Outcome.CantTell, message });
 const isHtmlElement = (snapshot: PageSnapshot, node: SnapshotNode): boolean => !inSvg(snapshot, node) && node.name !== 'svg' && node.name !== 'math';
 const inShadowTree = (snapshot: PageSnapshot, node: SnapshotNode): boolean => snapshotExtras(snapshot).inShadow.has(node.index);
 const topHtmlRoot = (snapshot: PageSnapshot): SnapshotNode | undefined => {

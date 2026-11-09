@@ -9,9 +9,10 @@
 // reply, which may echo the key.
 import {
   ANTHROPIC_API_VERSION, MAXIMUM_PLANNER_REPLY_BYTES, PLANNER_TIMEOUT_MILLISECONDS, failure, headerSecret, plannerPrompt, plannerRequestBody, success,
-  type DraftPlanner, type DraftRequest, type HeaderScheme, type PlannerEndpoint, type PlannerWire, type Result, type SecretStore,
+  type DraftPlanner, type DraftRequest, HeaderScheme, type PlannerEndpoint, PlannerWire, type Result, type SecretStore,
   type ServiceCallErrorCode, type ServiceCaller, type ServiceRequestHeader,
 } from '@revisum/engine';
+import { HttpMethod } from '@revisum/contracts';
 
 // Why a planner call failed: the service caller's code, or a status other than success.
 export type PlannerCallFailure = ServiceCallErrorCode | 'planner-status';
@@ -24,8 +25,8 @@ export interface PlannerAdapter extends DraftPlanner {
 
 // The header each wire format carries the key in, and how.
 const KEY_HEADERS: { readonly [Wire in PlannerWire]: { readonly name: string; readonly scheme: HeaderScheme } } = {
-  'anthropic-messages': { name: 'x-api-key', scheme: 'raw' },
-  'openai-chat': { name: 'authorization', scheme: 'bearer' },
+  'anthropic-messages': { name: 'x-api-key', scheme: HeaderScheme.Raw },
+  'openai-chat': { name: 'authorization', scheme: HeaderScheme.Bearer },
 };
 
 const JSON_MEDIA_TYPE = 'application/json';
@@ -45,14 +46,14 @@ export function plannerAdapter(endpoint: PlannerEndpoint, connection: PlannerCon
     const keyHeader = KEY_HEADERS[endpoint.wire];
     headers.push({ name: keyHeader.name, value: headerSecret(secret, keyHeader.scheme) });
   }
-  if (endpoint.wire === 'anthropic-messages') headers.push({ name: 'anthropic-version', value: ANTHROPIC_API_VERSION });
+  if (endpoint.wire === PlannerWire.AnthropicMessages) headers.push({ name: 'anthropic-version', value: ANTHROPIC_API_VERSION });
   headers.push({ name: 'content-type', value: JSON_MEDIA_TYPE });
   const { origin, pathAndQuery } = endpoint;
   return success({
     async draft(request: DraftRequest): Promise<Result<Uint8Array, PlannerCallFailure>> {
       const body = plannerRequestBody(endpoint.wire, endpoint.model, plannerPrompt(request));
       const answered = await connection.caller.call({
-        origin, method: 'POST', pathAndQuery, headers, body: { jsonParts: [body] },
+        origin, method: HttpMethod.Post, pathAndQuery, headers, body: { jsonParts: [body] },
         timeoutMilliseconds: PLANNER_TIMEOUT_MILLISECONDS, maximumResponseBytes: MAXIMUM_PLANNER_REPLY_BYTES,
       });
       if (!answered.ok) return failure(answered.error);

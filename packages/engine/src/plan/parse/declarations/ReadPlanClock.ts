@@ -2,7 +2,7 @@
 // They are part of the plan parser, which calls them with its own text reader, and the only
 // place a ValueName is made. Errors carry a code and a path, never a value.
 import {
-  DATE_ANCHORS, DATE_FORMATS, GENERATED_VALUE_KINDS,
+  GeneratedValueKind, PlanErrorCode, DATE_ANCHORS, DATE_FORMATS, GENERATED_VALUE_KINDS,
   type EmailDomain, type FieldName, type GeneratedValue, type PlanClock, type RelativeDay, type SafeText, type ValueName,
 } from '@revisum/contracts';
 import { brand } from '../../../foundation/Brand.ts';
@@ -24,8 +24,8 @@ export type ValueContext = {
 
 // A value name as text: wrong_type when it is not text, unknown_value when it breaks the pattern.
 export function readValueName(input: unknown, path: string, issues: Issues): Parsed<ValueName> {
-  if (typeof input !== 'string') { issues.push({ code: 'wrong_type', path }); return INVALID; }
-  if (!VALUE_NAME.test(input)) { issues.push({ code: 'unknown_value', path }); return INVALID; }
+  if (typeof input !== 'string') { issues.push({ code: PlanErrorCode.WrongType, path }); return INVALID; }
+  if (!VALUE_NAME.test(input)) { issues.push({ code: PlanErrorCode.UnknownValue, path }); return INVALID; }
   return brand<string, 'ValueName'>(input);
 }
 
@@ -44,16 +44,16 @@ export function readPlanClock(input: unknown, path: string, issues: Issues): Par
   if (fields === INVALID) return INVALID;
   const day = readRelativeDay(fields['day'], `${path}.day`, issues);
   const time = fields['time'];
-  if (typeof time !== 'string') { issues.push({ code: 'wrong_type', path: `${path}.time` }); return INVALID; }
-  if (!CLOCK_TIME.test(time)) { issues.push({ code: 'unknown_value', path: `${path}.time` }); return INVALID; }
+  if (typeof time !== 'string') { issues.push({ code: PlanErrorCode.WrongType, path: `${path}.time` }); return INVALID; }
+  if (!CLOCK_TIME.test(time)) { issues.push({ code: PlanErrorCode.UnknownValue, path: `${path}.time` }); return INVALID; }
   return day === INVALID ? INVALID : { day, time };
 }
 
 // The domain of a unique email: one the project declares. The error never repeats the domain.
 function readEmailDomain(input: unknown, path: string, context: ValueContext): Parsed<EmailDomain> {
-  if (typeof input !== 'string') { context.issues.push({ code: 'wrong_type', path }); return INVALID; }
+  if (typeof input !== 'string') { context.issues.push({ code: PlanErrorCode.WrongType, path }); return INVALID; }
   const found = context.emailDomains.find((domain) => domain === input);
-  if (found === undefined) { context.issues.push({ code: 'unknown_value', path }); return INVALID; }
+  if (found === undefined) { context.issues.push({ code: PlanErrorCode.UnknownValue, path }); return INVALID; }
   return found;
 }
 
@@ -64,29 +64,29 @@ function readGeneratedValue(input: unknown, path: string, context: ValueContext)
   const kind = readOneOf(head['kind'], `${path}.kind`, issues, GENERATED_VALUE_KINDS);
   if (kind === INVALID) return INVALID;
   switch (kind) {
-    case 'uniqueText': {
+    case GeneratedValueKind.UniqueText: {
       if (readRecord(input, path, issues, ['kind', 'prefix']) === INVALID) return INVALID;
       const prefix = context.readText(head['prefix'], `${path}.prefix`, MAXIMUM_VALUE_PREFIX_LENGTH);
       return prefix === INVALID ? INVALID : { kind, prefix };
     }
-    case 'uniqueEmail': {
+    case GeneratedValueKind.UniqueEmail: {
       if (readRecord(input, path, issues, ['kind', 'localPrefix', 'domain'], ['kind', 'localPrefix']) === INVALID) return INVALID;
       // Only characters every mail system accepts, so the address is always well formed.
       const localPrefix = context.readText(head['localPrefix'], `${path}.localPrefix`, MAXIMUM_VALUE_PREFIX_LENGTH);
       if (localPrefix !== INVALID && !EMAIL_LOCAL_PREFIX.test(localPrefix)) {
-        issues.push({ code: 'unknown_value', path: `${path}.localPrefix` });
+        issues.push({ code: PlanErrorCode.UnknownValue, path: `${path}.localPrefix` });
         return INVALID;
       }
       if (!Object.hasOwn(head, 'domain')) return localPrefix === INVALID ? INVALID : { kind, localPrefix };
       const domain = readEmailDomain(head['domain'], `${path}.domain`, context);
       return localPrefix === INVALID || domain === INVALID ? INVALID : { kind, localPrefix, domain };
     }
-    case 'uniqueNumber': {
+    case GeneratedValueKind.UniqueNumber: {
       if (readRecord(input, path, issues, ['kind', 'digits']) === INVALID) return INVALID;
       const digits = readInteger(head['digits'], `${path}.digits`, issues, UNIQUE_NUMBER_DIGITS.fewest, UNIQUE_NUMBER_DIGITS.most);
       return digits === INVALID ? INVALID : { kind, digits };
     }
-    case 'date': {
+    case GeneratedValueKind.Date: {
       if (readRecord(input, path, issues, ['kind', 'day', 'format']) === INVALID) return INVALID;
       const parts = [readRelativeDay(head['day'], `${path}.day`, issues), readOneOf(head['format'], `${path}.format`, issues, DATE_FORMATS)] as const;
       return allValid(parts) ? { kind, day: parts[0], format: parts[1] } : INVALID;
@@ -104,9 +104,9 @@ export function readGeneratedValues(
   const fields = peekRecord(input, path, issues);
   if (fields === INVALID) return INVALID;
   const names = Object.keys(fields);
-  if (names.length > MAXIMUM_VALUES) { issues.push({ code: 'too_large', path }); return INVALID; }
+  if (names.length > MAXIMUM_VALUES) { issues.push({ code: PlanErrorCode.TooLarge, path }); return INVALID; }
   const entries = names.map((name): Parsed<readonly [string, GeneratedValue]> => {
-    if (!VALUE_NAME.test(name)) { issues.push({ code: 'unknown_value', path }); return INVALID; }
+    if (!VALUE_NAME.test(name)) { issues.push({ code: PlanErrorCode.UnknownValue, path }); return INVALID; }
     defined.add(name);
     const value = readGeneratedValue(fields[name], `${path}.${name}`, context);
     return value === INVALID ? INVALID : [name, value];

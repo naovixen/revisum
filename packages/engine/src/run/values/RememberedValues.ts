@@ -7,6 +7,7 @@ import { failure, success, type Result, type SafeText, type StepCode, type Value
 import { sha256 } from "../../foundation/Sha256.ts";
 import type { Logger } from "../logging/LoggingManifest.ts";
 import { runTimeText } from "../../plan/parse/ReadRecord.ts";
+import { EventKind } from "../logging/LoggingManifest.ts";
 
 export type RememberRefusal =
     | typeof StepCode.ValueHoldsSecret
@@ -91,7 +92,7 @@ export function rememberedValues(options: RememberedValuesOptions): RememberedVa
         values.set(name, safe);
         rememberedTexts.add(safe);
         const digest = sha256(safe);
-        logger.log({ kind: "value.remembered", stepIndex, valueName: name, sha256: digest });
+        logger.log({ kind: EventKind.ValueRemembered, stepIndex, valueName: name, sha256: digest });
         return { valueName: name, sha256: digest };
     };
 

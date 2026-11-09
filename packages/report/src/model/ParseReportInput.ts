@@ -7,7 +7,7 @@ import {
   HISTORY_SCHEMA, MAXIMUM_CAPTION_WORDS, REPORT_INPUT_SCHEMA, SEVERITIES,
   type AcceptanceCriterion, type Criterion, type EvidenceReference, type Exchange, type Finding, type History,
   type HistoryPeriod, type ImageMeta, type Parsed, type PixelBox, type PlanStep, type ReportError, type ReportInput, type ReportKind, type RunInfo,
-  type Severity, type ValidReport, type Verdict,
+  type Severity, type ValidReport, Verdict,
 } from './ReportKind.ts';
 
 type Fields = Readonly<Record<string, unknown>>;
@@ -113,14 +113,14 @@ const FINDING_KEYS = ['id', 'status', 'severity', 'title', 'caption', 'rule', 'c
 
 function readFinding(errors: ErrorList, path: string, value: unknown): Finding {
   const empty: Finding = {
-    id: '', status: 'failed', severity: 'P4', title: '', caption: '', rule: '', criterion: { kind: 'assertion', text: '' },
+    id: '', status: Verdict.Failed, severity: 'P4', title: '', caption: '', rule: '', criterion: { kind: 'assertion', text: '' },
     criterionIds: [], stepIds: [], steps: [], image: null, exchanges: [], log: [], reason: null, action: null,
   };
   if (!isPlainObject(value)) { errors.add(path, 'not_object'); return empty; }
   rejectUnknownKeys(errors, path, value, FINDING_KEYS);
   const status = readOneOf(errors, `${path}.status`, value['status'], ['failed', 'needs-review'] as const, 'unknown_status');
   const severity = value['severity'] === null ? null : readOneOf<Severity>(errors, `${path}.severity`, value['severity'], SEVERITIES, 'unknown_severity');
-  if (severity === null && status === 'failed') errors.add(`${path}.severity`, 'failed_needs_severity');
+  if (severity === null && status === Verdict.Failed) errors.add(`${path}.severity`, 'failed_needs_severity');
   const caption = readText(errors, `${path}.caption`, value['caption'], 200);
   if (wordCount(caption) > MAXIMUM_CAPTION_WORDS) errors.add(`${path}.caption`, 'caption_too_long');
   const steps = readLines(errors, `${path}.steps`, value['steps'], 12);
@@ -138,7 +138,7 @@ function readFinding(errors: ErrorList, path: string, value: unknown): Finding {
     .map((exchange, index) => readExchange(errors, `${path}.exchanges[${index}]`, exchange));
   const reason = readOptionalText(errors, `${path}.reason`, value['reason']);
   const action = readOptionalText(errors, `${path}.action`, value['action']);
-  if (status === 'needs-review' && (reason === null || action === null)) errors.add(path, 'review_needs_reason_and_action');
+  if (status === Verdict.NeedsReview && (reason === null || action === null)) errors.add(path, 'review_needs_reason_and_action');
   return {
     id: readId(errors, `${path}.id`, value['id']), status, severity, title: readText(errors, `${path}.title`, value['title']), caption,
     rule: readText(errors, `${path}.rule`, value['rule'], 80), criterion: readCriterion(errors, `${path}.criterion`, value['criterion']),
@@ -149,7 +149,7 @@ function readFinding(errors: ErrorList, path: string, value: unknown): Finding {
 }
 
 function readAcceptanceCriterion(errors: ErrorList, path: string, value: unknown): AcceptanceCriterion {
-  const empty: AcceptanceCriterion = { id: '', text: '', status: 'passed', stepIds: [], evidence: [] };
+  const empty: AcceptanceCriterion = { id: '', text: '', status: Verdict.Passed, stepIds: [], evidence: [] };
   if (!isPlainObject(value)) { errors.add(path, 'not_object'); return empty; }
   rejectUnknownKeys(errors, path, value, ['id', 'text', 'status', 'stepIds', 'evidence']);
   const stepIds = readList(errors, `${path}.stepIds`, value['stepIds'], 500).map((id, index) => readId(errors, `${path}.stepIds[${index}]`, id));

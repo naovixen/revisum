@@ -41,6 +41,7 @@ import { cannotPinDeterminism, type OpenedSession } from "./session/OpenSession.
 import { withOpenSession } from "./session/WithOpenSession.ts";
 import { runTheSteps, stepsNotRunForTheLog } from "./steps/RunTheSteps.ts";
 import { durationsOf, resultsOf } from "./steps/TimedStep.ts";
+import { EventKind } from "./logging/LoggingManifest.ts";
 
 export async function runPlan(
     cleared: ClearedRun,
@@ -74,7 +75,7 @@ export async function runPlan(
     // A log that fails this early ends the run Errored like one that fails later, once there are steps
     // to account for. It must not reject the run, and a refusal below still stands.
     const isPlanLogged = logKeepingTheResult(
-        { kind: "run.state", state: planned.state, targetId: target.id },
+        { kind: EventKind.RunState, state: planned.state, targetId: target.id },
         logger,
     );
     if (!preflight.outcome.ok) {
@@ -208,7 +209,7 @@ function verdictAfterRefusals(
         const { spoiltStep, spoiltStepMilliseconds } = counted;
         logKeepingTheResult(
             {
-                kind: "step.end",
+                kind: EventKind.StepEnd,
                 stepIndex: spoiltStep.index,
                 stepType: spoiltStep.type,
                 outcome: spoiltStep.outcome,

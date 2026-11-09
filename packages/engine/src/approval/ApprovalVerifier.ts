@@ -19,8 +19,8 @@
 //     refused; until the route is built, no signature verifies.
 import { posix } from 'node:path';
 import {
-  failure, success,
-  type ActorType, type Approval, type ApprovalErrorCode, type ApprovalFields, type ApprovalProof, type ApprovalStrength, type ApprovalSubject,
+  AuditEventKind, ApprovalProofKind, VersionControlFailure, AccountType, VersionControlReviewState, ApprovalSubjectKind, failure, success,
+  ActorType, type Approval, ApprovalErrorCode, type ApprovalFields, type ApprovalProof, ApprovalStrength, type ApprovalSubject,
   type DerivedActor, type EventSink, type Result, type VersionControlAccount, type VersionControlPort, type VersionControlReview,
 } from '@revisum/contracts';
 import { deriveActor, pseudonymousActorId, sourceActorId } from './DeriveActor.ts';
@@ -68,7 +68,7 @@ type Checked<Value> = { readonly ok: true; readonly value: Value } | { readonly 
 type Approved = { readonly login: string; readonly strength: ApprovalStrength; readonly at: string };
 
 // Both strengths are a person; the strength chooses only which label the actor carries.
-const PERSON_FOR_STRENGTH: Readonly<Record<ApprovalStrength, ActorType>> = { verified: 'person-verified', declared: 'person-declared' };
+const PERSON_FOR_STRENGTH: Readonly<Record<ApprovalStrength, ActorType>> = { verified: ActorType.PersonVerified, declared: ActorType.PersonDeclared };
 
 const passed = <Value>(value: Value): Checked<Value> => ({ ok: true, value });
 
@@ -88,25 +88,25 @@ function hashOfPlanAsWritten(bytes: Uint8Array, decoded: unknown, trusted: Trust
 // hash is over the plan as the parser returns it, a file that reads as that plan.
 function holdsSubject(subject: ApprovalSubject, bytes: Uint8Array, trusted: TrustedProject): boolean {
   const decoded = parseJson(bytes);
-  if (subject.kind === 'holdout-plan') return holdoutPlanHashes(decoded).includes(subject.hash);
+  if (subject.kind === ApprovalSubjectKind.HoldoutPlan) return holdoutPlanHashes(decoded).includes(subject.hash);
   if (sha256(bytes) === subject.hash || (decoded !== undefined && sha256(canonicalJson(decoded)) === subject.hash)) {
     return true;
   }
-  return subject.kind === 'plan' && hashOfPlanAsWritten(bytes, decoded, trusted) === subject.hash;
+  return subject.kind === ApprovalSubjectKind.Plan && hashOfPlanAsWritten(bytes, decoded, trusted) === subject.hash;
 }
 
 // The repository file an approval of this subject is about, or null when it can be about none. A
 // holdout plan is in no file of its own, so only holdouts.json can show it, whatever path the
 // caller gives. A plan must live in plans/ once any "." and ".." in its path are resolved.
 function subjectFile(subject: ApprovalSubject): string | null {
-  if (subject.kind === 'holdout-plan') {
+  if (subject.kind === ApprovalSubjectKind.HoldoutPlan) {
     return HOLDOUTS_FILE;
   }
   if (subject.path === undefined) {
     return null;
   }
   const path = posix.normalize(repositoryPath(subject.path));
-  return subject.kind === 'plan' && !path.startsWith(PLANS_FOLDER) ? null : path;
+  return subject.kind === ApprovalSubjectKind.Plan && !path.startsWith(PLANS_FOLDER) ? null : path;
 }
 
 // What a reviewer last said about a commit: their latest approval or request for changes. A comment
@@ -114,7 +114,7 @@ function subjectFile(subject: ApprovalSubject): string | null {
 function latestVerdict(reviews: readonly VersionControlReview[], reviewed: VersionControlReview): VersionControlReview {
   const login = reviewed.reviewer.login.toLowerCase();
   return reviews
-    .filter((candidate) => candidate.commit === reviewed.commit && candidate.reviewer.login.toLowerCase() === login && candidate.state !== 'commented')
+    .filter((candidate) => candidate.commit === reviewed.commit && candidate.reviewer.login.toLowerCase() === login && candidate.state !== VersionControlReviewState.Commented)
     .reduce((latest, candidate) => (Date.parse(latest.submittedAt) > Date.parse(candidate.submittedAt) ? latest : candidate), reviewed);
 }
 
@@ -123,7 +123,7 @@ export function approvalVerifier(options: ApprovalVerifierOptions): ApprovalVeri
 
   // A bot or app is an agent; a user whose approval does not count is unverified.
   const accountActor = (account: VersionControlAccount): DerivedActor =>
-    deriveActor(pseudonymousActorId(account.login, actorKey), account.type === 'user' ? 'unverified' : 'agent');
+    deriveActor(pseudonymousActorId(account.login, actorKey), account.type === AccountType.User ? 'unverified' : 'agent');
   const loginActor = (login: string): DerivedActor => deriveActor(pseudonymousActorId(login, actorKey), 'unverified');
   const refusedBy = <Value>(code: ApprovalErrorCode, actor: DerivedActor): Checked<Value> => ({ ok: false, refusal: { code, actor } });
 
@@ -131,14 +131,14 @@ export function approvalVerifier(options: ApprovalVerifierOptions): ApprovalVeri
   async function protectedJson(versionControl: VersionControlPort, path: string, actor: DerivedActor): Promise<Checked<unknown>> {
     const read = await versionControl.protectedFile(repositoryPath(path));
     if (read.ok) return passed(parseJson(read.value.bytes));
-    return read.error === 'unavailable' ? refusedBy('version-control-unavailable', actor) : passed(null);
+    return read.error === VersionControlFailure.Unavailable ? refusedBy('version-control-unavailable', actor) : passed(null);
   }
 
   async function codeOwnerRules(versionControl: VersionControlPort, actor: DerivedActor): Promise<Checked<readonly CodeOwnerRule[]>> {
     for (const path of CODE_OWNERS_PATHS) {
       const read = await versionControl.protectedFile(path);
       if (read.ok) return passed(parseCodeOwners(new TextDecoder().decode(read.value.bytes)));
-      if (read.error === 'unavailable') return refusedBy('version-control-unavailable', actor);
+      if (read.error === VersionControlFailure.Unavailable) return refusedBy('version-control-unavailable', actor);
     }
     // No code-owners file: nobody is a code owner.
     return passed([]);
@@ -151,10 +151,10 @@ export function approvalVerifier(options: ApprovalVerifierOptions): ApprovalVeri
     const reviews = await versionControl.reviews(proof.pullRequest);
     if (!reviews.ok) return refusedBy('version-control-unavailable', unknownReviewer);
     const review = reviews.value.find((candidate) => candidate.id === proof.reviewId);
-    if (review === undefined || review.state !== 'approved') return refusedBy('subject-mismatch', unknownReviewer);
+    if (review === undefined || review.state !== VersionControlReviewState.Approved) return refusedBy('subject-mismatch', unknownReviewer);
     const reviewer = accountActor(review.reviewer);
-    if (review.reviewer.type !== 'user') return refusedBy('bot-or-app', reviewer);
-    if (latestVerdict(reviews.value, review).state !== 'approved') {
+    if (review.reviewer.type !== AccountType.User) return refusedBy('bot-or-app', reviewer);
+    if (latestVerdict(reviews.value, review).state !== VersionControlReviewState.Approved) {
       return refusedBy('subject-mismatch', reviewer);
     }
     const path = subjectFile(subject);
@@ -184,7 +184,7 @@ export function approvalVerifier(options: ApprovalVerifierOptions): ApprovalVeri
     // consulted: it may still hold the version the change replaces.
     const reviewed = await reviewedBytes(subject, path, review.commit, trusted, versionControl, reviewer);
     if (!reviewed.ok) return reviewed;
-    return passed({ login: review.reviewer.login, strength: 'verified', at: review.submittedAt });
+    return passed({ login: review.reviewer.login, strength: ApprovalStrength.Verified, at: review.submittedAt });
   }
 
   // The subject's file as the reviewed commit holds it must have the subject's hash. For a holdout
@@ -195,7 +195,7 @@ export function approvalVerifier(options: ApprovalVerifierOptions): ApprovalVeri
     // A port that cannot read a file at a commit cannot show what the reviewer saw.
     if (versionControl.fileAtCommit === undefined) return refusedBy('version-control-unavailable', actor);
     const read = await versionControl.fileAtCommit(path, commit);
-    if (!read.ok) return refusedBy(read.error === 'unavailable' ? 'version-control-unavailable' : 'subject-mismatch', actor);
+    if (!read.ok) return refusedBy(read.error === VersionControlFailure.Unavailable ? 'version-control-unavailable' : 'subject-mismatch', actor);
     return holdsSubject(subject, read.value.bytes, trusted) ? passed(true) : refusedBy('subject-mismatch', actor);
   }
 
@@ -222,11 +222,11 @@ export function approvalVerifier(options: ApprovalVerifierOptions): ApprovalVeri
     const isMaintainer = landed.value.login.toLowerCase() === lockdown.maintainer.toLowerCase();
     // GitHub's answer decides who landed the commit; a proof naming someone else is not believed.
     const proofAgrees = landed.value.login.toLowerCase() === proof.mergedBy.toLowerCase();
-    if (landed.value.type !== 'user' || !isMaintainer || !proofAgrees) return refusedBy('not-maintainer', lander);
+    if (landed.value.type !== AccountType.User || !isMaintainer || !proofAgrees) return refusedBy('not-maintainer', lander);
 
     const onBranch = await subjectOnProtectedBranch(subject, proof.commit, trusted, versionControl, lander);
     if (!onBranch.ok) return onBranch;
-    return passed({ login: landed.value.login, strength: 'declared', at: landed.value.at });
+    return passed({ login: landed.value.login, strength: ApprovalStrength.Declared, at: landed.value.at });
   }
 
   // The subject as it stands on the protected branch must have the subject's hash, and the proof's
@@ -240,7 +240,7 @@ export function approvalVerifier(options: ApprovalVerifierOptions): ApprovalVeri
       return refusedBy('subject-mismatch', actor);
     }
     const read = await versionControl.protectedFile(path);
-    if (!read.ok) return refusedBy(read.error === 'unavailable' ? 'version-control-unavailable' : 'not-protected-branch', actor);
+    if (!read.ok) return refusedBy(read.error === VersionControlFailure.Unavailable ? 'version-control-unavailable' : 'not-protected-branch', actor);
     if (!holdsSubject(subject, read.value.bytes, trusted)) {
       return refusedBy('not-protected-branch', actor);
     }
@@ -262,21 +262,21 @@ export function approvalVerifier(options: ApprovalVerifierOptions): ApprovalVeri
 
   const checkProof = (subject: ApprovalSubject, proof: ApprovalProof, trusted: TrustedProject, versionControl: VersionControlPort): Promise<Checked<Approved>> => {
     switch (proof.kind) {
-      case 'code-owner-review': return checkCodeOwnerReview(subject, proof, trusted, versionControl);
-      case 'agent-lockdown-merge': return checkAgentLockdown(subject, proof, trusted, versionControl);
-      case 'signature': return checkSignature(proof, versionControl);
+      case ApprovalProofKind.CodeOwnerReview: return checkCodeOwnerReview(subject, proof, trusted, versionControl);
+      case ApprovalProofKind.AgentLockdownMerge: return checkAgentLockdown(subject, proof, trusted, versionControl);
+      case ApprovalProofKind.Signature: return checkSignature(proof, versionControl);
     }
   };
 
   return {
     async verify(subject, proof, trusted, versionControl) {
       const refuse = (refusal: Refusal): VerifierResult => {
-        events.append({ kind: 'approval.refused', subjectHash: subject.hash, proofKind: proof.kind, code: refusal.code }, refusal.actor);
+        events.append({ kind: AuditEventKind.ApprovalRefused, subjectHash: subject.hash, proofKind: proof.kind, code: refusal.code }, refusal.actor);
         return failure(refusal.code);
       };
       // The trusted project must come from the same protected branch the port reads.
       if (trusted.provenance.kind === 'protected-branch' && trusted.provenance.branch !== versionControl.protectedBranch) {
-        return refuse({ code: 'not-protected-branch', actor: deriveActor(sourceActorId('approval proof'), 'unverified') });
+        return refuse({ code: ApprovalErrorCode.NotProtectedBranch, actor: deriveActor(sourceActorId('approval proof'), 'unverified') });
       }
       const checked = await checkProof(subject, proof, trusted, versionControl);
       if (!checked.ok) return refuse(checked.refusal);
@@ -285,12 +285,12 @@ export function approvalVerifier(options: ApprovalVerifierOptions): ApprovalVeri
       const approver = pseudonymousActorId(login, actorKey);
       const actor = deriveActor(approver, PERSON_FOR_STRENGTH[strength]);
       // The file the proof was judged on, never a path the caller offers beside it.
-      const judgedFile = subject.kind === 'holdout-plan' ? HOLDOUTS_FILE : subject.path;
+      const judgedFile = subject.kind === ApprovalSubjectKind.HoldoutPlan ? HOLDOUTS_FILE : subject.path;
       const approval = brand<ApprovalFields, 'Approval'>({
         subject: { kind: subject.kind, hash: subject.hash, ...(judgedFile === undefined ? {} : { path: judgedFile }) },
         approver, proofKind: proof.kind, strength, at,
       });
-      const recorded = events.append({ kind: 'plan.approved', subjectHash: subject.hash, proofKind: proof.kind }, actor);
+      const recorded = events.append({ kind: AuditEventKind.PlanApproved, subjectHash: subject.hash, proofKind: proof.kind }, actor);
       // An approval the audit sink did not record does not exist: it is absent, never assumed.
       if (!recorded.ok) return failure('version-control-unavailable');
       mintedApprovals.record(approval);

@@ -8,7 +8,7 @@
 // whose service is not private with a port, a command whose program a plan could choose, and an
 // environment name Revisum sets itself, each with its code and JSON path and never the value.
 import {
-  CALL_EFFECTS, COMMAND_OUTPUTS, UNSAFE_FEATURES,
+  ParameterKind, PlanErrorCode, CALL_EFFECTS, COMMAND_OUTPUTS, UNSAFE_FEATURES,
   type CommandArgument, type CommandName, type DatabaseCommandDeclaration, type DeclaredService, type PageScriptDeclaration,
   type ParameterName, type ParameterType, type SafeText, type ScriptName, type ScriptParameterType, type SecretName, type ServiceName,
   type UnsafeFeature, type UnsafeFeaturesDeclaration,
@@ -104,7 +104,7 @@ export function enabledUnsafeFeatures(declaration: UnsafeFeaturesDeclaration | u
 // An optional true or false; absent is false. Present but null is not "absent".
 function readSwitch(fields: Readonly<Record<string, unknown>>, key: string, path: string, issues: Issues): Parsed<boolean> {
   const value = Object.hasOwn(fields, key) ? fields[key] : false;
-  if (typeof value !== 'boolean') { issues.push({ code: 'wrong_type', path: `${path}.${key}` }); return INVALID; }
+  if (typeof value !== 'boolean') { issues.push({ code: PlanErrorCode.WrongType, path: `${path}.${key}` }); return INVALID; }
   return value;
 }
 
@@ -117,8 +117,8 @@ function readScriptParameters(input: unknown, path: string, issues: Issues): Par
   const parameters = readParameters(input, path, issues);
   if (parameters === INVALID) return INVALID;
   const entries = Object.entries<ParameterType>(parameters).map(([name, type]): Parsed<readonly [string, ScriptParameterType]> => {
-    if (type.kind !== 'secret') return [name, type];
-    issues.push({ code: 'unknown_value', path: `${path}.${name}.kind` });
+    if (type.kind !== ParameterKind.Secret) return [name, type];
+    issues.push({ code: PlanErrorCode.UnknownValue, path: `${path}.${name}.kind` });
     return INVALID;
   });
   return allValid(entries) ? Object.fromEntries(entries) : INVALID;
@@ -163,7 +163,7 @@ function readScriptFile(input: unknown, path: string, issues: Issues): Parsed<Sa
   if (file === INVALID) return INVALID;
   const segments = file.slice(SCRIPT_FOLDER.length).split('/');
   if (!SCRIPT_FILE.test(file) || segments.some((segment) => segment === '' || segment === '.' || segment === '..')) {
-    issues.push({ code: 'path_not_allowed', path });
+    issues.push({ code: PlanErrorCode.PathNotAllowed, path });
     return INVALID;
   }
   return file;
@@ -189,7 +189,7 @@ function readCommand(input: unknown, path: string, context: UnsafeFeaturesContex
   const output = readOneOf(fields['output'], `${path}.output`, issues, COMMAND_OUTPUTS);
   // Only JSON output has fields to read.
   const hasFields = Object.hasOwn(fields, 'fields');
-  if (hasFields && output === 'none') { issues.push({ code: 'unknown_field', path: `${path}.fields` }); return INVALID; }
+  if (hasFields && output === 'none') { issues.push({ code: PlanErrorCode.UnknownField, path: `${path}.fields` }); return INVALID; }
   const outputFields = hasFields ? readFieldPointers(fields['fields'], `${path}.fields`, issues) : undefined;
   const environment = Object.hasOwn(fields, 'environment')
     ? readEnvironmentVariables(fields['environment'], `${path}.environment`, issues, context.secretNames) : undefined;
@@ -221,9 +221,9 @@ function readCommand(input: unknown, path: string, context: UnsafeFeaturesContex
 // A declared service that may resolve to a private address and names the one port the command may
 // reach. Any other service is refused: a command's network reaches nothing else.
 function readCommandService(input: unknown, path: string, context: UnsafeFeaturesContext): Parsed<ServiceName> {
-  if (typeof input !== 'string') { context.issues.push({ code: 'wrong_type', path }); return INVALID; }
+  if (typeof input !== 'string') { context.issues.push({ code: PlanErrorCode.WrongType, path }); return INVALID; }
   const found = context.services.find((service) => service.name === input);
-  if (found === undefined || !found.private || found.port === undefined) { context.issues.push({ code: 'unknown_value', path }); return INVALID; }
+  if (found === undefined || !found.private || found.port === undefined) { context.issues.push({ code: PlanErrorCode.UnknownValue, path }); return INVALID; }
   return found.name;
 }
 
@@ -241,7 +241,7 @@ function readArgumentVector(
       const fields = readRecord(entry, at, issues, ['$parameter']);
       if (fields === INVALID) return INVALID;
       const name = Object.keys(parameters).find((parameter) => parameter === fields['$parameter']);
-      if (name === undefined || index === 0) { issues.push({ code: 'unknown_value', path: at }); return INVALID; }
+      if (name === undefined || index === 0) { issues.push({ code: PlanErrorCode.UnknownValue, path: at }); return INVALID; }
       return { $parameter: brand<string, 'ParameterName'>(name) };
     }
     const fields = readRecord(entry, at, issues, ['literal']);
@@ -257,7 +257,7 @@ function readExitCodes(input: unknown, path: string, issues: Issues): Parsed<rea
   if (raw === INVALID) return INVALID;
   const codes = raw.map((code, index) => readInteger(code, `${path}[${index}]`, issues, 0, LARGEST_EXIT_CODE));
   if (!allValid(codes)) return INVALID;
-  if (new Set(codes).size !== codes.length) { issues.push({ code: 'duplicate', path }); return INVALID; }
+  if (new Set(codes).size !== codes.length) { issues.push({ code: PlanErrorCode.Duplicate, path }); return INVALID; }
   return codes;
 }
 
@@ -270,11 +270,11 @@ function readSelectorList(input: unknown, path: string, issues: Issues): Parsed<
   const selectors = raw.map((value, index): Parsed<SafeText> => {
     const at = `${path}[${index}]`;
     const selector = readUnscannedText(value, at, issues, MAXIMUM_SELECTOR_LENGTH);
-    if (selector !== INVALID && SELECTOR_FORBIDDEN_CHARACTERS.test(selector)) { issues.push({ code: 'unsafe_text', path: at }); return INVALID; }
+    if (selector !== INVALID && SELECTOR_FORBIDDEN_CHARACTERS.test(selector)) { issues.push({ code: PlanErrorCode.UnsafeText, path: at }); return INVALID; }
     return selector;
   });
   if (!allValid(selectors)) return INVALID;
-  if (new Set(selectors).size !== selectors.length) { issues.push({ code: 'duplicate', path }); return INVALID; }
+  if (new Set(selectors).size !== selectors.length) { issues.push({ code: PlanErrorCode.Duplicate, path }); return INVALID; }
   return selectors;
 }
 

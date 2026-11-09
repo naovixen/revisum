@@ -1,7 +1,7 @@
 // Sealing a plan run's result: the run mode, the guarantee statement, the unsafe label (for a plan
 // using unsafe features), the approval label (for an approved plan) and the result's two hashes.
 import {
-    RunMode,
+    GuaranteeLevel, RunMode,
     type GuaranteeStatement,
     type PlanDeniedResult,
     type PlanDeniedThenErroredResult,
@@ -13,6 +13,7 @@ import {
     type UnsafeFeature,
 } from "@revisum/contracts";
 import { approvalLabel } from "../../approval/PlanStanding.ts";
+import { PlanStandingMode } from "../../approval/PlanStandingMode.ts";
 import { guaranteeStatement } from "./GuaranteeStatement.ts";
 import type { Logger } from "../logging/LoggingManifest.ts";
 import { callsServices } from "../../plan/CallsServices.ts";
@@ -83,9 +84,9 @@ const planRunGuarantees = (
 ): GuaranteeStatement => {
     const { plan, project } = context.subject;
     const hasUnrecordedReplies = callsServices(plan) && project.replay?.recordReplies !== true;
-    const isIsolated = context.ports.isolation.guaranteeLevel() === "isolated";
+    const isIsolated = context.ports.isolation.guaranteeLevel() === GuaranteeLevel.Isolated;
     return guaranteeStatement({
-        mode: "plan",
+        mode: RunMode.Plan,
         egressEnforced: isIsolated && egress.kind === RecordReadKind.Read,
         unmaskedScreenshotsKept: false,
         unsafeFeatures,
@@ -142,7 +143,7 @@ function seal(
         ...(unsafeFeatures.length === 0 ? {} : { unsafeFeatures }),
     };
     return withRunHashes(
-        standing.mode === "approved"
+        standing.mode === PlanStandingMode.Approved
             ? { ...labelled, approvalLabel: approvalLabel(standing.approval) }
             : labelled,
     );

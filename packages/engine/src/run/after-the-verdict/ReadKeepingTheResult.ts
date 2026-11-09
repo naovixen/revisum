@@ -5,6 +5,7 @@ import { RunReviewItemCode, StepCode, type Result } from "@revisum/contracts";
 import type { Logger } from "../logging/LoggingManifest.ts";
 import { errorText } from "../CodeForThrow.ts";
 import { RECORD_UNREAD, recordRead, type RecordRead } from "./RecordRead.ts";
+import { EventKind } from "../logging/LoggingManifest.ts";
 
 // The codes a failure after the verdict is logged with: a session record that could not be read, a
 // session that would not close, a request decision the browser refused or an adapter that threw, and
@@ -65,7 +66,7 @@ export function logFailureAfterTheVerdict(
     logger: Logger,
 ): void {
     try {
-        logger.log({ kind: "step.end", outcome: "failed", code, detail: errorText(error) });
+        logger.log({ kind: EventKind.StepEnd, outcome: "failed", code, detail: errorText(error) });
     } catch {
         // The log is what failed, and the result is all that is left to say it with.
     }

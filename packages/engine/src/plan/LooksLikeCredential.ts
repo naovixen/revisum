@@ -4,7 +4,7 @@
 //     passcode, token, secret or API key, in English, German or French;
 //   - text anywhere in the plan shaped like a credential: a JSON Web Token, a "Bearer" header
 //     value, or a key with a well-known issuer prefix.
-import { literalText, type Locator } from '@revisum/contracts';
+import { StructuralLocatorKind, SemanticLocatorKind, literalText, type Locator } from '@revisum/contracts';
 
 // Words that name a field holding a credential.
 const SENSITIVE_FIELD_WORDS: readonly RegExp[] = [
@@ -41,12 +41,12 @@ export const looksLikeCredential = (text: string): boolean => CREDENTIAL_SHAPES.
 // with the locator it is inside, which may name the field just as plainly.
 function locatorText(locator: Locator): string {
   switch (locator.by) {
-    case 'role': return literalText(locator.name) ?? '';
-    case 'label': return literalText(locator.label) ?? '';
-    case 'text': return literalText(locator.text) ?? '';
-    case 'testId': return literalText(locator.testId) ?? '';
-    case 'css': return [locator.selector, ...surroundingText(locator)].join(' ');
-    case 'xpath': return [locator.expression, ...surroundingText(locator)].join(' ');
+    case SemanticLocatorKind.Role: return literalText(locator.name) ?? '';
+    case SemanticLocatorKind.Label: return literalText(locator.label) ?? '';
+    case SemanticLocatorKind.Text: return literalText(locator.text) ?? '';
+    case SemanticLocatorKind.TestId: return literalText(locator.testId) ?? '';
+    case StructuralLocatorKind.Css: return [locator.selector, ...surroundingText(locator)].join(' ');
+    case StructuralLocatorKind.Xpath: return [locator.expression, ...surroundingText(locator)].join(' ');
   }
 }
 

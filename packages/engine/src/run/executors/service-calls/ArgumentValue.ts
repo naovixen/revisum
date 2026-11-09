@@ -3,6 +3,7 @@
 // asks it about run values once their text is known, and refuses any problem as
 // parameter-invalid. Either way the same rules decide.
 import type { ParameterType, SafeText } from '@revisum/contracts';
+import { ParameterKind } from '@revisum/contracts';
 
 // A value that fits its parameter: text, an integer or a boolean.
 export type ArgumentValue = SafeText | number | boolean;
@@ -33,27 +34,27 @@ function isCalendarDay(text: string): boolean {
 // secret by name, which the caller handles before it gets here.
 export function argumentProblem(type: ParameterType, value: ArgumentValue): ArgumentProblem | undefined {
   switch (type.kind) {
-    case 'text':
+    case ParameterKind.Text:
       if (typeof value !== 'string') return 'wrong_type';
       return value.length > type.maximumLength ? 'too_long' : undefined;
-    case 'identifier':
+    case ParameterKind.Identifier:
       if (typeof value !== 'string') return 'wrong_type';
       return IDENTIFIER.test(value) ? undefined : 'unknown_value';
-    case 'integer':
+    case ParameterKind.Integer:
       if (typeof value !== 'number' || !Number.isSafeInteger(value)) return 'wrong_type';
       return value < type.minimum || value > type.maximum ? 'unknown_value' : undefined;
-    case 'boolean':
+    case ParameterKind.Boolean:
       return typeof value === 'boolean' ? undefined : 'wrong_type';
-    case 'email':
+    case ParameterKind.Email:
       if (typeof value !== 'string') return 'wrong_type';
       return value.length <= MAXIMUM_EMAIL_LENGTH && EMAIL.test(value) ? undefined : 'unknown_value';
-    case 'yearMonthDay':
+    case ParameterKind.YearMonthDay:
       if (typeof value !== 'string') return 'wrong_type';
       return isCalendarDay(value) ? undefined : 'unknown_value';
-    case 'oneOf':
+    case ParameterKind.OneOf:
       if (typeof value !== 'string') return 'wrong_type';
       return type.values.includes(value) ? undefined : 'unknown_value';
-    case 'secret':
+    case ParameterKind.Secret:
       return 'wrong_type';
   }
 }
@@ -63,8 +64,8 @@ export function argumentProblem(type: ParameterType, value: ArgumentValue): Argu
 export function runValueArgument(type: ParameterType, text: SafeText): ArgumentValue | undefined {
   const value = ((): ArgumentValue | undefined => {
     switch (type.kind) {
-      case 'integer': return DECIMAL_INTEGER.test(text) ? Number(text) : undefined;
-      case 'boolean': return text === 'true' ? true : text === 'false' ? false : undefined;
+      case ParameterKind.Integer: return DECIMAL_INTEGER.test(text) ? Number(text) : undefined;
+      case ParameterKind.Boolean: return text === 'true' ? true : text === 'false' ? false : undefined;
       default: return text;
     }
   })();
@@ -82,9 +83,9 @@ const DIGITS = /^[0-9]+$/;
 // says. An integer that may be negative is left out: a minus sign after another can start a comment.
 export function isInterpolationSafe(type: ParameterType): boolean {
   switch (type.kind) {
-    case 'identifier': case 'yearMonthDay': return true;
-    case 'integer': return type.minimum >= 0;
-    case 'oneOf': return type.values.every((value) => IDENTIFIER.test(value) || DIGITS.test(value) || isCalendarDay(value));
-    case 'text': case 'email': case 'boolean': case 'secret': return false;
+    case ParameterKind.Identifier: case ParameterKind.YearMonthDay: return true;
+    case ParameterKind.Integer: return type.minimum >= 0;
+    case ParameterKind.OneOf: return type.values.every((value) => IDENTIFIER.test(value) || DIGITS.test(value) || isCalendarDay(value));
+    case ParameterKind.Text: case ParameterKind.Email: case ParameterKind.Boolean: case ParameterKind.Secret: return false;
   }
 }

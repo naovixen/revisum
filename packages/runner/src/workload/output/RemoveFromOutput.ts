@@ -9,6 +9,7 @@ import { areMountablePaths } from "../team-container/AreMountablePaths.ts";
 import { readyOutputFolder } from "./ReadyOutputFolder.ts";
 import { teamImageContainer } from "../team-container/TeamImageContainer.ts";
 import type { WorkloadLog } from "../WorkloadRefusal.ts";
+import { ImageAnswerKind, MountKind } from "../../containers/ContainerEngine.ts";
 
 const noticeOf =
     (log: WorkloadLog) =>
@@ -43,7 +44,7 @@ async function removeInContainer(context: RemovalContext, scope: ContainerLifeti
             environment: { HOME: "/tmp" },
             mounts: [
                 {
-                    kind: "folder",
+                    kind: MountKind.Folder,
                     source: removal.outputDirectory,
                     target: WORKLOAD_OUTPUT_PATH,
                     writable: true,
@@ -90,11 +91,11 @@ export async function removeFromOutput(
         return;
     }
     const answer = await engine.imageId(removal.image);
-    if (answer.kind === "unanswered") {
+    if (answer.kind === ImageAnswerKind.Unanswered) {
         cannotUseAContainer(`Docker did not answer: ${answer.problem.detail}`);
         return;
     }
-    if (answer.kind === "absent" || answer.id !== removal.image) {
+    if (answer.kind === ImageAnswerKind.Absent || answer.id !== removal.image) {
         cannotUseAContainer("the image is not on this host");
         return;
     }

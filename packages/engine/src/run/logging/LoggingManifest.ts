@@ -34,11 +34,20 @@ type FieldValue<Field extends LogField> = (typeof LOGGING_MANIFEST)[Field]['type
 // database.command: one run of a database command, by step, outcome, code, output sha256 and duration.
 // session.connection-failed: a declared origin the session could not connect to, by origin, with what to
 // tell whoever is running as its detail.
-export const EVENT_KINDS = [
-  'run.state', 'step.start', 'step.end', 'artifact', 'audit', 'network.blocked', 'service.call', 'value.remembered', 'page.script',
-  'database.command', 'session.connection-failed',
-] as const;
-export type EventKind = (typeof EVENT_KINDS)[number];
+export const EventKind = {
+  RunState: 'run.state',
+  StepStart: 'step.start',
+  StepEnd: 'step.end',
+  Artifact: 'artifact',
+  Audit: 'audit',
+  NetworkBlocked: 'network.blocked',
+  ServiceCall: 'service.call',
+  ValueRemembered: 'value.remembered',
+  PageScript: 'page.script',
+  DatabaseCommand: 'database.command',
+  SessionConnectionFailed: 'session.connection-failed',
+} as const;
+export type EventKind = (typeof EventKind)[keyof typeof EventKind];
 
 // What a caller may log: a kind plus any subset of the manifest fields.
 export type LogRecord = { readonly kind: EventKind } & {

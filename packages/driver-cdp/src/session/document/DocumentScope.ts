@@ -1,9 +1,9 @@
 // What every port of one document works with, and the rules they share for time and failure.
 import {
-    failure,
+    PageReadFailureCode, failure,
     success,
     type DriverError,
-    type DriverErrorCode,
+    DriverErrorCode,
     type PageReadFailure,
     type Result,
     type SessionEnvironment,
@@ -41,11 +41,11 @@ export type DocumentScope<Handle> = {
 };
 
 export const DIALOG_OPEN: PageReadFailure = {
-    code: "dialog-open",
+    code: PageReadFailureCode.DialogOpen,
     detail: "a dialog is open: a dialog step must answer it first",
 };
 export const SELECTOR_INVALID: DriverError = {
-    code: "selector-invalid",
+    code: DriverErrorCode.SelectorInvalid,
     detail: "the browser rejects a CSS selector or XPath expression of the locator",
 };
 
@@ -72,7 +72,7 @@ export async function inputWithinTimeout<Handle, Value>(
     const ended = await inputForAtMost(timeForTheStep(scope, stepDeadline), send);
     return ended === TIMED_OUT
         ? failure({
-              code: "timeout",
+              code: DriverErrorCode.Timeout,
               detail: `the input was still being handled after ${scope.timeout} ms`,
           })
         : success(ended);
@@ -138,7 +138,7 @@ export function failureOfRead<Handle>(
     if (error instanceof PageHeldByDialog || scope.events.openDialog() !== null) {
         return DIALOG_OPEN;
     }
-    return { code: "page-unreadable", detail: errorText(error) };
+    return { code: PageReadFailureCode.PageUnreadable, detail: errorText(error) };
 }
 
 // A read of the page never rejects: every signal the page's commands give ends here, as its failure.
@@ -171,8 +171,8 @@ export function failureOfThrow<Handle>(scope: DocumentScope<Handle>, error: unkn
     return {
         code:
             isCommandTimeout(error) || error instanceof StepOutOfTime
-                ? "timeout"
-                : "not-actionable",
+                ? DriverErrorCode.Timeout
+                : DriverErrorCode.NotActionable,
         detail: errorText(error),
     };
 }

@@ -1,7 +1,7 @@
 // The command, through exec as an argument vector, under its timeout. A command that outlives it is
 // stopped by removing its container, and the wait for that to end the command is bounded, so a daemon
 // that never answers cannot hold the run open.
-import { WorkloadStop, success, type ExecOutcome, type Result } from "@revisum/contracts";
+import { WorkloadOutcomeKind, WorkloadStop, success, type ExecOutcome, type Result } from "@revisum/contracts";
 import type { ContainerEngine, EngineProblem } from "../containers/ContainerEngine.ts";
 import type { ContainerScope } from "../containers/ContainerScope.ts";
 import type { CheckedWorkloadRequest } from "./CheckWorkloadRequest.ts";
@@ -52,10 +52,10 @@ async function stopped(
     wait.cancel();
     const { removal, ended } = progress;
     if (removal === null || !removal.ok) {
-        return { kind: "timed-out", stop: WorkloadStop.RemovalFailed, printed: printedBy(ended) };
+        return { kind: WorkloadOutcomeKind.TimedOut, stop: WorkloadStop.RemovalFailed, printed: printedBy(ended) };
     }
     return {
-        kind: "timed-out",
+        kind: WorkloadOutcomeKind.TimedOut,
         stop: ended === null ? WorkloadStop.CommandNeverSettled : WorkloadStop.Removed,
         printed: printedBy(ended),
     };
@@ -83,5 +83,5 @@ export async function runCommandUnderTimeout(
             `the command could not be run: ${first.error.detail}`,
         );
     }
-    return success({ kind: "exited", exitCode: first.value.exitCode, printed: first.value });
+    return success({ kind: WorkloadOutcomeKind.Exited, exitCode: first.value.exitCode, printed: first.value });
 }

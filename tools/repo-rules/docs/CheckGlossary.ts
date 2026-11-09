@@ -12,7 +12,7 @@
 // Runs in `npm run lint`.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { tokenize, type Token } from '../naming/LintRepository.ts';
+import { TokenKind, tokenize, type Token } from '../naming/LintRepository.ts';
 import { NAMING_LINT } from '../naming/NamingLint.ts';
 import { reportProblems } from '../ReadWorkspacePackages.ts';
 
@@ -92,19 +92,19 @@ function listCodeFiles(root: string, folder: string): string[] {
   return files;
 }
 
-const codeTokens = (root: string, file: string): Token[] => tokenize(readFileSync(join(root, file), 'utf8')).filter((token) => token.kind !== 'comment');
-const isPunctuator = (token: Token | undefined, text: string): boolean => token?.kind === 'punctuator' && token.text === text;
+const codeTokens = (root: string, file: string): Token[] => tokenize(readFileSync(join(root, file), 'utf8')).filter((token) => token.kind !== TokenKind.Comment);
+const isPunctuator = (token: Token | undefined, text: string): boolean => token?.kind === TokenKind.Punctuator && token.text === text;
 
 // The names a file exports by declaration or in an export list.
 function exportedNames(tokens: readonly Token[]): string[] {
   const names: string[] = [];
   tokens.forEach((token, index) => {
-    if (token.kind !== 'identifier' || token.text !== 'export') return;
+    if (token.kind !== TokenKind.Identifier || token.text !== 'export') return;
     let next = index + 1;
     while (MODIFIERS.has(tokens[next]?.text ?? '')) next += 1;
     const keyword = tokens[next];
     if (isPunctuator(keyword, '*')) {
-      if (tokens[next + 1]?.text === 'as' && tokens[next + 2]?.kind === 'identifier') names.push(tokens[next + 2]?.text ?? '');
+      if (tokens[next + 1]?.text === 'as' && tokens[next + 2]?.kind === TokenKind.Identifier) names.push(tokens[next + 2]?.text ?? '');
       return;
     }
     if (keyword?.text === 'type' && isPunctuator(tokens[next + 1], '{')) next += 1;
@@ -112,11 +112,11 @@ function exportedNames(tokens: readonly Token[]): string[] {
       names.push(...exportList(tokens, next).map((item) => item.exported));
       return;
     }
-    if (keyword === undefined || keyword.kind !== 'identifier') return;
+    if (keyword === undefined || keyword.kind !== TokenKind.Identifier) return;
     let nameIndex = next + 1;
     if (isPunctuator(tokens[nameIndex], '*')) nameIndex += 1;
     const name = tokens[nameIndex];
-    if ((VALUE_KEYWORDS.has(keyword.text) || keyword.text === 'type' || keyword.text === 'interface') && name?.kind === 'identifier') names.push(name.text);
+    if ((VALUE_KEYWORDS.has(keyword.text) || keyword.text === 'type' || keyword.text === 'interface') && name?.kind === TokenKind.Identifier) names.push(name.text);
   });
   return names;
 }
@@ -130,7 +130,7 @@ function exportList(tokens: readonly Token[], open: number): ExportItem[] {
   let index = open + 1;
   while (index < tokens.length && !isPunctuator(tokens[index], '}')) {
     let typeOnly = statementIsType;
-    if (tokens[index]?.text === 'type' && tokens[index + 1]?.kind === 'identifier' && !isPunctuator(tokens[index + 1], ',')) {
+    if (tokens[index]?.text === 'type' && tokens[index + 1]?.kind === TokenKind.Identifier && !isPunctuator(tokens[index + 1], ',')) {
       typeOnly = true;
       index += 1;
     }
@@ -161,13 +161,13 @@ function readDeclarations(root: string): Declarations {
     for (const name of exportedNames(tokens)) exported.add(name);
     if (!file.startsWith('packages/')) continue;
     tokens.forEach((token, index) => {
-      if (token.kind === 'string') strings.add(token.text);
+      if (token.kind === TokenKind.String) strings.add(token.text);
       const next = tokens[index + 1];
       const isKey = isPunctuator(next, ':') || (isPunctuator(next, '?') && isPunctuator(tokens[index + 2], ':'));
       // A method of an interface, type or object literal: `decide(…)` at the start of a member.
       const previous = tokens[index - 1];
       const isMethod = isPunctuator(next, '(') && (isPunctuator(previous, '{') || isPunctuator(previous, ';') || isPunctuator(previous, ',') || previous?.text === 'readonly');
-      if (token.kind === 'identifier' && (isKey || isMethod)) properties.add(token.text);
+      if (token.kind === TokenKind.Identifier && (isKey || isMethod)) properties.add(token.text);
     });
   }
   return { exported, strings, properties };
@@ -213,13 +213,13 @@ function exportedTypes(root: string, file: string, seen = new Map<string, Set<st
   const localTypes = new Set<string>();
   tokens.forEach((token, index) => {
     const name = tokens[index + 1];
-    if ((token.text === 'type' || token.text === 'interface') && token.kind === 'identifier' && name?.kind === 'identifier'
+    if ((token.text === 'type' || token.text === 'interface') && token.kind === TokenKind.Identifier && name?.kind === TokenKind.Identifier
       && (isPunctuator(tokens[index + 2], '=') || isPunctuator(tokens[index + 2], '<') || isPunctuator(tokens[index + 2], '{') || tokens[index + 2]?.text === 'extends')) {
       localTypes.add(name.text);
     }
   });
   tokens.forEach((token, index) => {
-    if (token.kind !== 'identifier' || token.text !== 'export') return;
+    if (token.kind !== TokenKind.Identifier || token.text !== 'export') return;
     let next = index + 1;
     while (MODIFIERS.has(tokens[next]?.text ?? '')) next += 1;
     const keyword = tokens[next];
@@ -227,11 +227,11 @@ function exportedTypes(root: string, file: string, seen = new Map<string, Set<st
       // `export * as name` exports a namespace object, not its types by name.
       if (tokens[next + 1]?.text === 'as') return;
       const specifier = tokens[next + 2];
-      const target = specifier?.kind === 'string' ? moduleFile(root, file, specifier.text) : undefined;
+      const target = specifier?.kind === TokenKind.String ? moduleFile(root, file, specifier.text) : undefined;
       if (target !== undefined) for (const type of exportedTypes(root, target, seen)) types.add(type);
       return;
     }
-    if ((keyword?.text === 'type' || keyword?.text === 'interface') && tokens[next + 1]?.kind === 'identifier') {
+    if ((keyword?.text === 'type' || keyword?.text === 'interface') && tokens[next + 1]?.kind === TokenKind.Identifier) {
       types.add(tokens[next + 1]?.text ?? '');
       return;
     }
@@ -241,7 +241,7 @@ function exportedTypes(root: string, file: string, seen = new Map<string, Set<st
     let close = next;
     while (close < tokens.length && !isPunctuator(tokens[close], '}')) close += 1;
     const specifier = tokens[close + 1]?.text === 'from' ? tokens[close + 2] : undefined;
-    const target = specifier?.kind === 'string' ? moduleFile(root, file, specifier.text) : undefined;
+    const target = specifier?.kind === TokenKind.String ? moduleFile(root, file, specifier.text) : undefined;
     const sourceTypes = target === undefined ? localTypes : exportedTypes(root, target, seen);
     for (const item of items) if (item.typeOnly || sourceTypes.has(item.local)) types.add(item.exported);
   });

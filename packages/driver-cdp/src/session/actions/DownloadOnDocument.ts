@@ -2,7 +2,7 @@
 // has, with the browser armed, just before the press, to save the one download it starts. A popup the click opens, or a download that is not its own,
 // fails the step with unsupported-step and nothing of it is kept.
 import {
-    failure,
+    DriverErrorCode, StepType, failure,
     type ActionGuard,
     type DownloadedFile,
     type DriverError,
@@ -37,7 +37,7 @@ export async function downloadOnDocument<Handle>(
     try {
         const clicked = await actBeforePress(
             scope,
-            { type: "click", locator },
+            { type: StepType.Click, locator },
             guard,
             async (element, at) => {
                 await armed.expectFromPress({
@@ -59,7 +59,7 @@ export async function downloadOnDocument<Handle>(
         }
         if (hasOpenedAnother()) {
             return failure({
-                code: "unsupported-step",
+                code: DriverErrorCode.UnsupportedStep,
                 detail: "something other than the click started a file, or the click opened a popup, a second page or a second download",
             });
         }

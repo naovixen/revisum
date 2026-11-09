@@ -5,7 +5,7 @@ import { PRODUCT } from '@revisum/contracts';
 import { figureSvg, SEVERITY_STYLE } from './FigureSvg.ts';
 import { LEVEL_NAMES, LEVEL_RULES, levelSeries, metricsFor, type Level } from '../model/LevelAt.ts';
 import {
-  SEVERITIES, type Criterion, type Finding, type History, type ImageMeta, type ReportInput, type Severity, type Verdict,
+  SEVERITIES, type Criterion, type Finding, type History, type ImageMeta, type ReportInput, type Severity, Verdict,
 } from '../model/ReportKind.ts';
 import { deriveView, type ImageFigure, type NumberedFinding, type ReportView } from '../model/ReportView.ts';
 import { escapeHtml, formatPercent } from '../model/CleanText.ts';
@@ -24,7 +24,7 @@ const SEVERITY_MEANING: Readonly<Record<Severity, string>> = {
 export interface EmbeddedImages { readonly dataUris: ReadonlyMap<string, string> }
 
 const severityPill = (finding: Finding): string =>
-  `<span class="sev sev-${finding.severity ?? 'none'}">${finding.severity ?? 'unrated'}${finding.status === 'needs-review' ? ' ?' : ''}</span>`;
+  `<span class="sev sev-${finding.severity ?? 'none'}">${finding.severity ?? 'unrated'}${finding.status === Verdict.NeedsReview ? ' ?' : ''}</span>`;
 const criterionLinks = (finding: Finding): string => finding.criterionIds.map((id) => escapeHtml(id)).join(', ');
 const labelledValue = (label: string, valueHtml: string): string => `<div class="kv"><strong>${label}</strong><div>${valueHtml}</div></div>`;
 const captionedTable = (key: string, captionHtml: string): string => `<p class="cap" id="cap-${key}">${captionHtml}</p><table aria-labelledby="cap-${key}">`;
@@ -70,7 +70,7 @@ function topSection(report: ReportInput, view: ReportView, images: EmbeddedImage
         + calloutList(top, 4) + `</div></section>`;
     }
   }
-  const firstFailed = view.numbered.filter((entry) => entry.finding.status === 'failed').slice(0, 5);
+  const firstFailed = view.numbered.filter((entry) => entry.finding.status === Verdict.Failed).slice(0, 5);
   const items = firstFailed.map((entry) => `<li><span class="num">${entry.number}</span> ${severityPill(entry.finding)} <span>${escapeHtml(entry.finding.caption)}</span></li>`).join('');
   return `<section id="top" aria-labelledby="h-top"><h2 id="h-top">Top problems</h2>${firstFailed.length === 0 ? '<p>No failed findings.</p>' : `<ol class="callouts">${items}</ol>`}</section>`;
 }
@@ -78,7 +78,7 @@ function topSection(report: ReportInput, view: ReportView, images: EmbeddedImage
 function findingsTable(view: ReportView): string {
   if (view.numbered.length === 0) return '<p>No findings.</p>';
   const rows = view.numbered.map((entry) => `<tr><th scope="row" class="n"><a href="#f-${entry.number}">${entry.number}</a></th><td>${severityPill(entry.finding)}</td>`
-    + `<td>${entry.finding.status === 'failed' ? 'Failed' : 'Needs review'}</td><td>${escapeHtml(entry.finding.caption)}</td><td>${criterionLinks(entry.finding)}</td>`
+    + `<td>${entry.finding.status === Verdict.Failed ? 'Failed' : 'Needs review'}</td><td>${escapeHtml(entry.finding.caption)}</td><td>${criterionLinks(entry.finding)}</td>`
     + `<td>${escapeHtml(entry.finding.rule)}</td><td>${escapeHtml(criterionText(entry.finding.criterion))}</td></tr>`);
   return `${captionedTable('findings', 'All findings, most severe first')}<thead><tr><th scope="col">#</th><th scope="col">Severity</th><th scope="col">Status</th>`
     + `<th scope="col">Finding</th><th scope="col">Spec item</th><th scope="col">Rule</th><th scope="col">Criterion</th></tr></thead><tbody>${rows.join('')}</tbody></table>`;
@@ -116,7 +116,7 @@ function findingCard(entry: NumberedFinding): string {
   const criteria = finding.criterionIds.map((id) => escapeHtml(id)).join(', ');
   return `<article class="card c-${finding.severity ?? 'none'}" id="f-${entry.number}" aria-labelledby="h-f-${entry.number}">`
     + `<h3 id="h-f-${entry.number}"><span class="num">${entry.number}</span> ${severityPill(finding)} ${escapeHtml(finding.title)}</h3>`
-    + labelledValue('Status', finding.status === 'failed' ? 'Failed' : 'Needs review')
+    + labelledValue('Status', finding.status === Verdict.Failed ? 'Failed' : 'Needs review')
     + labelledValue('Severity', finding.severity ?? 'unrated')
     + labelledValue('Rule or probe', escapeHtml(finding.rule)) + labelledValue('Criterion', escapeHtml(criterionText(finding.criterion)))
     + (criteria ? labelledValue('Acceptance criteria', criteria) : '')

@@ -2,7 +2,7 @@
 // field by its JSON pointer. Nothing here keeps the body: a run records only its status and sha256
 // until redacted excerpts land.
 import {
-  failure, success,
+  BackendAssertionKind, failure, success,
   type BackendAssertion, type CallDeclaration, type JsonPointer, type ResponseReadErrorCode, type Result, type SafeText, type ServiceResponse,
 } from '@revisum/contracts';
 
@@ -62,14 +62,14 @@ export const fieldText = (value: unknown): string | undefined =>
 // names nothing; `expected` is the check's text with any value reference already resolved.
 export function checkBackendField(assertion: BackendAssertion, found: { readonly value: unknown } | undefined, expected: SafeText | null): boolean {
   switch (assertion.kind) {
-    case 'present': return found !== undefined;
-    case 'absent': return found === undefined;
-    case 'numberEquals': return typeof found?.value === 'number' && found.value === assertion.value;
-    case 'equals': case 'contains': {
+    case BackendAssertionKind.Present: return found !== undefined;
+    case BackendAssertionKind.Absent: return found === undefined;
+    case BackendAssertionKind.NumberEquals: return typeof found?.value === 'number' && found.value === assertion.value;
+    case BackendAssertionKind.Equals: case BackendAssertionKind.Contains: {
       const text = found === undefined ? undefined : fieldText(found.value);
       if (text === undefined || expected === null) return false;
       // Backend data is not rendered text, so it is compared exactly, spaces and case included.
-      return assertion.kind === 'equals' ? text === expected : text.includes(expected);
+      return assertion.kind === BackendAssertionKind.Equals ? text === expected : text.includes(expected);
     }
   }
 }

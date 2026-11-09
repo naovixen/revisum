@@ -25,6 +25,7 @@ import {
     logFailureAfterTheVerdict,
     readKeepingTheResult,
 } from "./ReadKeepingTheResult.ts";
+import { EventKind } from "../logging/LoggingManifest.ts";
 
 export type AfterTheVerdict = {
     readonly cleanup: readonly CleanupResult[] | undefined;
@@ -130,7 +131,7 @@ function logTheEnd(
     readKeepingTheResult(
         () => {
             for (const { origin, message } of readValueOr(connectionFailures, [])) {
-                logger.log({ kind: "session.connection-failed", origin, detail: message });
+                logger.log({ kind: EventKind.SessionConnectionFailed, origin, detail: message });
             }
         },
         undefined,
@@ -139,10 +140,10 @@ function logTheEnd(
     readKeepingTheResult(
         () => {
             for (const origin of blocked) {
-                logger.log({ kind: "network.blocked", origin });
+                logger.log({ kind: EventKind.NetworkBlocked, origin });
             }
             logger.log({
-                kind: "run.state",
+                kind: EventKind.RunState,
                 state: end.state,
                 targetId: context.cleared.target.id,
                 ...(end.kind === EndOfTheRunKind.WithDenial

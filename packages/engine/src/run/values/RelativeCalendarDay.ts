@@ -2,7 +2,8 @@
 // and locale data are fixed by the Node version the run manifest records, so no date library is
 // needed and the same inputs always give the same dates. Days are counted with Date.UTC as plain
 // calendar arithmetic, so 31 January plus one day is 1 February whatever the time zone.
-import type { DateAnchor, DateFormat, Locale, RelativeDay, TimeZone } from '@revisum/contracts';
+import type { Locale, RelativeDay, TimeZone } from '@revisum/contracts';
+import { DateFormat, DateAnchor } from '@revisum/contracts';
 
 // A day on the calendar. month is 1 to 12.
 type CalendarDay = { readonly year: number; readonly month: number; readonly day: number };
@@ -67,14 +68,14 @@ const MONDAY = 1;
 function anchorDay(anchor: DateAnchor, clockStart: number, timezone: TimeZone): CalendarDay {
   const today = calendarDayAt(clockStart, timezone);
   switch (anchor) {
-    case 'today': return today;
-    case 'startOfWeek': {
+    case DateAnchor.Today: return today;
+    case DateAnchor.StartOfWeek: {
       // Weeks start on Monday: getUTCDay counts from Sunday as 0.
       const weekday = new Date(Date.UTC(today.year, today.month - 1, today.day)).getUTCDay();
       return addDays(today, -((weekday - MONDAY + DAYS_PER_WEEK) % DAYS_PER_WEEK));
     }
-    case 'startOfMonth': return { ...today, day: 1 };
-    case 'startOfNextMonth': return addDays({ year: today.year, month: today.month + 1, day: 1 }, 0);
+    case DateAnchor.StartOfMonth: return { ...today, day: 1 };
+    case DateAnchor.StartOfNextMonth: return addDays({ year: today.year, month: today.month + 1, day: 1 }, 0);
   }
 }
 
@@ -98,11 +99,11 @@ const LOCALE_FORMATS: { readonly [Format in 'monthAndYear' | 'longDate' | 'weekd
 // `timezone`; the locale formats use the target's locale through Intl.
 export function formatCalendarDay(day: CalendarDay, format: DateFormat, locale: Locale, timezone: TimeZone): string {
   switch (format) {
-    case 'yearMonthDay': return `${String(day.year).padStart(4, '0')}-${twoDigits(day.month)}-${twoDigits(day.day)}`;
-    case 'dayOfMonth': return String(day.day);
-    case 'timestamp': return new Date(instantOf(day, 0, 0, timezone)).toISOString();
-    case 'epochMilliseconds': return String(instantOf(day, 0, 0, timezone));
-    case 'monthAndYear': case 'longDate': case 'weekday':
+    case DateFormat.YearMonthDay: return `${String(day.year).padStart(4, '0')}-${twoDigits(day.month)}-${twoDigits(day.day)}`;
+    case DateFormat.DayOfMonth: return String(day.day);
+    case DateFormat.Timestamp: return new Date(instantOf(day, 0, 0, timezone)).toISOString();
+    case DateFormat.EpochMilliseconds: return String(instantOf(day, 0, 0, timezone));
+    case DateFormat.MonthAndYear: case DateFormat.LongDate: case DateFormat.Weekday:
       return new Intl.DateTimeFormat(locale, { ...LOCALE_FORMATS[format], timeZone: 'UTC' }).format(noonOf(day));
   }
 }

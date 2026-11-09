@@ -32,7 +32,8 @@ import {
 } from '@revisum/engine';
 import type { ProxyRulesRefusal, ProxyStartFailure } from '@revisum/runner';
 import { CLI_OUTPUT_SCHEMA, cliError, exitCodeFor, type CliError, type CliOutput, type CommandOutcome } from '../output/CliOutput.ts';
-import { crawlInBrowser, crawlInRunner, crawlTarget, type CrawlStop, type IsolatedRunner, type LoginRunner } from '../explore/CrawlInBrowser.ts';
+import { crawlInBrowser, crawlInRunner, crawlTarget, CrawlStop, type IsolatedRunner, type LoginRunner } from '../explore/CrawlInBrowser.ts';
+import { ProvenanceBasis, PlanFormat, GuaranteeLevel } from '@revisum/contracts';
 
 // What a planner call came to: its reply, or why there is none, and what went wrong with the egress
 // proxy it went through, if anything did. `proxy-failed` means the proxy never ran.
@@ -298,10 +299,10 @@ function clearedLogin(path: string, project: Project, target: Target, ports: Dra
 // A crawl that ran and crashed is told apart from a runner that could not run it by what the error
 // says, since a crawl's stop is the run's concern and the published error codes don't change here.
 function crawlStop(code: CrawlStop, closeFailure: string | null): Stop {
-  if (code === 'explore-crawl-crashed') {
+  if (code === CrawlStop.ExploreCrawlCrashed) {
     return { ...stop('explore-runner-unavailable', '--explore', closeFailure), stopped: { ...cliError('explore-runner-unavailable', '--explore'), reason: 'the crawl started in the run container and then crashed' } };
   }
-  return stop(code, code === 'plan-rejected' ? '--after' : '--explore', closeFailure);
+  return stop(code, code === CrawlStop.PlanRejected ? '--after' : '--explore', closeFailure);
 }
 
 async function exploreSite(explore: ExploreArguments, prepared: Prepared, ports: DraftCommandPorts): Promise<Explored | Stop> {
@@ -318,7 +319,7 @@ async function exploreSite(explore: ExploreArguments, prepared: Prepared, ports:
 
   if (explore.host) {
     const crawled = await crawlInBrowser(ports.browser, {
-      redactor, secrets: ports.secrets, audit: ports.events, options: { ...bounds, placement: 'host' },
+      redactor, secrets: ports.secrets, audit: ports.events, options: { ...bounds, placement: GuaranteeLevel.Host },
       ...(login === undefined ? { project, target } : { login: login.cleared, runLogin: ports.runLogin }),
     });
     return crawled.ok
@@ -370,9 +371,9 @@ async function draft(options: DraftArguments, ports: DraftCommandPorts): Promise
   const content = explored === undefined ? text.value : `${EXPLORE_NOTICE}${text.value}`;
   const reference = explored === undefined ? prepared.specPath : pageMapReference(explored.text);
   const source: Extract<PlanSource, 'draft-command' | 'explore-draft'> = explored === undefined ? 'draft-command' : 'explore-draft';
-  const drafted: PlanDraft = { format: 'text', content };
+  const drafted: PlanDraft = { format: PlanFormat.Text, content };
   const admitted = admitCoreDraft(drafted, { source, ...(reference === undefined ? {} : { reference }) }, planParser(project), ports.events);
-  const provenance: PlanProvenance = { source, basis: 'core-recorded', ...(reference === undefined ? {} : { reference }) };
+  const provenance: PlanProvenance = { source, basis: ProvenanceBasis.CoreRecorded, ...(reference === undefined ? {} : { reference }) };
   let warnings: readonly DraftWarning[] = [];
   if (explored !== undefined && admitted.ok) {
     const reading = readPlanText(content, project.limits);

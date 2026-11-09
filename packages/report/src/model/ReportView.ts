@@ -1,6 +1,6 @@
 // Derives everything the renderers show from the model, once, in one place. Pure.
 import { usableBox, type Callout } from '../render/FigureSvg.ts';
-import { SEVERITIES, type AcceptanceCriterion, type Finding, type ReportInput, type Severity, type Verdict } from './ReportKind.ts';
+import { SEVERITIES, type AcceptanceCriterion, type Finding, type ReportInput, type Severity, Verdict } from './ReportKind.ts';
 
 export interface NumberedFinding { readonly number: number; readonly finding: Finding }
 export interface ImageFigure {
@@ -25,7 +25,7 @@ const severityRank = (severity: Severity | null): number => (severity === null ?
 export function orderFindings(findings: readonly Finding[]): readonly NumberedFinding[] {
   return findings
     .map((finding, index) => ({ finding, index }))
-    .sort((left, right) => (left.finding.status === right.finding.status ? 0 : left.finding.status === 'failed' ? -1 : 1)
+    .sort((left, right) => (left.finding.status === right.finding.status ? 0 : left.finding.status === Verdict.Failed ? -1 : 1)
       || severityRank(left.finding.severity) - severityRank(right.finding.severity) || left.index - right.index)
     .map((entry, position) => ({ number: position + 1, finding: entry.finding }));
 }
@@ -39,7 +39,7 @@ export function deriveView(report: ReportInput): ReportView {
   const numbered = orderFindings(report.findings);
   const counts = countVerdicts(report.acceptance);
   const overall: Verdict = counts.failed > 0 ? 'failed' : counts.needsReview > 0 ? 'needs-review' : 'passed';
-  const failedSeverities = numbered.filter((entry) => entry.finding.status === 'failed').map((entry) => entry.finding.severity);
+  const failedSeverities = numbered.filter((entry) => entry.finding.status === Verdict.Failed).map((entry) => entry.finding.severity);
   const highest = SEVERITIES.find((severity) => failedSeverities.includes(severity)) ?? null;
   const figures: ImageFigure[] = report.images.map((image) => {
     const onImage = numbered.filter((entry) => entry.finding.image?.imageId === image.id);
@@ -54,13 +54,13 @@ export function deriveView(report: ReportInput): ReportView {
   });
   // The top-problem screenshot: the best failed severity among its callouts, then the most callouts, then input order.
   const bestRank = (figure: ImageFigure): number =>
-    Math.min(9, ...figure.callouts.filter((callout) => callout.finding.status === 'failed').map((callout) => severityRank(callout.finding.severity)));
+    Math.min(9, ...figure.callouts.filter((callout) => callout.finding.status === Verdict.Failed).map((callout) => severityRank(callout.finding.severity)));
   const candidates = figures.map((figure, index) => ({ figure, index }))
-    .filter((entry) => entry.figure.callouts.some((callout) => callout.finding.status === 'failed'));
+    .filter((entry) => entry.figure.callouts.some((callout) => callout.finding.status === Verdict.Failed));
   candidates.sort((left, right) => bestRank(left.figure) - bestRank(right.figure)
     || right.figure.callouts.length - left.figure.callouts.length || left.index - right.index);
   return {
     numbered, counts, overall, highest, figures, top: candidates[0]?.figure ?? null,
-    review: numbered.filter((entry) => entry.finding.status === 'needs-review'),
+    review: numbered.filter((entry) => entry.finding.status === Verdict.NeedsReview),
   };
 }

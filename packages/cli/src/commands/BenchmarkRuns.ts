@@ -4,7 +4,7 @@
 // and every process it started (Chromium), sampled from /proc every 100 ms. tools/scheduled/BenchmarkRuns.ts
 // calls this and compares the medians with the stored Linux baseline; it is never a gate.
 import {
-  failure, loadTrustedProject, parseBaseUrl, planParser, policyGate, sha256, success,
+  EventKind, failure, loadTrustedProject, parseBaseUrl, planParser, policyGate, sha256, success,
   type FixtureReference, type LoggedEvent, type RunEventSink, type VersionControlPort,
 } from '@revisum/engine';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -12,6 +12,7 @@ import { createServer, type Server } from 'node:http';
 import { arch, platform } from 'node:os';
 import { extname, join } from 'node:path';
 import { buildAdapters } from '../wiring/BuildAdapters.ts';
+import { TerminalState } from '@revisum/contracts';
 
 export type BenchmarkSample = { readonly setupMilliseconds: number; readonly peakMemoryMegabytes: number };
 export type BenchmarkRunsOptions = {
@@ -148,7 +149,7 @@ export async function benchmarkRuns(options: BenchmarkRunsOptions): Promise<Benc
       const events: LoggedEvent[] = [];
       const sink: RunEventSink = {
         append(event) {
-          if (timing.firstStep === null && event.kind === 'step.start') timing.firstStep = performance.now();
+          if (timing.firstStep === null && event.kind === EventKind.StepStart) timing.firstStep = performance.now();
           events.push(event);
         },
         read: () => [...events],
@@ -160,7 +161,7 @@ export async function benchmarkRuns(options: BenchmarkRunsOptions): Promise<Benc
         const result = await ports.runService(sink).run(decision.run, {
           baseUrl: baseUrl.value, seed: 42, fixedTimeMilliseconds: Date.UTC(2026, 0, 15, 10, 30), fixtures, host: { platform: platform(), arch: arch() },
         });
-        if (result.state !== 'Passed') throw new Error(`benchmark run ${index + 1} ended ${result.state}`);
+        if (result.state !== TerminalState.Passed) throw new Error(`benchmark run ${index + 1} ended ${result.state}`);
       } finally {
         clearInterval(sampler);
       }

@@ -3,7 +3,7 @@
 import type {
   Finding, PageDriver, PageSnapshot, Rule, RuleRun, ScanResult, TabWalk, TargetResult,
 } from '../rules/Rule.ts';
-import { isStaticRule, pageOutcome } from '../rules/Rule.ts';
+import { Outcome, isStaticRule, pageOutcome } from '../rules/Rule.ts';
 import { INTERACTIVE_RULES } from '../rules/InteractiveRules.ts';
 import { STATIC_RULES, ariaHiddenFocusRule, textContrastRule } from '../rules/StaticRules.ts';
 import { boxOf, selectorFor } from '../page/InAccessibilityTree.ts';
@@ -22,7 +22,7 @@ const roundToHundredths = (value: number): number => Math.round(value * 100) / 1
 function toFindings(page: string, snapshot: PageSnapshot, rule: Rule, targets: TargetResult[], walk: TabWalk | null): Finding[] {
   const findings: Finding[] = [];
   for (const target of targets) {
-    if (target.outcome === 'passed') continue;
+    if (target.outcome === Outcome.Passed) continue;
     const node = snapshot.nodes[target.node];
     if (!node) continue;
     const box = walk?.boxes.get(target.node) ?? boxOf(snapshot, node);

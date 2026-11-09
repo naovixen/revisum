@@ -1,6 +1,6 @@
 // The only entry point for untrusted input, such as a plan an AI proposed.
 import {
-    RejectedState,
+    PolicyVerdictKind, RejectedState,
     TerminalState,
     UnavailableReason,
     type Plan,
@@ -68,7 +68,7 @@ export async function runUntrusted(
     // One result per target the plan names, in its order: one the matrix does not declare ends
     // TargetUnavailable with not-declared.
     const decision = gate.decide(parsed.value, parsed.value.targets, standing);
-    if (decision.kind === "deny") {
+    if (decision.kind === PolicyVerdictKind.Deny) {
         return {
             kind: UntrustedRunOutcomeKind.Denied,
             state: TerminalState.Denied,

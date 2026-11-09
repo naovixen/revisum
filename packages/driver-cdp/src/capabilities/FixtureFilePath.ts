@@ -1,6 +1,6 @@
 // The project's declared fixtures, which an upload step sends and a stub serves, and never a file
 // outside their folder.
-import { failure, success, type DriverError, type Result } from "@revisum/contracts";
+import { DriverErrorCode, failure, success, type DriverError, type Result } from "@revisum/contracts";
 import { readFileSync, realpathSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
 import { errorText } from "../connection/ErrorText.ts";
@@ -13,7 +13,7 @@ export function fixtureFilePath(
 ): Result<string, DriverError> {
     if (fixturesFolder === undefined) {
         return failure({
-            code: "unsupported-step",
+            code: DriverErrorCode.UnsupportedStep,
             detail: "this driver was given no fixtures folder to upload from",
         });
     }
@@ -24,14 +24,14 @@ export function fixtureFilePath(
         file = realpathSync(resolve(folder, fixture));
     } catch {
         return failure({
-            code: "not-found",
+            code: DriverErrorCode.NotFound,
             detail: "the fixture file is not in the fixtures folder",
         });
     }
     const inside = relative(folder, file);
     if (inside === "" || inside.startsWith("..") || isAbsolute(inside)) {
         return failure({
-            code: "not-actionable",
+            code: DriverErrorCode.NotActionable,
             detail: "the fixture leads outside the fixtures folder",
         });
     }
@@ -51,7 +51,7 @@ export function readFixture(
         return success(readFileSync(path.value));
     } catch (error) {
         return failure({
-            code: "not-found",
+            code: DriverErrorCode.NotFound,
             detail: `the fixture could not be read: ${errorText(error)}`,
         });
     }

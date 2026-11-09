@@ -13,6 +13,7 @@ import { join } from 'node:path';
 import type { Token } from '../naming/LintRepository.ts';
 import { codeTokens, isIdentifier, isPunctuator, listSourceFiles } from '../ListSourceFiles.ts';
 import { reportProblems } from '../ReadWorkspacePackages.ts';
+import { TokenKind } from '../naming/LintRepository.ts';
 
 const PLAN_PARSE = 'packages/engine/src/plan/parse';
 const PLAN_PARSER = `${PLAN_PARSE}/PlanParser.ts`;
@@ -123,7 +124,7 @@ function brandedTypeNames(fileTokens: readonly (readonly Token[])[]): Set<string
   for (const tokens of fileTokens) {
     tokens.forEach((token, index) => {
       const name = tokens[index + 1];
-      if (isIdentifier(token, 'type') && name?.kind === 'identifier'
+      if (isIdentifier(token, 'type') && name?.kind === TokenKind.Identifier
         && isPunctuator(tokens[index + 2], '=') && isIdentifier(tokens[index + 3], 'Brand')) names.add(name.text);
     });
   }
@@ -140,7 +141,7 @@ function brandCallName(tokens: readonly Token[], openIndex: number): string | un
     if (isPunctuator(token, '<')) depth += 1;
     // A ">" straight after "=" closes an arrow in a function type, not the type arguments.
     else if (isPunctuator(token, '>') && !isPunctuator(tokens[index - 1], '=')) depth -= 1;
-    else if (token?.kind === 'string' && depth === 1) name = token.text;
+    else if (token?.kind === TokenKind.String && depth === 1) name = token.text;
     if (depth === 0) return name;
   }
   return undefined;
@@ -189,10 +190,10 @@ function readType(tokens: readonly Token[], start: number): TypeRead {
       isTypeExpected = true;
     } else if (open.length === 0 && !isTypeExpected && !continuesType(tokens, index)) {
       break;
-    } else if (token.kind === 'punctuator' && closer !== undefined) {
+    } else if (token.kind === TokenKind.Punctuator && closer !== undefined) {
       open.push({ closer, namesBefore: names.length });
       isTypeExpected = true;
-    } else if (token.kind === 'punctuator' && [...TYPE_BRACKETS.values()].includes(token.text)) {
+    } else if (token.kind === TokenKind.Punctuator && [...TYPE_BRACKETS.values()].includes(token.text)) {
       const closed = open.pop();
       if (closed?.closer !== token.text) {
         break;
@@ -201,16 +202,16 @@ function readType(tokens: readonly Token[], start: number): TypeRead {
         names.splice(closed.namesBefore);
       }
       isTypeExpected = false;
-    } else if (token.kind === 'punctuator') {
+    } else if (token.kind === TokenKind.Punctuator) {
       if (token.text === ';' && open.at(-1)?.closer !== '}') {
         break;
       }
       isTypeExpected = true;
-    } else if (token.kind !== 'identifier' || !WORDS_BEFORE_A_TYPE.has(token.text)) {
+    } else if (token.kind !== TokenKind.Identifier || !WORDS_BEFORE_A_TYPE.has(token.text)) {
       const previous = tokens[index - 1];
       const isQueried = isIdentifier(previous, 'keyof') || isIdentifier(previous, 'typeof');
       const isPropertyName = isPunctuator(tokens[index + 1], ':') || (isPunctuator(tokens[index + 1], '?') && isPunctuator(tokens[index + 2], ':'));
-      if (token.kind === 'identifier' && !isQueried && !isPropertyName) {
+      if (token.kind === TokenKind.Identifier && !isQueried && !isPropertyName) {
         names.push(token.text);
       }
       isTypeExpected = false;
@@ -223,7 +224,7 @@ function readType(tokens: readonly Token[], start: number): TypeRead {
 // when the ":" at `index` starts such an annotation, on a name or a destructuring pattern.
 function annotatesWhatJsonParseReturns(tokens: readonly Token[], index: number, end: number): boolean {
   const annotated = tokens[index - 1];
-  const isAnnotation = annotated?.kind === 'identifier' || isPunctuator(annotated, '}') || isPunctuator(annotated, ']');
+  const isAnnotation = annotated?.kind === TokenKind.Identifier || isPunctuator(annotated, '}') || isPunctuator(annotated, ']');
   return isAnnotation && isPunctuator(tokens[end], '=')
     && isIdentifier(tokens[end + 1], 'JSON') && isPunctuator(tokens[end + 2], '.') && isIdentifier(tokens[end + 3], 'parse');
 }
@@ -256,8 +257,8 @@ function brandCreations(tokens: readonly Token[], brands: ReadonlySet<string>): 
       // After an arrow an expression starts.
       const isAfterArrow = isPunctuator(previous, '>') && isPunctuator(tokens[index - 2], '=');
       const isExpressionStart = previous === undefined || isAfterArrow
-        || (previous.kind === 'punctuator' && ![')', ']', '>', '.'].includes(previous.text))
-        || (previous.kind === 'identifier' && KEYWORDS_BEFORE_EXPRESSION.has(previous.text));
+        || (previous.kind === TokenKind.Punctuator && ![')', ']', '>', '.'].includes(previous.text))
+        || (previous.kind === TokenKind.Identifier && KEYWORDS_BEFORE_EXPRESSION.has(previous.text));
       // `<T extends Name>(…) => …` and `<T, U>(…) => …` declare type parameters; they make no value.
       const isTypeParameterList = isIdentifier(tokens[index + 2], 'extends') || isPunctuator(tokens[index + 2], ',') || isPunctuator(tokens[index + 2], '=');
       if (isExpressionStart && !isTypeParameterList) {

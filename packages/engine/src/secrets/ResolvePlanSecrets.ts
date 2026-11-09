@@ -6,7 +6,7 @@
 // manifest records, and each fill of a secret its secret; their values stay inside the opaque Secret
 // objects.
 import {
-  failure, NavigateScripts, success,
+  StepType, failure, NavigateScripts, success,
   type CallDeclaration, type CallName, type CommandName, type DatabaseCommandDeclaration, type Plan, type Redactor, type Result, type Secret, type SecretName, type SecretStore, type Step, type SecretRecord, type StorageStateRecord,
 } from '@revisum/contracts';
 import { sha256 } from '../foundation/Sha256.ts';
@@ -39,7 +39,7 @@ type ResolveName = (name: SecretName) => Result<Secret, SecretName>;
 function callSecretNames(plan: Plan, calls: Readonly<Record<CallName, CallDeclaration>>): SecretName[] {
   const steps = [...plan.steps, ...(plan.cleanup ?? [])];
   return steps.flatMap((step) => {
-    if (step.type !== 'call' && step.type !== 'expectBackend') return [];
+    if (step.type !== StepType.Call && step.type !== StepType.ExpectBackend) return [];
     const declaration = Object.entries(calls).find(([name]) => name === step.call)?.[1];
     const headers = Object.values(declaration?.headers ?? {}).flatMap((header) => ('secretName' in header ? [header.secretName] : []));
     const passed = Object.values(step.arguments).flatMap((argument) => (typeof argument === 'object' && 'secretName' in argument ? [argument.secretName] : []));
@@ -64,14 +64,14 @@ function runStepsOf(steps: readonly Step[], resolveName: ResolveName): Result<Ru
 
 function runStepOf(step: Step, resolveName: ResolveName): Result<RunStep, SecretName> {
   switch (step.type) {
-    case 'frame':
-    case 'newTab': {
+    case StepType.Frame:
+    case StepType.NewTab: {
       const inner = runStepsOf(step.steps, resolveName);
       return inner.ok ? success({ ...step, steps: inner.value }) : inner;
     }
-    case 'navigate':
+    case StepType.Navigate:
       return success({ ...step, navigation: { scripts: step.scripts ?? NavigateScripts.Enabled } });
-    case 'fill': {
+    case StepType.Fill: {
       const value = step.value;
       if (typeof value === 'string' || !('secretName' in value)) {
         return success({ ...step, value });
@@ -79,15 +79,15 @@ function runStepOf(step: Step, resolveName: ResolveName): Result<RunStep, Secret
       const secret = resolveName(value.secretName);
       return secret.ok ? success({ ...step, value, secret: secret.value }) : secret;
     }
-    case 'click': case 'hover': case 'select': case 'upload': case 'press': case 'dialog':
-    case 'expect': case 'expectPage': case 'a11yAudit': case 'capture': case 'remember':
-    case 'download': case 'expectDownload':
-    case 'call': case 'expectBackend':
-    case 'stub': case 'resetRequests': case 'expectRequests': case 'expectResponse':
-    case 'setStorage': case 'removeStorage': case 'expectStorage':
-    case 'advanceClock': case 'expectClipboard':
-    case 'evaluate': case 'expectScript':
-    case 'database': case 'expectDatabase':
+    case StepType.Click: case StepType.Hover: case StepType.Select: case StepType.Upload: case StepType.Press: case StepType.Dialog:
+    case StepType.Expect: case StepType.ExpectPage: case StepType.A11yAudit: case StepType.Capture: case StepType.Remember:
+    case StepType.Download: case StepType.ExpectDownload:
+    case StepType.Call: case StepType.ExpectBackend:
+    case StepType.Stub: case StepType.ResetRequests: case StepType.ExpectRequests: case StepType.ExpectResponse:
+    case StepType.SetStorage: case StepType.RemoveStorage: case StepType.ExpectStorage:
+    case StepType.AdvanceClock: case StepType.ExpectClipboard:
+    case StepType.Evaluate: case StepType.ExpectScript:
+    case StepType.Database: case StepType.ExpectDatabase:
       return success(step);
   }
 }
@@ -96,7 +96,7 @@ function runStepOf(step: Step, resolveName: ResolveName): Result<RunStep, Secret
 // too, in plan order.
 function stubAndStorageSecretNames(steps: readonly Step[]): SecretName[] {
   return stepsWithin(steps).flatMap((step) => {
-    if (step.type !== 'stub' && step.type !== 'setStorage') return [];
+    if (step.type !== StepType.Stub && step.type !== StepType.SetStorage) return [];
     return Object.values(step.arguments ?? {}).flatMap((argument) => (typeof argument === 'object' && 'secretName' in argument ? [argument.secretName] : []));
   });
 }
@@ -106,7 +106,7 @@ function stubAndStorageSecretNames(steps: readonly Step[]): SecretName[] {
 function commandSecretNames(plan: Plan, commands: Readonly<Record<CommandName, DatabaseCommandDeclaration>>): SecretName[] {
   const steps = [...plan.steps, ...(plan.cleanup ?? [])];
   return steps.flatMap((step) => {
-    if (step.type !== 'database' && step.type !== 'expectDatabase') return [];
+    if (step.type !== StepType.Database && step.type !== StepType.ExpectDatabase) return [];
     const declaration = Object.entries(commands).find(([name]) => name === step.command)?.[1];
     return Object.values(declaration?.environment ?? {}).flatMap((value) => ('secretName' in value ? [value.secretName] : []));
   });

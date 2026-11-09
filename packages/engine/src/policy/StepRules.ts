@@ -2,7 +2,7 @@
 // and as it acts, in one table. Every
 // step type has an entry, so a new type does not compile until someone decides what may deny it:
 // nothing is allowed by default for want of a case.
-import { literalText } from "@revisum/contracts";
+import { DialogAction, CallEffect, StubAction, StructuralLocatorKind, SemanticLocatorKind, literalText } from "@revisum/contracts";
 import type {
     AllowedUrl,
     DatabaseCommandStep,
@@ -75,15 +75,15 @@ const isBlank = (text: string | null): boolean => text === null || isBlankName(t
 // and a value reference has none until the run; the runtime guard then sees the element's name.
 function locatorName(locator: Locator): string | null {
     switch (locator.by) {
-        case "role":
+        case SemanticLocatorKind.Role:
             return literalText(locator.name) ?? null;
-        case "label":
+        case SemanticLocatorKind.Label:
             return literalText(locator.label) ?? null;
-        case "text":
+        case SemanticLocatorKind.Text:
             return literalText(locator.text) ?? null;
-        case "testId":
-        case "css":
-        case "xpath":
+        case SemanticLocatorKind.TestId:
+        case StructuralLocatorKind.Css:
+        case StructuralLocatorKind.Xpath:
             return null;
     }
 }
@@ -91,14 +91,14 @@ function locatorName(locator: Locator): string | null {
 // The selector or expression of a css or XPath locator; undefined for any other.
 function structuralQuery(locator: Locator): SafeText | undefined {
     switch (locator.by) {
-        case "css":
+        case StructuralLocatorKind.Css:
             return locator.selector;
-        case "xpath":
+        case StructuralLocatorKind.Xpath:
             return locator.expression;
-        case "role":
-        case "label":
-        case "text":
-        case "testId":
+        case SemanticLocatorKind.Role:
+        case SemanticLocatorKind.Label:
+        case SemanticLocatorKind.Text:
+        case SemanticLocatorKind.TestId:
             return undefined;
     }
 }
@@ -190,7 +190,7 @@ function proposalSideEffectRule(
 const stubRule = (step: StubStep, context: StaticContext): PolicyRuleId | null =>
     proposalSideEffectRule(
         Object.entries(context.project.stubs).find(([name]) => name === step.stub)?.[1],
-        step.action === "start",
+        step.action === StubAction.Start,
         context,
     );
 
@@ -220,7 +220,7 @@ function scriptRule(step: PageScriptStep, context: StaticContext): PolicyRuleId 
     if (declaration === undefined) {
         return "undeclared-origin";
     }
-    return !context.approved && declaration.effect === "write" && !declaration.allowInProposals
+    return !context.approved && declaration.effect === CallEffect.Write && !declaration.allowInProposals
         ? "side-effect-in-proposal"
         : null;
 }
@@ -246,7 +246,7 @@ function callRule(step: ServiceCallStep, context: StaticContext): PolicyRuleId |
     ) {
         return "production-origin";
     }
-    return !context.approved && declaration.effect === "write" && !declaration.allowInProposals
+    return !context.approved && declaration.effect === CallEffect.Write && !declaration.allowInProposals
         ? "side-effect-in-proposal"
         : null;
 }
@@ -267,7 +267,7 @@ function commandRule(step: DatabaseCommandStep, context: StaticContext): PolicyR
     if (context.project.productionOrigins.some((origin) => origin === service.origin)) {
         return "production-origin";
     }
-    return !context.approved && declaration.effect === "write" && !declaration.allowInProposals
+    return !context.approved && declaration.effect === CallEffect.Write && !declaration.allowInProposals
         ? "side-effect-in-proposal"
         : null;
 }
@@ -300,7 +300,7 @@ const isIrreversibleText = (text: string | null, action: GuardedAction): boolean
 // XPath locator, by that exact selector or expression in its unsafe features' list.
 function isAllowedUnnamed(locator: Locator, element: ResolvedElement, project: Project): boolean {
     const allowed = project.policy.unnamedControlsAllowedByTestId;
-    const testId = locator.by === "testId" ? literalText(locator.testId) : undefined;
+    const testId = locator.by === SemanticLocatorKind.TestId ? literalText(locator.testId) : undefined;
     const structural = structuralQuery(locator);
     return (
         (testId !== undefined && allowed.includes(testId)) ||
@@ -435,7 +435,7 @@ export const STEP_RULES: { readonly [Type in StepType]: StepRule<StepByType[Type
         beforeRun: noRuleBeforeRun,
         beforeRunCalls: noRuleBeforeRun,
         duringRun: (step, action) =>
-            step.action === "accept" && isIrreversibleText(action.dialogText, action)
+            step.action === DialogAction.Accept && isIrreversibleText(action.dialogText, action)
                 ? "irreversible-dialog"
                 : null,
     },

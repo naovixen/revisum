@@ -9,7 +9,7 @@
 // before a replay hands the reply to the engine.
 import {
   MINIMUM_SECRET_LENGTH, createSecret, isNonArrayObject, isSecret, reveal,
-  type HeaderScheme, type JsonBodyWithSecrets, type LeakForm, type RedactionMode, type Secret, type SecretName,
+  HeaderScheme, type JsonBodyWithSecrets, LeakForm, RedactionMode, type Secret, type SecretName,
 } from '@revisum/contracts';
 import { sha256 } from '../foundation/Sha256.ts';
 import { normalise } from '../run/outcome/Verdict.ts';
@@ -87,7 +87,7 @@ function valueRedaction(value: string): (text: string) => string {
 // longer secret is never left in part by a shorter one inside it. Secrets redacted by key are left
 // out: their values are never searched for. With no secret to look for, text is unchanged.
 export function secretRedaction(secrets: readonly Secret[]): (text: string) => string {
-  const redactions = [...new Set(secrets.filter((secret) => redactionModeOf(secret) === 'value').map(reveal))]
+  const redactions = [...new Set(secrets.filter((secret) => redactionModeOf(secret) === RedactionMode.Value).map(reveal))]
     .sort((left, right) => right.length - left.length)
     .map(valueRedaction);
   if (redactions.length === 0) return (text) => text;
@@ -98,7 +98,7 @@ export function secretRedaction(secrets: readonly Secret[]): (text: string) => s
 // given secrets redacted by key, in any case. Such a value is too short to search for inside longer
 // text, but a text that is nothing but the value is an echo of it.
 export function shortSecretMatch(secrets: readonly Secret[]): (text: string) => boolean {
-  const values = new Set(secrets.filter((secret) => redactionModeOf(secret) === 'key-only').map((secret) => foldCase(normalise(reveal(secret)))));
+  const values = new Set(secrets.filter((secret) => redactionModeOf(secret) === RedactionMode.KeyOnly).map((secret) => foldCase(normalise(reveal(secret)))));
   values.delete('');
   return (text) => values.size > 0 && values.has(foldCase(normalise(text)));
 }
@@ -131,7 +131,7 @@ function echoFormsOfValueIn(text: string, value: string): readonly LeakForm[] {
   let hasItsWords = false;
   for (const echo of encodedEchoes(value)) {
     const found = echo.matchesIn(text);
-    const isWritten = echo.form === 'uri' || echo.form === 'json' || echo.form === 'html';
+    const isWritten = echo.form === LeakForm.Uri || echo.form === LeakForm.Json || echo.form === LeakForm.Html;
     const counts = isWritten ? found.some((match) => !sameWords(match, echo.writes)) : found.length > 0;
     if (counts) forms.add(echo.form);
     const asWords = isWritten ? found.filter((match) => sameWords(match, echo.writes)) : [];
@@ -184,8 +184,8 @@ export function storageStateSecrets(storageState: Secret): readonly Secret[] {
 // and token and raw are the value as it is.
 export function headerSecret(secret: Secret, scheme: HeaderScheme): Secret {
   switch (scheme) {
-    case 'token': case 'raw': return secret;
-    case 'bearer': case 'basic': {
+    case HeaderScheme.Token: case HeaderScheme.Raw: return secret;
+    case HeaderScheme.Bearer: case HeaderScheme.Basic: {
       const made = createSecret(secret.name, headerValue(reveal(secret), scheme));
       HEADER_SOURCES.set(made, { source: secret, scheme });
       return made;
@@ -197,7 +197,7 @@ export function headerSecret(secret: Secret, scheme: HeaderScheme): Secret {
 export type WrappingScheme = 'bearer' | 'basic';
 
 const headerValue = (value: string, scheme: WrappingScheme): string =>
-  (scheme === 'bearer' ? `Bearer ${value}` : `Basic ${Buffer.from(value, 'utf8').toString('base64')}`);
+  (scheme === HeaderScheme.Bearer ? `Bearer ${value}` : `Basic ${Buffer.from(value, 'utf8').toString('base64')}`);
 
 // The secret each header value headerSecret made was made from, and the scheme that made it, so an
 // echo of the bare value is cut from a recording too, and a replay can make the header value again
@@ -314,13 +314,13 @@ function spellingEcho(echoed: string, candidate: EchoCandidate, prefix: boolean)
   const described = describeSpelling(echoed, candidate.value);
   if (described === null) {
     return prefix
-      ? { ...named, form: 'prefix', characters: [...echoed].length, approximate: true }
-      : { ...named, form: 'uri', approximate: true };
+      ? { ...named, form: LeakForm.Prefix, characters: [...echoed].length, approximate: true }
+      : { ...named, form: LeakForm.Uri, approximate: true };
   }
   const form = spellingForm(described.characters, described.spelling, candidate.value);
   return {
     ...named, form,
-    ...(form === 'prefix' ? { characters: described.characters } : {}),
+    ...(form === LeakForm.Prefix ? { characters: described.characters } : {}),
     ...(/^\.*$/.test(described.spelling) ? {} : { spelling: described.spelling }),
   };
 }
@@ -382,7 +382,7 @@ function echoesOfLongValue(text: string, candidate: EchoCandidate): Found[] {
   }
   const typed = occurrences(text, candidate.value);
   if (typed.length > 0) {
-    return typed.map((range): Found => ({ ...range, echo: { ...named, form: 'raw' } }));
+    return typed.map((range): Found => ({ ...range, echo: { ...named, form: LeakForm.Raw } }));
   }
   const echoes = encodedEchoes(candidate.value);
   for (const form of ['uri', 'json', 'html'] as const) {
@@ -396,7 +396,7 @@ function echoesOfLongValue(text: string, candidate: EchoCandidate): Found[] {
     return prefixes;
   }
   return fragmentRuns(foldCase(candidate.value))(foldCase(text)).map((range): Found => ({
-    ...range, echo: { ...named, form: 'prefix', characters: [...text.slice(range.start, range.end)].length, approximate: true },
+    ...range, echo: { ...named, form: LeakForm.Prefix, characters: [...text.slice(range.start, range.end)].length, approximate: true },
   }));
 }
 
@@ -410,7 +410,7 @@ export function cutSecretEchoes(text: string, secrets: readonly Secret[]): CutTe
     return cutEchoesOf(text, candidates);
   } catch {
     const [first] = candidates;
-    return first === undefined ? { kept: text, echoes: [] } : { kept: '', echoes: [{ offset: 0, secretName: first.secretName, form: 'raw', approximate: true }] };
+    return first === undefined ? { kept: text, echoes: [] } : { kept: '', echoes: [{ offset: 0, secretName: first.secretName, form: LeakForm.Raw, approximate: true }] };
   }
 }
 
@@ -448,7 +448,7 @@ function cutEchoesOf(text: string, candidates: readonly EchoCandidate[]): CutTex
 // The text one echo stood for, written again from `secret`'s value.
 function echoText(echo: SecretEcho, secret: Secret): string {
   const value = echo.scheme === undefined ? reveal(secret) : headerValue(reveal(secret), echo.scheme);
-  if (echo.form === 'base64' || echo.form === 'base64url') return wholeEncodedCharacters(value, echo.alignment ?? 0, BASE64_ALPHABETS[echo.form]);
+  if (echo.form === LeakForm.Base64 || echo.form === LeakForm.Base64Url) return wholeEncodedCharacters(value, echo.alignment ?? 0, BASE64_ALPHABETS[echo.form]);
   return spelled(value, echo.characters ?? [...value].length, echo.approximate === true ? undefined : echo.spelling);
 }
 

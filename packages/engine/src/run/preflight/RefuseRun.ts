@@ -4,6 +4,7 @@ import { refuse, type Planned } from "../outcome/Transition.ts";
 import { logKeepingTheResult } from "../after-the-verdict/ReadKeepingTheResult.ts";
 import { refusedResult } from "../seal/RefusedResult.ts";
 import { runTimeOfNothingRan, sealResult, type NothingRanContext } from "../seal/SealResult.ts";
+import { EventKind } from "../logging/LoggingManifest.ts";
 
 // What the event log says of a refusal beyond its code.
 type LoggedWithRefusal = { readonly origin?: string; readonly detail?: string };
@@ -48,7 +49,7 @@ export function refuseRun(
     const refused = refuse(planned, refusal);
     logKeepingTheResult(
         {
-            kind: "run.state",
+            kind: EventKind.RunState,
             state: refused.state,
             targetId: planned.target.id,
             code: refused.refusal.code,

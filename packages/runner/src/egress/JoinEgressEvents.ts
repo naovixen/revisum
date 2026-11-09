@@ -1,7 +1,7 @@
 // Turns what the browser saw and what the egress proxy decided into a run's egress events. Over
 // HTTPS and for WebSockets the proxy sees only a host and port, so the channel comes from the
 // browser.
-import { hostAndPort, type BrowserRequestRecord, type EgressDecision, type EgressEvent, type ProxyDecision, type SeenOrigin } from '@revisum/contracts';
+import { EgressChannel, BrowserChannel, hostAndPort, type BrowserRequestRecord, type EgressDecision, type EgressEvent, type ProxyDecision, type SeenOrigin } from '@revisum/contracts';
 
 // True for an origin whose traffic the proxy can read, and so the only kind a rewrite may change.
 export const isPlainHttpOrigin = (origin: SeenOrigin): boolean => origin.startsWith('http://');
@@ -25,7 +25,7 @@ export function joinEgressEvents(
 ): readonly EgressEvent[] {
   const waiting = new Map<string, BrowserRequestRecord[]>();
   for (const record of records) {
-    if (record.channel === 'popup') continue;
+    if (record.channel === BrowserChannel.Popup) continue;
     const key = hostAndPort(record.origin);
     waiting.set(key, [...(waiting.get(key) ?? []), record]);
   }
@@ -34,12 +34,12 @@ export function joinEgressEvents(
   const paired = new Set<BrowserRequestRecord>();
   const events: EgressEvent[] = decisions.map((decided) => {
     const record = waiting.get(hostAndPort(decided.origin))?.shift();
-    if (record === undefined) return { origin: decided.origin, channel: 'unattributed', decision: decided.decision };
+    if (record === undefined) return { origin: decided.origin, channel: EgressChannel.Unattributed, decision: decided.decision };
     paired.add(record);
     return { origin: record.origin, channel: record.channel, decision: decided.decision };
   });
   const decisionFor = (record: BrowserRequestRecord): EgressDecision => {
-    if (record.channel === 'popup') return record.undeclared === true ? 'blocked' : 'held';
+    if (record.channel === BrowserChannel.Popup) return record.undeclared === true ? 'blocked' : 'held';
     const key = hostAndPort(record.origin);
     return latest.get(key) ?? (direct.has(key) ? 'allowed' : 'blocked');
   };

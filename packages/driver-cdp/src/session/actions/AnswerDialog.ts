@@ -1,6 +1,6 @@
 // A dialog step: answering the dialog the page has open.
 import {
-    failure,
+    DialogAction, DriverErrorCode, failure,
     success,
     type ActionGuard,
     type DriverError,
@@ -25,7 +25,7 @@ async function dialogText<Handle>(
             return failure(CRASHED);
         }
         if (Date.now() >= stepDeadline) {
-            return failure({ code: "not-found", detail: `no dialog opened within ${timeout} ms` });
+            return failure({ code: DriverErrorCode.NotFound, detail: `no dialog opened within ${timeout} ms` });
         }
         await pause(POLL_INTERVAL_MILLISECONDS);
         text = events.openDialog();
@@ -47,7 +47,7 @@ export async function answerDialog<Handle>(
     // The dialog's text is never echoed: it may hold personal data.
     if (step.expectText !== undefined && normalise(step.expectText) !== normalise(text.value)) {
         return failure({
-            code: "assertion-failed",
+            code: DriverErrorCode.AssertionFailed,
             detail: "the open dialog does not say the expected text",
         });
     }
@@ -56,7 +56,7 @@ export async function answerDialog<Handle>(
         return failure(denied);
     }
     await withinStep(scope, stepDeadline, () =>
-        scope.events.answerDialog(step.action === "accept"),
+        scope.events.answerDialog(step.action === DialogAction.Accept),
     );
     return success(undefined);
 }

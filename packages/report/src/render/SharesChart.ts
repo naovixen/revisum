@@ -55,7 +55,13 @@ export function escapedDefectsChart(history: History, id: string): string {
     + `${bars.join('')}${labels.join('')}${legend}</svg>`;
 }
 
-type MarkerShape = 'circle' | 'square' | 'triangle';
+const MarkerShape = {
+  Circle: 'circle',
+  Square: 'square',
+  Triangle: 'triangle',
+} as const;
+
+type MarkerShape = (typeof MarkerShape)[keyof typeof MarkerShape];
 
 export function sharesChart(history: History, id: string): string {
   const count = history.periods.length;
@@ -63,13 +69,13 @@ export function sharesChart(history: History, id: string): string {
   const plotHeight = CHART_HEIGHT - MARGIN_TOP - MARGIN_BOTTOM;
   const yOf = (value: number): number => MARGIN_TOP + plotHeight - Math.min(1, Math.max(0, value)) * plotHeight;
   const series: readonly { name: string; pick: (index: number) => number; dash: string; marker: MarkerShape; color: string }[] = [
-    { name: 'Traced to spec', pick: (index) => metrics[index]?.tracedCriteriaShare ?? 0, dash: '', marker: 'circle', color: '#1a5fb4' },
-    { name: 'Verified without review', pick: (index) => metrics[index]?.verifiedWithoutReviewShare ?? 0, dash: '8 4', marker: 'square', color: '#0b5d1e' },
-    { name: 'Flaky runs', pick: (index) => metrics[index]?.flakyRunRate ?? 0, dash: '2 4', marker: 'triangle', color: '#a50e0e' },
+    { name: 'Traced to spec', pick: (index) => metrics[index]?.tracedCriteriaShare ?? 0, dash: '', marker: MarkerShape.Circle, color: '#1a5fb4' },
+    { name: 'Verified without review', pick: (index) => metrics[index]?.verifiedWithoutReviewShare ?? 0, dash: '8 4', marker: MarkerShape.Square, color: '#0b5d1e' },
+    { name: 'Flaky runs', pick: (index) => metrics[index]?.flakyRunRate ?? 0, dash: '2 4', marker: MarkerShape.Triangle, color: '#a50e0e' },
   ];
-  const marker = (shape: MarkerShape, x: number, y: number, color: string): string => shape === 'circle'
+  const marker = (shape: MarkerShape, x: number, y: number, color: string): string => shape === MarkerShape.Circle
     ? `<circle cx="${oneDecimal(x)}" cy="${oneDecimal(y)}" r="4" fill="${color}"/>`
-    : shape === 'square'
+    : shape === MarkerShape.Square
       ? `<rect x="${oneDecimal(x - 4)}" y="${oneDecimal(y - 4)}" width="8" height="8" fill="${color}"/>`
       : `<path d="M${oneDecimal(x)} ${oneDecimal(y - 5)}L${oneDecimal(x + 5)} ${oneDecimal(y + 4)}L${oneDecimal(x - 5)} ${oneDecimal(y + 4)}Z" fill="${color}"/>`;
   const lines = series.map((line) => {

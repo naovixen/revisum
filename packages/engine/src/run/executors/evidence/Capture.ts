@@ -9,6 +9,7 @@ import {
 } from "@revisum/contracts";
 import { codeOfFailedCapture } from "../../CodeForThrow.ts";
 import type { StepExecutor, StepNeeds } from "../StepExecutor.ts";
+import { EventKind } from "../../logging/LoggingManifest.ts";
 
 // The viewport with personal data and every field a secret was typed into masked. Not-found says one of
 // those fields cannot be masked: text drawn as pixels is out of reach of any later scan, so no image is
@@ -44,7 +45,7 @@ export const capture: StepExecutor<
         "image/png",
     );
     context.logger.log({
-        kind: "artifact",
+        kind: EventKind.Artifact,
         stepIndex: context.index,
         artifact: reference.name,
         sha256: reference.sha256,

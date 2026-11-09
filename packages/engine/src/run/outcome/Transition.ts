@@ -10,8 +10,9 @@
 // A plan reaches Planned only once the policy gate has authorised it. Denied is the run the gate's
 // runtime guard stopped before an action; the denied action sent no input event.
 import type {
-  Denial, Plan, PlanRefusal, PlanRunManifest, Session, Target, TerminalState as EndState, Unavailable,
+  Denial, Plan, PlanRefusal, PlanRunManifest, Session, Target, Unavailable,
 } from '@revisum/contracts';
+import { TerminalState as EndState } from '@revisum/contracts';
 
 type Transitions = {
   readonly Planned: 'Resolved' | 'TargetUnavailable' | 'Refused' | 'Errored';
@@ -51,9 +52,9 @@ export const resolve = (run: Planned, session: Session, manifest: PlanRunManifes
   ({ ...run, state: 'Resolved', session, manifest, manifestHash });
 
 export const targetUnavailable = (run: Planned, unavailable: Unavailable): TargetUnavailableRun =>
-  ({ ...run, state: 'TargetUnavailable', unavailable });
+  ({ ...run, state: EndState.TargetUnavailable, unavailable });
 
-export const refuse = (run: Planned, refusal: PlanRefusal): RefusedRun => ({ ...run, state: 'Refused', refusal });
+export const refuse = (run: Planned, refusal: PlanRefusal): RefusedRun => ({ ...run, state: EndState.Refused, refusal });
 
 export const start = (run: Resolved): Running => ({ ...run, state: 'Running' });
 
@@ -64,6 +65,6 @@ export function finish<State extends Exclude<Transitions['Running'], 'Denied'>>(
 
 export function deny(run: Running, denial: Denial): DeniedRun {
   const { session: _closedSeparately, ...rest } = run;
-  return { ...rest, state: 'Denied', denial };
+  return { ...rest, state: EndState.Denied, denial };
 }
 

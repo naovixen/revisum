@@ -23,6 +23,7 @@ import { failedStep } from "../FailedStep.ts";
 import { runPlanStep } from "./RunPlanStep.ts";
 import { ranStep, resultsOf, stepNotRun, type TimedStep } from "./TimedStep.ts";
 import { verdictOfSteps, type FinishedRun, type StepsRun } from "./VerdictOfSteps.ts";
+import { EventKind } from "../logging/LoggingManifest.ts";
 
 // What the steps have given so far, kept as each ends, so a log or clock that fails part way still
 // leaves every step accounted for.
@@ -50,13 +51,13 @@ export async function runTheSteps(
     try {
         // The hash as it stands before the steps: a run whose proxy then rewrites a response ends with another.
         logger.log({
-            kind: "run.state",
+            kind: EventKind.RunState,
             state: resolved.state,
             targetId,
             adapter,
             sha256: resolved.manifestHash,
         });
-        logger.log({ kind: "run.state", state: running.state, targetId });
+        logger.log({ kind: EventKind.RunState, state: running.state, targetId });
         await runEachStep(context, soFar);
     } catch (error) {
         // Only what the steps do not catch themselves gets here, such as a log or a clock that failed part
@@ -130,7 +131,7 @@ async function runEachStep(context: SessionContext, soFar: StepsSoFar): Promise<
             continue;
         }
         const stepStartedAt = ports.clock.now();
-        logger.log({ kind: "step.start", stepIndex: index, stepType: step.type });
+        logger.log({ kind: EventKind.StepStart, stepIndex: index, stepType: step.type });
         // The first step stands for what could not be started, so the result says why nothing ran.
         const ran =
             index === 0 && notObserved !== undefined
@@ -146,7 +147,7 @@ async function runEachStep(context: SessionContext, soFar: StepsSoFar): Promise<
         const milliseconds = ports.clock.now() - stepStartedAt;
         steps.push(ranStep(result, milliseconds));
         logger.log({
-            kind: "step.end",
+            kind: EventKind.StepEnd,
             stepIndex: index,
             stepType: step.type,
             outcome: result.outcome,

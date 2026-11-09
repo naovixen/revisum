@@ -3,6 +3,7 @@
 // label and a stroke pattern, so no meaning rests on colour alone.
 import type { Finding, ImageMeta, PixelBox, Severity } from '../model/ReportKind.ts';
 import { escapeHtml } from '../model/CleanText.ts';
+import { Verdict } from '../model/ReportKind.ts';
 
 export const SEVERITY_STYLE: Readonly<Record<Severity | 'none', { color: string; dash: string; width: number; word: string }>> = {
   P1: { color: '#a50e0e', dash: '', width: 4, word: 'solid line' },
@@ -51,7 +52,7 @@ export function cropFor(boxes: readonly PixelBox[], width: number, height: numbe
 }
 
 export const calloutLabel = (number: number, finding: Finding): string =>
-  `${number} ${finding.severity ?? 'unrated'}${finding.status === 'needs-review' ? ' ?' : ''}`;
+  `${number} ${finding.severity ?? 'unrated'}${finding.status === Verdict.NeedsReview ? ' ?' : ''}`;
 
 const overlaps = (first: ViewArea, second: ViewArea): boolean =>
   first.x < second.x + second.width && second.x < first.x + first.width && first.y < second.y + second.height && second.y < first.y + first.height;

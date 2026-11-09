@@ -1,9 +1,10 @@
 // The pull-request comment, and the text-only verdict card used when a run has no screenshot.
 import { SEVERITY_STYLE } from './FigureSvg.ts';
-import type { ReportInput, Verdict } from '../model/ReportKind.ts';
+import type { ReportInput } from '../model/ReportKind.ts';
 import type { ReportView } from '../model/ReportView.ts';
 import { escapeHtml, markdownEscape } from '../model/CleanText.ts';
 import { REPORT_GENERATOR } from './RenderHtml.ts';
+import { Verdict } from '../model/ReportKind.ts';
 
 const VERDICT_WORD: Readonly<Record<Verdict, string>> = { passed: 'PASSED', failed: 'FAILED', 'needs-review': 'NEEDS REVIEW' };
 const VERDICT_COLOUR: Readonly<Record<Verdict, string>> = { passed: '#0b5d1e', failed: '#a50e0e', 'needs-review': '#a85200' };
@@ -12,7 +13,7 @@ export const MAXIMUM_PR_COMMENT_CHARACTERS = 1800;
 export function prComment(report: ReportInput, view: ReportView, imageFile: string, imageAlt: string, reportFile: string): string {
   const top = view.numbered.slice(0, 5);
   const rows = top.map((entry) =>
-    `| ${entry.number} | ${entry.finding.severity ?? 'unrated'}${entry.finding.status === 'needs-review' ? ' (review)' : ''} | ${markdownEscape(entry.finding.caption)} |`);
+    `| ${entry.number} | ${entry.finding.severity ?? 'unrated'}${entry.finding.status === Verdict.NeedsReview ? ' (review)' : ''} | ${markdownEscape(entry.finding.caption)} |`);
   const lines = [
     `### ${markdownEscape(report.title)}`,
     '',

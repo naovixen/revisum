@@ -1,5 +1,5 @@
 import {
-    hostAndPort,
+    EgressDecision, EgressChannel, hostAndPort,
     type EgressEvent,
     type EgressPolicy,
     type ProxyDecision,
@@ -28,5 +28,5 @@ export function processEvents(
     ]);
     return [...new Set(lookups)]
         .filter((name) => !explained.has(name))
-        .map((name): EgressEvent => ({ origin: name, channel: "process", decision: "blocked" }));
+        .map((name): EgressEvent => ({ origin: name, channel: EgressChannel.Process, decision: EgressDecision.Blocked }));
 }

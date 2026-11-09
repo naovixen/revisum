@@ -3,8 +3,8 @@
 // them in targets.lock.json beside project.json, and `checkPinnedBuild` refuses a run whose build
 // is not the pinned one. A build is never upgraded or swapped silently.
 import {
-  failure, success,
-  type AdapterRegistry, type BuildFailureCode, type LockEntry, type LockFailure, type LockfileFailure, type Result,
+  BuildFetchFailureCode, LockfileFailureCode, PlanErrorCode, failure, success,
+  type AdapterRegistry, BuildFailureCode, type LockEntry, type LockFailure, type LockfileFailure, type Result,
   type Target, type TargetId, type Unavailable, UnavailableReason, type PlanError,
 } from '@revisum/contracts';
 import { createHash, randomUUID } from 'node:crypto';
@@ -60,7 +60,7 @@ function readLockEntry(input: unknown, path: string, issues: Issues): Parsed<Loc
   const executableSha256 = fields['executableSha256'];
   const hashValid = typeof executableSha256 === 'string' && SHA256_HEX.test(executableSha256);
   if (!hashValid) {
-    issues.push({ code: typeof executableSha256 === 'string' ? 'unknown_value' : 'wrong_type', path: `${path}.executableSha256` });
+    issues.push({ code: typeof executableSha256 === 'string' ? PlanErrorCode.UnknownValue : PlanErrorCode.WrongType, path: `${path}.executableSha256` });
   }
   if (!allValid(parts) || !hashValid) return INVALID;
   const [targetId, version] = parts;
@@ -73,14 +73,14 @@ function parseLockfile(input: unknown): Result<readonly LockEntry[], readonly Pl
   const issues: Issues = [];
   const fields = readRecord(input, '$', issues, ['schema', 'entries']);
   if (fields === INVALID) return failure(issues);
-  if (fields['schema'] !== LOCKFILE_SCHEMA) issues.push({ code: 'version_unsupported', path: '$.schema' });
+  if (fields['schema'] !== LOCKFILE_SCHEMA) issues.push({ code: PlanErrorCode.VersionUnsupported, path: '$.schema' });
   const raw = readList(fields['entries'], '$.entries', issues, MAXIMUM_LOCK_ENTRIES, 0);
   if (raw === INVALID) return failure(issues);
   const entries = raw.map((entry, index) => readLockEntry(entry, `$.entries[${index}]`, issues));
   const seen = new Set<TargetId>();
   entries.forEach((entry, index) => {
     if (entry === INVALID) return;
-    if (seen.has(entry.targetId)) issues.push({ code: 'duplicate', path: `$.entries[${index}].targetId` });
+    if (seen.has(entry.targetId)) issues.push({ code: PlanErrorCode.Duplicate, path: `$.entries[${index}].targetId` });
     seen.add(entry.targetId);
   });
   if (issues.length > 0 || !allValid(entries)) return failure(issues);
@@ -99,18 +99,18 @@ export async function readLockfile(folder: string): Promise<Result<readonly Lock
     text = await readFile(join(folder, LOCKFILE_NAME), 'utf8');
   } catch (error) {
     if (error instanceof Error && Reflect.get(error, 'code') === 'ENOENT') return success([]);
-    return failure({ targetId: null, code: 'lockfile-invalid', detail: `cannot read ${LOCKFILE_NAME}: ${errorText(error)}` });
+    return failure({ targetId: null, code: LockfileFailureCode.LockfileInvalid, detail: `cannot read ${LOCKFILE_NAME}: ${errorText(error)}` });
   }
   let input: unknown;
   try {
     input = JSON.parse(text);
   } catch {
-    return failure({ targetId: null, code: 'lockfile-invalid', detail: `${LOCKFILE_NAME} is not JSON` });
+    return failure({ targetId: null, code: LockfileFailureCode.LockfileInvalid, detail: `${LOCKFILE_NAME} is not JSON` });
   }
   const parsed = parseLockfile(input);
   if (parsed.ok) return parsed;
   const where = parsed.error.map((error) => `${error.code} at ${error.path}`).join(', ');
-  return failure({ targetId: null, code: 'lockfile-invalid', detail: `${LOCKFILE_NAME} does not parse: ${where}` });
+  return failure({ targetId: null, code: LockfileFailureCode.LockfileInvalid, detail: `${LOCKFILE_NAME} does not parse: ${where}` });
 }
 
 // Pins every target in the matrix, in target id order. The first target that cannot be pinned
@@ -124,7 +124,7 @@ export async function lock(
   for (const target of [...project.matrix].sort((left, right) => compareText(left.id, right.id))) {
     const driver = registry.find(target.adapter);
     if (driver === null) {
-      return failure({ targetId: target.id, code: 'adapter-not-registered', detail: `no adapter '${target.adapter}' is registered` });
+      return failure({ targetId: target.id, code: UnavailableReason.AdapterNotRegistered, detail: `no adapter '${target.adapter}' is registered` });
     }
     const supported = driver.supports(target);
     if (!supported.ok) return failure({ targetId: target.id, code: supported.error.reason, detail: supported.error.detail });
@@ -136,14 +136,14 @@ export async function lock(
     // The version goes into the lockfile, so it must pass the lockfile's own decoder.
     const version = readBuildVersion(built.value.version, '$.version', []);
     if (version === INVALID) {
-      return failure({ targetId: target.id, code: 'lock-download-failed', detail: 'the adapter reported a build with no usable version number' });
+      return failure({ targetId: target.id, code: BuildFetchFailureCode.LockDownloadFailed, detail: 'the adapter reported a build with no usable version number' });
     }
     const hashed = await hashExecutable(built.value.executablePath);
-    if (!hashed.ok) return failure({ targetId: target.id, code: 'lock-download-failed', detail: hashed.error });
+    if (!hashed.ok) return failure({ targetId: target.id, code: BuildFetchFailureCode.LockDownloadFailed, detail: hashed.error });
     const pinned = previous.find((entry) => entry.targetId === target.id);
     if (pinned !== undefined && pinned.version === version && pinned.executableSha256 !== hashed.value) {
       return failure({
-        targetId: target.id, code: 'build-mismatch',
+        targetId: target.id, code: UnavailableReason.BuildMismatch,
         detail: `version ${version} was pinned with sha256 ${pinned.executableSha256}, but its executable now hashes to ${hashed.value}`,
       });
     }
@@ -168,7 +168,7 @@ export async function lockToFile(
     await rename(temporary, join(folder, LOCKFILE_NAME));
   } catch (error) {
     await rm(temporary, { force: true });
-    return failure({ targetId: null, code: 'lockfile-unwritable', detail: `cannot write ${LOCKFILE_NAME}: ${errorText(error)}` });
+    return failure({ targetId: null, code: LockfileFailureCode.LockfileUnwritable, detail: `cannot write ${LOCKFILE_NAME}: ${errorText(error)}` });
   }
   return locked;
 }
@@ -176,7 +176,7 @@ export async function lockToFile(
 // The lock-time codes have no run-time meaning of their own: at run time the build is simply not
 // there to launch.
 const runTimeReason = (code: BuildFailureCode): UnavailableReason =>
-  (code === 'lock-download-failed' || code === 'lock-offline' ? UnavailableReason.LaunchFailed : code);
+  (code === BuildFailureCode.LockDownloadFailed || code === BuildFailureCode.LockOffline ? UnavailableReason.LaunchFailed : code);
 
 // What a run learns of the browser build before it opens the browser.
 //   executableSha256: the sha256 core took of the executable the adapter will launch; absent for an
@@ -220,7 +220,7 @@ export async function checkPinnedBuild(
   if (pinned === undefined) return success({ executableSha256: hashed.value, unpinned: entries !== undefined });
   if (built.value.version !== pinned.version || hashed.value !== pinned.executableSha256) {
     return failure({
-      reason: 'build-mismatch',
+      reason: UnavailableReason.BuildMismatch,
       detail: `the lockfile pins version ${pinned.version} with sha256 ${pinned.executableSha256}; `
         + `this machine has version ${built.value.version} with sha256 ${hashed.value}`,
     });

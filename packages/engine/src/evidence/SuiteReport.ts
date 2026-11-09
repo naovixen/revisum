@@ -8,7 +8,7 @@
 // Every refusal is a bare code and JSON path. Neither ever holds text from the report: the paths
 // name only the fields this decoder reads, and any other key is written "*".
 import { Buffer } from 'node:buffer';
-import { failure, isPlainObject, success, type Brand, type EvidenceLimits, type Result, type SuiteDecodeError, type SuiteTestOutcome } from '@revisum/contracts';
+import { SuiteDecodeErrorCode, failure, isPlainObject, success, type Brand, type EvidenceLimits, type Result, type SuiteDecodeError, SuiteTestOutcome } from '@revisum/contracts';
 import { brand } from '../foundation/Brand.ts';
 import { INVALID, allValid, type Parsed } from '../plan/parse/ReadRecord.ts';
 import { staysInside } from '../foundation/RepositoryPath.ts';
@@ -54,7 +54,7 @@ export type SuiteReportOptions = { readonly outputDirectory?: string };
 
 // Playwright's result statuses, each mapped to its outcome.
 const RESULT_OUTCOMES: Readonly<Record<string, SuiteTestOutcome>> = {
-  passed: 'passed', failed: 'failed', timedOut: 'timed-out', skipped: 'skipped', interrupted: 'interrupted',
+  passed: SuiteTestOutcome.Passed, failed: SuiteTestOutcome.Failed, timedOut: SuiteTestOutcome.TimedOut, skipped: SuiteTestOutcome.Skipped, interrupted: SuiteTestOutcome.Interrupted,
 };
 // The statuses a suite may expect a test to end with: "failed" for a test marked test.fail().
 const EXPECTED_STATUSES: readonly string[] = ['passed', 'failed', 'timedOut', 'skipped', 'interrupted'];
@@ -115,7 +115,7 @@ function walk(input: unknown, limits: EvidenceLimits): SuiteDecodeError | undefi
 // `segments` is the path so far, kept as a list and joined only for a refusal.
 function walkValue(value: unknown, segments: string[], state: WalkState): SuiteDecodeError | undefined {
   // Every nested list or object adds one segment, so the depth is the path's length.
-  if (segments.length > state.maximumDepth) return { code: 'too-large', path: segments.join('') };
+  if (segments.length > state.maximumDepth) return { code: SuiteDecodeErrorCode.TooLarge, path: segments.join('') };
   if (value === null || typeof value === 'boolean' || typeof value === 'number' || typeof value === 'string') {
     if (typeof value === 'number' && !Number.isFinite(value)) return invalidAt(segments);
     state.bytes += Buffer.byteLength(JSON.stringify(value), 'utf8');
@@ -145,8 +145,8 @@ function walkValue(value: unknown, segments: string[], state: WalkState): SuiteD
   return state.bytes > state.maximumBytes ? tooLarge() : undefined;
 }
 
-const invalidAt = (segments: readonly string[]): SuiteDecodeError => ({ code: 'suite-report-invalid', path: segments.join('') });
-const tooLarge = (): SuiteDecodeError => ({ code: 'too-large', path: '$' });
+const invalidAt = (segments: readonly string[]): SuiteDecodeError => ({ code: SuiteDecodeErrorCode.SuiteReportInvalid, path: segments.join('') });
+const tooLarge = (): SuiteDecodeError => ({ code: SuiteDecodeErrorCode.TooLarge, path: '$' });
 
 // ---- The second pass: the fields Revisum reads ---------------------------------------------------
 
@@ -158,7 +158,7 @@ type DecodeContext = {
 type Fields = Readonly<Record<string, unknown>>;
 
 function refuse(path: string, context: DecodeContext): typeof INVALID {
-  context.issues.push({ code: 'suite-report-invalid', path });
+  context.issues.push({ code: SuiteDecodeErrorCode.SuiteReportInvalid, path });
   return INVALID;
 }
 
@@ -212,7 +212,7 @@ function readSpec(input: unknown, path: string, describeTitles: readonly string[
   for (const [index, test] of tests.entries()) {
     if (context.tests.length >= context.maximumTests) {
       // One refusal is enough: the rest of the report is not read.
-      if (!context.issues.some((issue) => issue.code === 'too-large')) context.issues.push({ code: 'too-large', path: '$' });
+      if (!context.issues.some((issue) => issue.code === SuiteDecodeErrorCode.TooLarge)) context.issues.push({ code: SuiteDecodeErrorCode.TooLarge, path: '$' });
       return;
     }
     const decoded = readTest(test, `${path}.tests[${index}]`, { file, titlePath: [...describeTitles, title] }, context);
@@ -239,7 +239,7 @@ function readTest(
     || result === INVALID) return INVALID;
   // A test the suite expects to fail, which failed, is Playwright's "expected" outcome: kept apart
   // from both a pass and an ordinary failure.
-  const finished: SuiteTestOutcome = expectedStatus === 'failed' && result.outcome === 'failed' ? 'expected-failure' : result.outcome;
+  const finished: SuiteTestOutcome = expectedStatus === 'failed' && result.outcome === SuiteTestOutcome.Failed ? 'expected-failure' : result.outcome;
   // A test.fail() whose body passed has a passed result and an "unexpected" test, and Playwright
   // exits 1 for it. Believing the result alone would count it as a pass.
   const outcome: SuiteTestOutcome = knownStatus === UNEXPECTED_STATUS && OUTCOMES_AN_UNEXPECTED_TEST_CANNOT_HAVE.includes(finished) ? 'failed' : finished;
@@ -263,7 +263,7 @@ function readOnlyResult(input: unknown, path: string, context: DecodeContext): P
   const results = readList(input, path, context);
   if (results === INVALID) return INVALID;
   if (results.length > 1) return refuse(path, context);
-  if (results.length === 0) return { outcome: 'interrupted', errors: [], attachments: [], durationMilliseconds: 0 };
+  if (results.length === 0) return { outcome: SuiteTestOutcome.Interrupted, errors: [], attachments: [], durationMilliseconds: 0 };
   const resultPath = `${path}[0]`;
   const fields = readObject(results[0], resultPath, context);
   if (fields === INVALID) return INVALID;

@@ -14,7 +14,7 @@
 // it, and its links with it. The next navigate ends any dialog. `truncated` also says whether a page
 // on the start origin was left unvisited because of maximumPages or maximumDepth.
 import {
-  failure, NavigateScripts, success,
+  ExploreErrorCode, failure, NavigateScripts, success,
   type A11yNode, type CrawlErrorCode, type ExploreDriver, type ExploreOptions, type Origin, type PageMap, type PageMapEntry, type PageReadFailure, type Redactor, type Result,
 } from '@revisum/contracts';
 import { defaultRedactor } from '../secrets/DefaultRedactor.ts';
@@ -98,7 +98,7 @@ export async function crawlSite(
 ): Promise<Result<PageMap, { readonly code: CrawlErrorCode }>> {
   // Refused before any driver call.
   const origin = exploreStartOrigin(project, options.start);
-  if (origin === undefined) return failure({ code: 'explore-origin-refused' });
+  if (origin === undefined) return failure({ code: ExploreErrorCode.ExploreOriginRefused });
   const maximumPages = clamp(options.maximumPages, 1, MAXIMUM_EXPLORE_PAGES);
   const maximumDepth = clamp(options.maximumDepth, 0, MAXIMUM_EXPLORE_DEPTH);
   const pageTimeout = Math.max(options.pageTimeoutMilliseconds, 1);
@@ -114,7 +114,7 @@ export async function crawlSite(
     const url = `${origin}${next.path}`;
     const read = await loadedInTime(driver, url, pageTimeout) ? await readLoadedPage(driver, origin) : success(undefined);
     if (!read.ok || read.value === undefined) {
-      if (next.depth === 0) return failure({ code: 'explore-start-unreachable' });
+      if (next.depth === 0) return failure({ code: ExploreErrorCode.ExploreStartUnreachable });
       truncated ||= !read.ok;
       continue;
     }

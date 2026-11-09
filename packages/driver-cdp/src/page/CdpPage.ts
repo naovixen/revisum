@@ -49,6 +49,7 @@ import type { PageWatch } from "./PageWatch.ts";
 import type { PressCheck, PressSent } from "./checks/PressCheck.ts";
 import { accessibilityTreeOf, exposedStatesOf, roleAndNameOf } from "./checks/RoleAndNameOf.ts";
 import { WhenLoaded, type LoadWait } from "./WhenLoaded.ts";
+import { NavigateScripts } from "@revisum/contracts";
 
 // Where a CdpPage's document is when it is an iframe's: its element in the parent document, and its frame.
 type FrameScope = {
@@ -100,7 +101,7 @@ export class CdpPage implements PageWithInput<string> {
         // Script execution is a setting of the whole page, so only the top document's navigate
         // changes it; it stays as set until the next one.
         if (frameId === undefined) {
-            const shouldDisable = scripts === "disabled";
+            const shouldDisable = scripts === NavigateScripts.Disabled;
             if (shouldDisable !== this.#scriptsDisabled) {
                 await this.#commands.ask(SET_SCRIPT_EXECUTION_DISABLED, { value: shouldDisable });
                 this.#scriptsDisabled = shouldDisable;

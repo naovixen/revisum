@@ -1,6 +1,6 @@
 // The own CDP driver: launches Chromium itself and speaks the Chrome DevTools Protocol over a
 // WebSocket, with no third-party automation library.
-import { failure, success, type Result } from "@revisum/contracts";
+import { UnavailableReason, Engine, failure, success, type Result } from "@revisum/contracts";
 import { openSessionEgress, type EgressSource } from "../capabilities/SessionEgress.ts";
 import { errorText } from "../connection/ErrorText.ts";
 import { chromiumBuild } from "../launch/ChromiumBuild.ts";
@@ -40,25 +40,25 @@ export function cdpDriver(options: CdpDriverOptions): OwnBrowserDriver {
             protocol: "Chrome DevTools Protocol (raw WebSocket)",
         },
         supports(target) {
-            if (target.engine !== "chromium") {
-                return failure({ reason: "engine-not-supported", detail: NOT_CHROMIUM });
+            if (target.engine !== Engine.Chromium) {
+                return failure({ reason: UnavailableReason.EngineNotSupported, detail: NOT_CHROMIUM });
             }
             return success(true);
         },
         build(target) {
             return Promise.resolve(
-                target.engine === "chromium"
+                target.engine === Engine.Chromium
                     ? chromiumBuild(options.executablePath)
-                    : failure({ code: "engine-not-supported", detail: NOT_CHROMIUM }),
+                    : failure({ code: UnavailableReason.EngineNotSupported, detail: NOT_CHROMIUM }),
             );
         },
         async open(target, environment) {
-            if (target.engine !== "chromium") {
-                return failure({ reason: "engine-not-supported", detail: NOT_CHROMIUM });
+            if (target.engine !== Engine.Chromium) {
+                return failure({ reason: UnavailableReason.EngineNotSupported, detail: NOT_CHROMIUM });
             }
             const opened = await openSessionEgress(options.egress, environment.allowedOrigins);
             if (!opened.ok) {
-                return failure({ reason: "launch-failed", detail: opened.error });
+                return failure({ reason: UnavailableReason.LaunchFailed, detail: opened.error });
             }
             const sessionEgress = opened.value;
             const closeEgress = (): Promise<Result<void, string>> => sessionEgress.egress.close();
@@ -67,7 +67,7 @@ export function cdpDriver(options: CdpDriverOptions): OwnBrowserDriver {
                 attached = await attachBrowser(options, target.locale);
             } catch (error) {
                 return failure({
-                    reason: "launch-failed",
+                    reason: UnavailableReason.LaunchFailed,
                     detail: await detailAfterClosing(error, [closeEgress]),
                 });
             }
@@ -85,7 +85,7 @@ export function cdpDriver(options: CdpDriverOptions): OwnBrowserDriver {
                 // A shared browser that keeps this context stays refused to later sessions, so what to
                 // report first here is what stopped this one opening.
                 return failure({
-                    reason: "launch-failed",
+                    reason: UnavailableReason.LaunchFailed,
                     detail: await detailAfterClosing(error, [() => attached.close(), closeEgress]),
                 });
             }

@@ -3,7 +3,7 @@
 // the driver runs on, so that machine's platform decides. Every other modifier is held as itself,
 // in the order the plan writes them; a key written twice through ControlOrMeta, such as Control
 // and ControlOrMeta off macOS, is held once, where it first appears.
-import type { Modifier } from "@revisum/contracts";
+import { Modifier } from "@revisum/contracts";
 
 export type HeldModifierKey = "Alt" | "Control" | "Meta" | "Shift";
 
@@ -18,7 +18,7 @@ export function heldModifierKeys(
     const held: HeldModifierKey[] = [];
     for (const modifier of modifiers) {
         const key: HeldModifierKey =
-            modifier === "ControlOrMeta" ? controlOrMetaOn(platform) : modifier;
+            modifier === Modifier.ControlOrMeta ? controlOrMetaOn(platform) : modifier;
         if (!held.includes(key)) {
             held.push(key);
         }

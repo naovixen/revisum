@@ -5,7 +5,7 @@
 // them the same way. The rules and those lines all cross a process boundary, so each is decoded here
 // before use. A write that fails does not stop the proxy: the state file says records were lost, and
 // the runner decides what that means for the run.
-import { parseOrigin, type AppliedRewrite, type ProxyDecision } from '@revisum/contracts';
+import { EgressDecision, parseOrigin, type AppliedRewrite, type ProxyDecision } from '@revisum/contracts';
 import { appendFileSync, openSync, writeSync } from 'node:fs';
 import { startRefusalsServer } from './ReadBrowserRefusals.ts';
 import { ownField } from '../egress-proxy/rules/OwnField.ts';
@@ -105,7 +105,7 @@ async function main(): Promise<number> {
     ...(hasRunAddresses ? { client: ProxyClient.Browser, servicePort: SERVICE_PROXY_PORT } : {}),
     onDecision: (decision, client) => {
       records.append(DECISIONS_FILE, decision);
-      if (client === ProxyClient.Browser && decision.decision === 'blocked') {
+      if (client === ProxyClient.Browser && decision.decision === EgressDecision.Blocked) {
         browserRefusals.push(decision.origin);
       }
     },

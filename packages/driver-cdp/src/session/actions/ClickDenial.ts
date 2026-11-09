@@ -9,6 +9,7 @@ import {
     reportedFields,
     reportedTextOrNull,
 } from "../document/ReportedFields.ts";
+import { DriverErrorCode, PolicyVerdictKind } from "@revisum/contracts";
 
 // What the runtime guard is told for a dialog step, which acts on no element.
 export const NO_RESOLVED_ELEMENT: ResolvedElement = {
@@ -59,8 +60,8 @@ export const guardWhileStepLasts =
 
 // A denial as the step's error, or null for an allow.
 export function denialOf(verdict: GuardVerdict): DriverError | null {
-    return verdict.kind === "deny"
-        ? { code: "policy-denied", detail: `denied by the ${verdict.rule} rule` }
+    return verdict.kind === PolicyVerdictKind.Deny
+        ? { code: DriverErrorCode.PolicyDenied, detail: `denied by the ${verdict.rule} rule` }
         : null;
 }
 

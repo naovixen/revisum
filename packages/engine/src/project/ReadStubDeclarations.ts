@@ -6,7 +6,7 @@
 // how the browser treats it, and a fixture or parameter nobody declared, so every stub it accepts
 // serves data only.
 import {
-  HTTP_METHODS, PATH_MATCHES, STORAGE_ACCESS, STORAGE_AREAS, STUB_MEDIA_TYPES,
+  StorageAccess, PlanErrorCode, HTTP_METHODS, PATH_MATCHES, STORAGE_ACCESS, STORAGE_AREAS, STUB_MEDIA_TYPES,
   type FixtureName, type JsonTemplate, type ObservedRequestDeclaration, type Origin, type ParameterName, type ParameterType,
   type RequestMatcher, type RequestName, type SafeText, type StorageEntryDeclaration, type StorageEntryName, type StubDeclaration, type StubName,
   type StubResponse, type StubResponseBody,
@@ -89,7 +89,7 @@ export function readStorageEntryDeclarations(
 // person says so.
 function readAllowInProposals(fields: Readonly<Record<string, unknown>>, path: string, issues: Issues): Parsed<boolean> {
   const allow = fields['allowInProposals'] ?? false;
-  if (typeof allow !== 'boolean') { issues.push({ code: 'wrong_type', path: `${path}.allowInProposals` }); return INVALID; }
+  if (typeof allow !== 'boolean') { issues.push({ code: PlanErrorCode.WrongType, path: `${path}.allowInProposals` }); return INVALID; }
   return allow;
 }
 
@@ -97,14 +97,14 @@ function readAllowInProposals(fields: Readonly<Record<string, unknown>>, path: s
 function readPermittedOrigin(input: unknown, path: string, issues: Issues, permitted: readonly Origin[]): Parsed<Origin> {
   const origin = readOrigin(input, path, issues);
   if (origin === INVALID) return INVALID;
-  if (!permitted.includes(origin)) { issues.push({ code: 'origin_not_allowed', path }); return INVALID; }
+  if (!permitted.includes(origin)) { issues.push({ code: PlanErrorCode.OriginNotAllowed, path }); return INVALID; }
   return origin;
 }
 
 function readMatcherPath(input: unknown, path: string, issues: Issues): Parsed<string> {
   const text = readUnscannedText(input, path, issues, MAXIMUM_MATCHER_PATH_LENGTH);
   if (text === INVALID) return INVALID;
-  if (!MATCHER_PATH.test(text)) { issues.push({ code: 'unknown_value', path }); return INVALID; }
+  if (!MATCHER_PATH.test(text)) { issues.push({ code: PlanErrorCode.UnknownValue, path }); return INVALID; }
   return text;
 }
 
@@ -166,14 +166,14 @@ function readStubHeaders(input: unknown, path: string, issues: Issues): Parsed<R
   const seen = new Set<string>();
   const entries = Object.entries(fields).map(([name, value]): Parsed<readonly [string, SafeText]> => {
     const at = `${path}.${name}`;
-    if (!HEADER_NAME.test(name)) { issues.push({ code: 'unknown_value', path: at }); return INVALID; }
+    if (!HEADER_NAME.test(name)) { issues.push({ code: PlanErrorCode.UnknownValue, path: at }); return INVALID; }
     const lower = name.toLowerCase();
     if (DENIED_STUB_HEADERS.includes(lower) || DENIED_STUB_HEADER_PREFIXES.some((prefix) => lower.startsWith(prefix))) {
-      issues.push({ code: 'header_not_allowed', path: at });
+      issues.push({ code: PlanErrorCode.HeaderNotAllowed, path: at });
       return INVALID;
     }
     // Header names are case-insensitive, so "Retry-After" and "retry-after" are one header set twice.
-    if (seen.has(lower)) { issues.push({ code: 'duplicate', path: at }); return INVALID; }
+    if (seen.has(lower)) { issues.push({ code: PlanErrorCode.Duplicate, path: at }); return INVALID; }
     seen.add(lower);
     const text = readUnscannedText(value, at, issues, MAXIMUM_HEADER_VALUE_LENGTH);
     return text === INVALID ? INVALID : [name, text];
@@ -192,7 +192,7 @@ function readStubBody(
   const kind = STUB_BODY_KINDS.find((candidate) => Object.hasOwn(head, candidate));
   if (kind === undefined) {
     // No body kind at all: every key is one the format does not have, or there is none.
-    if (readRecord(input, path, issues, STUB_BODY_KINDS, []) !== INVALID) issues.push({ code: 'empty', path });
+    if (readRecord(input, path, issues, STUB_BODY_KINDS, []) !== INVALID) issues.push({ code: PlanErrorCode.Empty, path });
     return INVALID;
   }
   if (readRecord(input, path, issues, [kind]) === INVALID) return INVALID;
@@ -200,10 +200,10 @@ function readStubBody(
   switch (kind) {
     case 'fixture': {
       const fixture = head['fixture'];
-      if (typeof fixture !== 'string') { issues.push({ code: 'wrong_type', path: at }); return INVALID; }
+      if (typeof fixture !== 'string') { issues.push({ code: PlanErrorCode.WrongType, path: at }); return INVALID; }
       // Only a file the project declares, so a stub can never serve a file from outside the fixtures folder.
       const found = context.fixtures.find((name) => name === fixture);
-      if (found === undefined) { issues.push({ code: 'unknown_value', path: at }); return INVALID; }
+      if (found === undefined) { issues.push({ code: PlanErrorCode.UnknownValue, path: at }); return INVALID; }
       return { fixture: found };
     }
     case 'json': {
@@ -250,12 +250,12 @@ function readStorageEntry(input: unknown, path: string, context: NetworkDeclarat
   ] as const;
   if (!allValid(parts)) return INVALID;
   const [area, origin, key, access, allowInProposals] = parts;
-  if (access === 'read') {
+  if (access === StorageAccess.Read) {
     const written = ['value', 'parameters'].filter((field) => Object.hasOwn(fields, field));
-    for (const field of written) issues.push({ code: 'unknown_field', path: `${path}.${field}` });
+    for (const field of written) issues.push({ code: PlanErrorCode.UnknownField, path: `${path}.${field}` });
     return written.length > 0 ? INVALID : { area, origin, key, access, allowInProposals };
   }
-  if (!Object.hasOwn(fields, 'value')) { issues.push({ code: 'missing_field', path: `${path}.value` }); return INVALID; }
+  if (!Object.hasOwn(fields, 'value')) { issues.push({ code: PlanErrorCode.MissingField, path: `${path}.value` }); return INVALID; }
   const parameters = Object.hasOwn(fields, 'parameters') ? readParameters(fields['parameters'], `${path}.parameters`, issues) : undefined;
   if (parameters === INVALID) return INVALID;
   const value: Parsed<JsonTemplate> = readJsonTemplate(fields['value'], `${path}.value`, issues, parameters ?? {});

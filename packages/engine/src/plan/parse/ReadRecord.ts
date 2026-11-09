@@ -92,10 +92,10 @@ export function readRecord(
   for (const key of Object.keys(fields)) {
     if (allowed.includes(key)) continue;
     // Errors are kept and shown, so a key shaped like a credential is reported by where it sits.
-    issues.push(looksLikeCredential(key) ? { code: 'literal_secret', path } : { code: 'unknown_field', path: `${path}.${key}` });
+    issues.push(looksLikeCredential(key) ? { code: PlanErrorCode.LiteralSecret, path } : { code: PlanErrorCode.UnknownField, path: `${path}.${key}` });
   }
   for (const key of required) {
-    if (!Object.hasOwn(fields, key)) issues.push({ code: 'missing_field', path: `${path}.${key}` });
+    if (!Object.hasOwn(fields, key)) issues.push({ code: PlanErrorCode.MissingField, path: `${path}.${key}` });
   }
   return issues.length === before ? fields : INVALID;
 }
@@ -108,7 +108,7 @@ export function peekRecord(input: unknown, path: string, issues: Issues): Parsed
 export function peekRecord(input: unknown, path: string, issues: Issues): Parsed<Readonly<Record<string, unknown>>> {
   const fields = readOneLevel(input);
   if (!isPlainObject(fields)) {
-    issues.push({ code: 'not_object', path });
+    issues.push({ code: PlanErrorCode.NotObject, path });
     return INVALID;
   }
   return fields;
@@ -130,7 +130,7 @@ export function runTimeTextOrDigest(value: string, maximumLength: number): SafeT
 export function readOneOf<Value extends string>(
   input: unknown, path: string, issues: Issues, values: readonly Value[], code: PlanErrorCode = PlanErrorCode.UnknownValue,
 ): Parsed<Value> {
-  if (typeof input !== 'string') { issues.push({ code: 'wrong_type', path }); return INVALID; }
+  if (typeof input !== 'string') { issues.push({ code: PlanErrorCode.WrongType, path }); return INVALID; }
   const found = values.find((value) => value === input);
   if (found === undefined) { issues.push({ code, path }); return INVALID; }
   return found;
@@ -155,17 +155,17 @@ export function readList(
 ): Parsed<readonly unknown[]> {
   // A copy of the list, read once, so walking it can't throw; a list that can't be read so is wrong_type.
   const read = readOneLevel(input);
-  if (!Array.isArray(read)) { issues.push({ code: 'wrong_type', path }); return INVALID; }
+  if (!Array.isArray(read)) { issues.push({ code: PlanErrorCode.WrongType, path }); return INVALID; }
   const list: readonly unknown[] = read;
-  if (list.length < minimumLength) { issues.push({ code: 'empty', path }); return INVALID; }
-  if (list.length > maximumLength) { issues.push({ code: 'too_large', path }); return INVALID; }
-  if (hasHoles(list)) { issues.push({ code: 'wrong_type', path }); return INVALID; }
+  if (list.length < minimumLength) { issues.push({ code: PlanErrorCode.Empty, path }); return INVALID; }
+  if (list.length > maximumLength) { issues.push({ code: PlanErrorCode.TooLarge, path }); return INVALID; }
+  if (hasHoles(list)) { issues.push({ code: PlanErrorCode.WrongType, path }); return INVALID; }
   return list;
 }
 
 export function readInteger(input: unknown, path: string, issues: Issues, lowest: number, highest: number): Parsed<number> {
-  if (typeof input !== 'number' || !Number.isInteger(input)) { issues.push({ code: 'wrong_type', path }); return INVALID; }
-  if (input < lowest || input > highest) { issues.push({ code: 'unknown_value', path }); return INVALID; }
+  if (typeof input !== 'number' || !Number.isInteger(input)) { issues.push({ code: PlanErrorCode.WrongType, path }); return INVALID; }
+  if (input < lowest || input > highest) { issues.push({ code: PlanErrorCode.UnknownValue, path }); return INVALID; }
   return input;
 }
 

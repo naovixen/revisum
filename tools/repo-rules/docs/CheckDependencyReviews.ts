@@ -10,10 +10,11 @@
 // are in tools/repo-rules/docs/DependencyReviews.ts.
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { DEPENDENCY_REVIEWS, type DependencyReview } from './DependencyReviews.ts';
+import { DependencyCheckResult, DEPENDENCY_REVIEWS, type DependencyReview } from './DependencyReviews.ts';
 import type { Token } from '../naming/LintRepository.ts';
 import { closingParenthesis, CODE_FILE, codeTokens, isPunctuator } from '../ListSourceFiles.ts';
 import { readWorkspacePackages, reportProblems } from '../ReadWorkspacePackages.ts';
+import { TokenKind } from '../naming/LintRepository.ts';
 
 const SUITE_CALLS = new Set(['describe', 'suite']);
 const TEST_CALLS = new Set([...SUITE_CALLS, 'test', 'it']);
@@ -124,7 +125,7 @@ function evidencePath(evidence: string): string | undefined {
 function literalTitle(tokens: readonly Token[], open: number): string | undefined {
   const title = tokens[open + 1];
   const isWholeArgument = isPunctuator(tokens[open + 2], ',') || isPunctuator(tokens[open + 2], ')');
-  if (!isWholeArgument || (title?.kind !== 'string' && title?.kind !== 'template')) {
+  if (!isWholeArgument || (title?.kind !== TokenKind.String && title?.kind !== TokenKind.Template)) {
     return undefined;
   }
   return title.text.replace(/\\(.)/gs, '$1');
@@ -133,7 +134,7 @@ function literalTitle(tokens: readonly Token[], open: number): string | undefine
 // The "(" of the node:test call starting at `index`: `test(…)`, or `test.only(…)` and its like.
 function testCallOpening(tokens: readonly Token[], index: number): number | undefined {
   const token = tokens[index];
-  if (token?.kind !== 'identifier' || !TEST_CALLS.has(token.text) || isPunctuator(tokens[index - 1], '.')) {
+  if (token?.kind !== TokenKind.Identifier || !TEST_CALLS.has(token.text) || isPunctuator(tokens[index - 1], '.')) {
     return undefined;
   }
   const hasModifier = isPunctuator(tokens[index + 1], '.') && TEST_CALL_MODIFIERS.has(tokens[index + 2]?.text ?? '');
@@ -191,7 +192,7 @@ export function checkDependencyReviews(root: string, reviews: readonly Dependenc
     }
   }
   for (const review of reviews) {
-    const failing = Object.entries(review.results).filter(([, result]) => result === 'fail').map(([check]) => check);
+    const failing = Object.entries(review.results).filter(([, result]) => result === DependencyCheckResult.Fail).map(([check]) => check);
     if (review.decision === 'default' && failing.length > 0) {
       problems.push(`${review.component} fails ${failing.join(', ')}, so it cannot stay on the default path; make it an optional adapter or drop it`);
     }

@@ -48,7 +48,7 @@ Architecture refactor:
   - [x] Golden check tolerates a move: tests, then code, keeping the old and new globs and updating ignore files
   - [x] Move packages, tools, config and docs (`79725ed`)
   - [x] Move test data, tests and helpers, with their imports and paths (`e88db4c`). Goldens and fixtures all exact renames. Stale paths left for phase 5: `CLAUDE.md` names the old `tools/check-tests-apart.ts` (now `tools/repo-rules/commits/CheckTestsApart.ts`), and `docs/prompts/session-00-seed.md`, `session-core-review.md` and `session-decision-assessment.md` have one old path each and need the founder's agreement
-  - [ ] Verify the move: `npm run check`, `check:push`, `check:containers`; goldens rename-only; test count unchanged
+  - [x] Verify the move at `4a95f3e`: `npm run check:linux` green (78 minutes) and `npm run check:containers` green (168 of 170, 2 skipped); goldens rename-only; test counts reconciled
   - [ ] Sweeps, each its own commit pair: domain strings to constants, `curly`, Prettier; new ESLint rules on
   - [ ] Carried findings: 193, 196, 245, 294, 320, 326, 332, 356
   - [ ] After the founder pushes: drop the legacy `fixtures/` and `golden/` globs

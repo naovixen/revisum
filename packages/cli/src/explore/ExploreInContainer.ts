@@ -11,7 +11,8 @@ import {
   type ClearedRun, type EventSink, type Project, type Target,
 } from '@revisum/engine';
 import { buildAdapters } from '../wiring/BuildAdapters.ts';
-import { CONTAINER_EXIT, crawlInBrowser, crawlTarget, decodeContainerCrawlInput } from './CrawlInBrowser.ts';
+import { CrawlStop, CONTAINER_EXIT, crawlInBrowser, crawlTarget, decodeContainerCrawlInput } from './CrawlInBrowser.ts';
+import { GuaranteeLevel } from '@revisum/contracts';
 
 // Where the run image keeps the pinned Chrome for Testing builds, relative to the working folder.
 const BROWSER_CACHE = join('.browsers', 'chrome');
@@ -77,13 +78,13 @@ async function main(): Promise<number> {
     redactor: ports.redactor, secrets: ports.secrets, audit: ports.audit,
     options: {
       start: input.start, maximumPages: input.maximumPages, maximumDepth: input.maximumDepth,
-      pageTimeoutMilliseconds: input.pageTimeoutMilliseconds, placement: 'isolated',
+      pageTimeoutMilliseconds: input.pageTimeoutMilliseconds, placement: GuaranteeLevel.Isolated,
     },
     ...(login === undefined ? { project: project.value, target } : { login, runLogin: ports.runLogin }),
   });
   if (!crawled.ok) {
-    if (crawled.error === 'explore-start-unreachable') return stop(CONTAINER_EXIT.startUnreachable, crawled.error);
-    if (crawled.error === 'plan-rejected') return stop(CONTAINER_EXIT.loginRefused, crawled.error);
+    if (crawled.error === CrawlStop.ExploreStartUnreachable) return stop(CONTAINER_EXIT.startUnreachable, crawled.error);
+    if (crawled.error === CrawlStop.PlanRejected) return stop(CONTAINER_EXIT.loginRefused, crawled.error);
     return stop(CONTAINER_EXIT.failed, crawled.error);
   }
   process.stdout.write(pageMapText(crawled.value));

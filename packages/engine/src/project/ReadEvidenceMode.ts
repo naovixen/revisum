@@ -6,7 +6,7 @@
 import type {
   EnvironmentValue, EvidenceLimits, EvidenceMode, EvidenceSuiteDeclaration, ImageDigest, SafeText, SecretName, SuiteName,
 } from '@revisum/contracts';
-import { SuiteFramework } from '@revisum/contracts';
+import { PlanErrorCode, SuiteFramework } from '@revisum/contracts';
 import { brand } from '../foundation/Brand.ts';
 import { looksLikeCredential } from '../plan/LooksLikeCredential.ts';
 import {
@@ -93,7 +93,7 @@ export function readEvidenceMode(input: unknown, issues: Issues, secretNames: re
   if (!allValid(suites)) return INVALID;
   const seen = new Set<string>();
   for (const [index, suite] of suites.entries()) {
-    if (seen.has(suite.name)) { issues.push({ code: 'duplicate', path: `${path}.suites[${index}].name` }); return INVALID; }
+    if (seen.has(suite.name)) { issues.push({ code: PlanErrorCode.Duplicate, path: `${path}.suites[${index}].name` }); return INVALID; }
     seen.add(suite.name);
   }
   return { suites, limits };
@@ -149,14 +149,14 @@ function readSuite(input: unknown, path: string, context: SuiteContext): Parsed<
 }
 
 export function readSuiteName(input: unknown, path: string, issues: Issues): Parsed<SuiteName> {
-  if (typeof input !== 'string') { issues.push({ code: 'wrong_type', path }); return INVALID; }
-  if (!SUITE_NAME.test(input)) { issues.push({ code: 'unknown_value', path }); return INVALID; }
+  if (typeof input !== 'string') { issues.push({ code: PlanErrorCode.WrongType, path }); return INVALID; }
+  if (!SUITE_NAME.test(input)) { issues.push({ code: PlanErrorCode.UnknownValue, path }); return INVALID; }
   return brand<string, 'SuiteName'>(input);
 }
 
 // Anything but "sha256:" and 64 lowercase hex digits, a tag included, is the wrong kind of value.
 export function readImageDigest(input: unknown, path: string, issues: Issues): Parsed<ImageDigest> {
-  if (typeof input !== 'string' || !IMAGE_DIGEST.test(input)) { issues.push({ code: 'wrong_type', path }); return INVALID; }
+  if (typeof input !== 'string' || !IMAGE_DIGEST.test(input)) { issues.push({ code: PlanErrorCode.WrongType, path }); return INVALID; }
   return brand<string, 'ImageDigest'>(input);
 }
 
@@ -164,7 +164,7 @@ export function readImageDigest(input: unknown, path: string, issues: Issues): P
 function readInsidePath(input: unknown, path: string, issues: Issues): Parsed<SafeText> {
   const text = readUnscannedText(input, path, issues, MAXIMUM_PATH_LENGTH);
   if (text === INVALID) return INVALID;
-  if (!staysInside(text)) { issues.push({ code: 'path_not_allowed', path }); return INVALID; }
+  if (!staysInside(text)) { issues.push({ code: PlanErrorCode.PathNotAllowed, path }); return INVALID; }
   return text;
 }
 
@@ -173,7 +173,7 @@ function readSuitePaths(input: unknown, path: string, issues: Issues): Parsed<re
   if (raw === INVALID) return INVALID;
   const paths = raw.map((entry, index) => readInsidePath(entry, `${path}[${index}]`, issues));
   if (!allValid(paths)) return INVALID;
-  if (new Set(paths).size !== paths.length) { issues.push({ code: 'duplicate', path }); return INVALID; }
+  if (new Set(paths).size !== paths.length) { issues.push({ code: PlanErrorCode.Duplicate, path }); return INVALID; }
   return paths;
 }
 
@@ -194,7 +194,7 @@ function readPlaywrightCommand(input: unknown, path: string, issues: Issues): Pa
   const ownArguments = invocation === undefined ? [] : command.slice(invocation.length);
   const setsOwnArgument = ownArguments.some((argument) =>
     ARGUMENTS_REVISUM_SETS.some((name) => argument === name || argument.startsWith(`${name}=`)));
-  if (invocation === undefined || setsOwnArgument) { issues.push({ code: 'command_not_allowed', path }); return INVALID; }
+  if (invocation === undefined || setsOwnArgument) { issues.push({ code: PlanErrorCode.CommandNotAllowed, path }); return INVALID; }
   return command;
 }
 
@@ -203,7 +203,7 @@ function readProjects(input: unknown, path: string, issues: Issues): Parsed<read
   if (raw === INVALID) return INVALID;
   const projects = raw.map((entry, index) => readUnscannedText(entry, `${path}[${index}]`, issues, MAXIMUM_PROJECT_NAME_LENGTH));
   if (!allValid(projects)) return INVALID;
-  if (new Set(projects).size !== projects.length) { issues.push({ code: 'duplicate', path }); return INVALID; }
+  if (new Set(projects).size !== projects.length) { issues.push({ code: PlanErrorCode.Duplicate, path }); return INVALID; }
   return projects;
 }
 
@@ -232,22 +232,22 @@ function readEnvironmentValue(input: unknown, path: string, context: SuiteContex
     const at = `${path}.literal`;
     const literal = readUnscannedText(fields['literal'], at, issues, MAXIMUM_LITERAL_LENGTH, 0);
     if (literal === INVALID) return INVALID;
-    if (looksLikeCredential(literal)) { issues.push({ code: 'literal_secret', path: at }); return INVALID; }
+    if (looksLikeCredential(literal)) { issues.push({ code: PlanErrorCode.LiteralSecret, path: at }); return INVALID; }
     return { literal };
   }
   const fields = readRecord(input, path, issues, ['secretName']);
   if (fields === INVALID) return INVALID;
   const at = `${path}.secretName`;
   const secretName = fields['secretName'];
-  if (typeof secretName !== 'string') { issues.push({ code: 'wrong_type', path: at }); return INVALID; }
+  if (typeof secretName !== 'string') { issues.push({ code: PlanErrorCode.WrongType, path: at }); return INVALID; }
   const found = context.secretNames.find((name) => name === secretName);
-  if (found === undefined) { issues.push({ code: 'unknown_value', path: at }); return INVALID; }
+  if (found === undefined) { issues.push({ code: PlanErrorCode.UnknownValue, path: at }); return INVALID; }
   return { secretName: found };
 }
 
 // An optional true or false; absent keeps `fallback`. Present but null is not "absent".
 function readSetting(fields: Readonly<Record<string, unknown>>, key: string, path: string, issues: Issues, fallback: boolean): Parsed<boolean> {
   const value = Object.hasOwn(fields, key) ? fields[key] : fallback;
-  if (typeof value !== 'boolean') { issues.push({ code: 'wrong_type', path: `${path}.${key}` }); return INVALID; }
+  if (typeof value !== 'boolean') { issues.push({ code: PlanErrorCode.WrongType, path: `${path}.${key}` }); return INVALID; }
   return value;
 }

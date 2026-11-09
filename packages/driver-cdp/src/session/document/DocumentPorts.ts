@@ -1,6 +1,6 @@
 // The ports of one document: the top document of a tab, or an iframe's document inside it.
 import {
-    failure,
+    DriverErrorCode, NavigateScripts, failure,
     success,
     type DocumentSession,
     type DriverError,
@@ -54,9 +54,9 @@ async function navigateDocument<Handle>(
         return failure(alreadyRefused);
     }
     // Scripts are a setting of the whole page, so only the top document's navigate turns them off.
-    if (options.scripts === "disabled" && !isTopDocument(scope)) {
+    if (options.scripts === NavigateScripts.Disabled && !isTopDocument(scope)) {
         return failure({
-            code: "unsupported-step",
+            code: DriverErrorCode.UnsupportedStep,
             detail: "scripts can be turned off only for the top document",
         });
     }
@@ -104,7 +104,7 @@ function failureOfNavigation<Handle>(scope: DocumentScope<Handle>, error: unknow
     }
     return error instanceof PageHeldByDialog
         ? DIALOG_OPEN
-        : { code: "navigation-failed", detail: errorText(error) };
+        : { code: DriverErrorCode.NavigationFailed, detail: errorText(error) };
 }
 
 async function frameOf<Handle>(
@@ -137,7 +137,7 @@ async function frameOf<Handle>(
     // An element that is no iframe, or an iframe whose document runs in another process.
     if (inner === null) {
         return failure({
-            code: "unsupported-step",
+            code: DriverErrorCode.UnsupportedStep,
             detail: "the element is not an iframe whose document this driver can reach",
         });
     }

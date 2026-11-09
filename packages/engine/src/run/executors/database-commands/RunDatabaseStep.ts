@@ -14,7 +14,7 @@
 // hand under the declaration's limits. Neither the output nor a field's value is kept: the result
 // and the log record the output's sha256, and a remembered value's name and sha256.
 import {
-  failure, StepCode, stepFailed, success, type StepOutcome,
+  CallEffect, BackendAssertionKind, CommandOutput, WorkloadOutcomeKind, failure, StepCode, stepFailed, success, StepOutcome,
   type CommandName, type Clock, type DatabaseCommandDeclaration, type DatabaseCommandRequest, type DatabaseCommandRunner, type DatabaseStep,
   type DeclaredService, type ExpectDatabaseStep, type FieldName, type ParameterName, type Result, type ScriptArguments,
   type DatabaseCommandRecord, type SecretStore, type ValueName, type WorkloadErrorCode, type WorkloadOutcome, type WorkloadVariable,
@@ -30,6 +30,7 @@ import { sha256UnlessHoldingASecret } from '../../../secrets/ResolvePlanSecrets.
 import { argumentProblem, argumentText, runValueArgument, type ArgumentValue } from '../service-calls/ArgumentValue.ts';
 import { checkBackendField, fieldAt, fieldText } from '../service-calls/CheckBackendField.ts';
 import { isJudgedLookDone, pollUntil, type JudgedLook } from '../../PollUntil.ts';
+import { EventKind } from '../../logging/LoggingManifest.ts';
 
 // A declared command's limits when its declaration sets none: 60 seconds and 1 MiB.
 export const DEFAULT_COMMAND_TIMEOUT_MILLISECONDS = 60_000;
@@ -192,10 +193,10 @@ function judgedReply(
 ): Result<unknown, DatabaseStepCode> {
   if (!reply.ok) return reply;
   const outcome = reply.value;
-  if (outcome.kind === 'timed-out') return failure('command-timeout');
+  if (outcome.kind === WorkloadOutcomeKind.TimedOut) return failure('command-timeout');
   if (!declaration.successExitCodes.includes(outcome.exitCode)) return failure('command-failed');
   if (outcome.stdout.truncated || outcome.stdout.bytes.length > maximumOutputBytes) return failure('command-output-invalid');
-  return declaration.output === 'json' ? outputJson(outcome.stdout.bytes) : success(null);
+  return declaration.output === CommandOutput.Json ? outputJson(outcome.stdout.bytes) : success(null);
 }
 
 type OneRun = { readonly result: Result<unknown, DatabaseStepCode>; readonly exitCode: number | null; readonly outputSha256: string | null };
@@ -218,11 +219,11 @@ async function runOnce(
   // Output cut short is only part of what was printed, so it has no hash to keep.
   const outputSha256 = reply.ok && !reply.value.stdout.truncated ? sha256UnlessHoldingASecret(reply.value.stdout.bytes, context.holdsSecret) : null;
   context.logger.log({
-    kind: 'database.command', stepIndex, stepType, outcome: result.ok ? 'passed' : 'failed',
+    kind: EventKind.DatabaseCommand, stepIndex, stepType, outcome: result.ok ? 'passed' : 'failed',
     ...(result.ok ? {} : { code: result.error }), ...(outputSha256 === null ? {} : { sha256: outputSha256 }),
     durationMilliseconds: context.clock.now() - startedAt,
   });
-  return { result, exitCode: reply.ok && reply.value.kind === 'exited' ? reply.value.exitCode : null, outputSha256 };
+  return { result, exitCode: reply.ok && reply.value.kind === WorkloadOutcomeKind.Exited ? reply.value.exitCode : null, outputSha256 };
 }
 
 const record = (found: Declared, once: OneRun | null, attempts: number): DatabaseCommandRecord => ({
@@ -263,7 +264,7 @@ export async function runDatabaseStep(step: DatabaseStep, stepIndex: number, con
   if (!texts.ok) return failedWith(texts.error, databaseCommand);
   const remembered = context.remembered.rememberAll(texts.value, stepIndex);
   if (!remembered.ok) return failedWith(remembered.error, databaseCommand);
-  return { outcome: 'passed', databaseCommand, ...recordsOfRemembered(remembered.value) };
+  return { outcome: StepOutcome.Passed, databaseCommand, ...recordsOfRemembered(remembered.value) };
 }
 
 // A database check: its read command rerun until the field passes or the backend check timeout
@@ -287,10 +288,10 @@ export async function runDatabaseCheck(step: ExpectDatabaseStep, stepIndex: numb
     // A command that failed, timed out or printed nothing readable would do the same again.
     if (!once.result.ok) return { outcome: failedWith(once.result.error, databaseCommand), isDone: true };
     const field = outputField(once.result.value, found.declaration, step.field);
-    if (checkBackendField(step.assert, field.ok ? { value: field.value } : undefined, expected.value)) return { outcome: { outcome: 'passed', databaseCommand }, isDone: true };
-    const code = !field.ok && step.assert.kind !== 'present' && step.assert.kind !== 'absent' ? 'field-missing' : 'assertion-failed';
+    if (checkBackendField(step.assert, field.ok ? { value: field.value } : undefined, expected.value)) return { outcome: { outcome: StepOutcome.Passed, databaseCommand }, isDone: true };
+    const code = !field.ok && step.assert.kind !== BackendAssertionKind.Present && step.assert.kind !== BackendAssertionKind.Absent ? 'field-missing' : 'assertion-failed';
     // The parser lets only a read command stand in a check; a write one is never run twice all the same.
-    return { outcome: failedWith(code, databaseCommand), isDone: found.declaration.effect === 'write' };
+    return { outcome: failedWith(code, databaseCommand), isDone: found.declaration.effect === CallEffect.Write };
   });
   return last.outcome;
 }

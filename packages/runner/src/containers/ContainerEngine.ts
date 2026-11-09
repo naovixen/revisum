@@ -7,10 +7,18 @@ import { failure, success, type ExecOutcome, type Result } from '@revisum/contra
 import { spawn, type ChildProcessByStdio } from 'node:child_process';
 import type { Readable } from 'node:stream';
 
+export const MountKind = {
+  Folder: 'folder',
+  File: 'file',
+  Volume: 'volume',
+} as const;
+
+export type MountKind = (typeof MountKind)[keyof typeof MountKind];
+
 // A host folder, a single host file or a named volume, mounted read-only unless `writable` says
 // otherwise. Only a workload's output folder is ever writable.
 export type ContainerMount = {
-  readonly kind: 'folder' | 'file' | 'volume'; readonly source: string; readonly target: string; readonly writable?: true;
+  readonly kind: MountKind; readonly source: string; readonly target: string; readonly writable?: true;
 };
 
 // A container to start. Every container the engine starts is also hardened the same way: no
@@ -59,6 +67,14 @@ export type ProbeTarget = {
   // answered there, even with no service on this port. Elsewhere a refusal means not reached.
   readonly refusalCountsAsReached?: true;
 };
+
+export const ImageAnswerKind = {
+  Found: 'found',
+  Absent: 'absent',
+  Unanswered: 'unanswered',
+} as const;
+
+export type ImageAnswerKind = (typeof ImageAnswerKind)[keyof typeof ImageAnswerKind];
 
 // What the engine says about an image, by reference: it has it, it has none, or it could not say.
 export type ImageAnswer =
@@ -190,7 +206,7 @@ const startProblem = (cause: DockerOutcome, removed: Result<void, EngineProblem>
   (removed.ok ? problem(cause) : { detail: `${problem(cause).detail}; it could not be removed afterwards: ${removed.error.detail}` });
 
 function mountArgument(mount: ContainerMount): string {
-  const type = mount.kind === 'volume' ? 'volume' : 'bind';
+  const type = mount.kind === MountKind.Volume ? 'volume' : 'bind';
   return `type=${type},source=${mount.source},target=${mount.target}${mount.writable === true ? '' : ',readonly'}`;
 }
 
@@ -245,9 +261,9 @@ export function dockerCliEngine(): ContainerEngine {
     async imageId(reference) {
       const outcome = await runDocker(['image', 'inspect', '--format', '{{.Id}}', reference]);
       const id = outcome.stdout.trim();
-      if (outcome.status === 0 && id !== '') {return { kind: 'found', id };}
-      if (outcome.status !== 0 && NO_SUCH_IMAGE.test(outcome.stderr)) {return { kind: 'absent' };}
-      return { kind: 'unanswered', problem: problem(outcome) };
+      if (outcome.status === 0 && id !== '') {return { kind: ImageAnswerKind.Found, id };}
+      if (outcome.status !== 0 && NO_SUCH_IMAGE.test(outcome.stderr)) {return { kind: ImageAnswerKind.Absent };}
+      return { kind: ImageAnswerKind.Unanswered, problem: problem(outcome) };
     },
     async createNetwork(name, options) {
       const outcome = await runDocker(['network', 'create', ...(options.internal ? ['--internal', '--opt', NO_GATEWAY_OPTION] : []), name]);

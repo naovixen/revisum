@@ -18,13 +18,22 @@ import {
   type VariableName,
 } from '@revisum/engine';
 import { buildEgressPolicy, readVariableName } from '@revisum/runner';
+import { GuaranteeLevel, TerminalState, Engine } from '@revisum/contracts';
 
 // Why a crawl stopped, as the command reports it.
 // target-unavailable: the browser did not open.
 // plan-rejected: the --after plan did not pass, so the pages would not be the signed-in ones.
 // explore-crawl-crashed: the crawl started in the run container and ended with a failure of its own.
-export type CrawlStop =
-  | 'explore-origin-refused' | 'explore-start-unreachable' | 'explore-runner-unavailable' | 'explore-crawl-crashed' | 'target-unavailable' | 'plan-rejected';
+export const CrawlStop = {
+  ExploreOriginRefused: 'explore-origin-refused',
+  ExploreStartUnreachable: 'explore-start-unreachable',
+  ExploreRunnerUnavailable: 'explore-runner-unavailable',
+  ExploreCrawlCrashed: 'explore-crawl-crashed',
+  TargetUnavailable: 'target-unavailable',
+  PlanRejected: 'plan-rejected',
+} as const;
+
+export type CrawlStop = (typeof CrawlStop)[keyof typeof CrawlStop];
 
 // What a crawl in a browser found or why it stopped, and what its session's close said. The close says
 // nothing of the pages, so the crawl's outcome stands whatever it was; it is carried to the command's
@@ -80,7 +89,7 @@ const CRAWL_SEED = 0;
 
 // The target a crawl opens its session on: the project's first Chromium target, since the crawl
 // reads pages through the CDP driver.
-export const crawlTarget = (project: Project): Target | undefined => project.matrix.find((target) => target.engine === 'chromium');
+export const crawlTarget = (project: Project): Target | undefined => project.matrix.find((target) => target.engine === Engine.Chromium);
 
 // Longer than a driver's stop takes to give up by itself, so this deadline is only for what has wedged.
 const SESSION_CLOSE_DEADLINE_MILLISECONDS = 60_000;
@@ -145,7 +154,7 @@ async function crawlOpenSession(
     const loggedIn = await crawl.runLogin(onItsSession, {
       baseUrl, seed: CRAWL_SEED, fixedTimeMilliseconds, fixtures: [], host: { platform: platform(), arch: arch() },
     });
-    if (loggedIn.state !== 'Passed') {return failure('plan-rejected');}
+    if (loggedIn.state !== TerminalState.Passed) {return failure('plan-rejected');}
   }
   // Navigation and reads only: nothing else of the session is in reach of the crawl.
   const explorer: ExploreDriver = {
@@ -208,7 +217,7 @@ export async function crawlInRunner(
     crawlInRun(run, isolated, input, origin, variableNames.filter((name) => name !== null), redactor));
   if (!crawled.ok) {return failure('explore-runner-unavailable');}
   // Read after the run's end, so this says whether all of the crawl's egress was recorded.
-  const isStillIsolated = crawled.value.final.guaranteeLevel === 'isolated';
+  const isStillIsolated = crawled.value.final.guaranteeLevel === GuaranteeLevel.Isolated;
   return isStillIsolated ? crawled.value.value : failure('explore-runner-unavailable');
 }
 
@@ -216,7 +225,7 @@ export async function crawlInRunner(
 async function crawlInRun(
   run: RunnerHandle, isolated: IsolatedRunner, input: ContainerCrawlInput, origin: Origin, variableNames: readonly VariableName[], redactor: Redactor,
 ): Promise<Result<PageMap, CrawlStop>> {
-  if (run.guaranteeLevel() !== 'isolated') {return failure('explore-runner-unavailable');}
+  if (run.guaranteeLevel() !== GuaranteeLevel.Isolated) {return failure('explore-runner-unavailable');}
   const given: ContainerCrawlInput = isolated.browserPath === undefined ? input : { ...input, browserPath: isolated.browserPath };
   const executed = await run.exec(['node', CONTAINER_CRAWL_MODULE, JSON.stringify(given)], variableNames);
   if (!executed.ok) {return failure('explore-runner-unavailable');}
@@ -231,7 +240,7 @@ async function crawlInRun(
     return failure('explore-runner-unavailable');
   }
   const decoded = decodePageMap(printed, origin);
-  if (!decoded.ok || decoded.value.guaranteeLevel !== 'isolated') {return failure('explore-runner-unavailable');}
+  if (!decoded.ok || decoded.value.guaranteeLevel !== GuaranteeLevel.Isolated) {return failure('explore-runner-unavailable');}
   // Redacted again on the host, in case the container lacked a secret's value.
   return success(redactPageMap(decoded.value, redactor));
 }

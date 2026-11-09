@@ -1,4 +1,4 @@
-import { isNonArrayObject } from "@revisum/contracts";
+import { PlanErrorCode, isNonArrayObject } from "@revisum/contracts";
 import type { ReadableInput } from "../decoding/ReadableCopy.ts";
 import { INVALID, readRecord, type Issues, type Parsed } from "./parse/ReadRecord.ts";
 
@@ -108,7 +108,7 @@ export function readFields(
         const value = readField(fields[key], fieldPath, issues);
         // A rejection must give its reason, even when the reader doesn't.
         if (value === INVALID && issues.length === issuesBeforeField) {
-            issues.push({ code: "wrong_type", path: fieldPath });
+            issues.push({ code: PlanErrorCode.WrongType, path: fieldPath });
         }
         return [[key, value]];
     });

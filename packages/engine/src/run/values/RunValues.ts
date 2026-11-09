@@ -4,7 +4,7 @@
 // seed or clock start) gives new unique ones. Substitution happens before the policy gate's
 // runtime guard, so the guard sees the final text and URL.
 import {
-  failure, literalText, referencedValueName, StepCode, success,
+  StepType, ElementTextKind, ElementAssertionKind, StructuralLocatorKind, SemanticLocatorKind, GeneratedValueKind, failure, literalText, referencedValueName, StepCode, success,
   type AllowedUrl, type ElementAssertion, type GeneratedValue, type Locator, type PathTemplate, type Plan,
   type PlanClock, type ResolvedActionStep, type ResolvedMultiLineText, type ResolvedElementAssertion, type ResolvedLocator, type Result, type SafeText, type SecretReference, type Step,
   type Target,
@@ -77,15 +77,15 @@ export function generateValue(
   const digest = uniqueDigest(name, seed, clockStartMilliseconds);
   const text = ((): string => {
     switch (value.kind) {
-      case 'uniqueText': return `${value.prefix}-${uniquePart(digest)}`;
-      case 'uniqueEmail': {
+      case GeneratedValueKind.UniqueText: return `${value.prefix}-${uniquePart(digest)}`;
+      case GeneratedValueKind.UniqueEmail: {
         // The project parser never leaves the list empty; it defaults to example.com.
         const domain = value.domain ?? project.generatedEmailDomains[0];
         if (domain === undefined) throw new TypeError('the project declares no email domain for a generated email address');
         return `${value.localPrefix}-${uniquePart(digest)}@${domain}`;
       }
-      case 'uniqueNumber': return uniqueNumber(digest, value.digits);
-      case 'date': {
+      case GeneratedValueKind.UniqueNumber: return uniqueNumber(digest, value.digits);
+      case GeneratedValueKind.Date: {
         const day = relativeCalendarDay(value.day, clockStartMilliseconds, target.timezone);
         return formatCalendarDay(day, value.format, target.locale, target.timezone);
       }
@@ -139,23 +139,23 @@ export function resolveText(text: TextOrValue, values: RunValues, maximumLength:
 // selector is always literal; only its hasText, and the locators it is inside, may hold a reference.
 export function resolveLocator(locator: Locator, values: RunValues, project: LimitsOf): Result<ResolvedLocator, StepErrorCode> {
   switch (locator.by) {
-    case 'role': {
+    case SemanticLocatorKind.Role: {
       const name = resolveText(locator.name, values, project.limits.maximumTextLength);
       return name.ok ? success({ ...locator, name: name.value }) : name;
     }
-    case 'label': {
+    case SemanticLocatorKind.Label: {
       const label = resolveText(locator.label, values, project.limits.maximumTextLength);
       return label.ok ? success({ ...locator, label: label.value }) : label;
     }
-    case 'text': {
+    case SemanticLocatorKind.Text: {
       const text = resolveText(locator.text, values, project.limits.maximumTextLength);
       return text.ok ? success({ ...locator, text: text.value }) : text;
     }
-    case 'testId': {
+    case SemanticLocatorKind.TestId: {
       const testId = resolveText(locator.testId, values, project.limits.maximumTextLength);
       return testId.ok ? success({ ...locator, testId: testId.value }) : testId;
     }
-    case 'css': case 'xpath': {
+    case StructuralLocatorKind.Css: case StructuralLocatorKind.Xpath: {
       const hasText = locator.hasText === undefined ? undefined : resolveText(locator.hasText, values, project.limits.maximumTextLength);
       if (hasText !== undefined && !hasText.ok) return hasText;
       const inside = locator.inside === undefined ? undefined : resolveLocator(locator.inside, values, project);
@@ -164,7 +164,7 @@ export function resolveLocator(locator: Locator, values: RunValues, project: Lim
         ...(hasText === undefined ? {} : { hasText: hasText.value }), ...(inside === undefined ? {} : { inside: inside.value }),
         ...(locator.position === undefined ? {} : { position: locator.position }),
       };
-      return success(locator.by === 'css' ? { by: 'css', selector: locator.selector, ...optional } : { by: 'xpath', expression: locator.expression, ...optional });
+      return success(locator.by === StructuralLocatorKind.Css ? { by: StructuralLocatorKind.Css, selector: locator.selector, ...optional } : { by: StructuralLocatorKind.Xpath, expression: locator.expression, ...optional });
     }
   }
 }
@@ -174,15 +174,15 @@ export function resolveElementAssertion(
   assertion: ElementAssertion, values: RunValues, project: Project,
 ): Result<ResolvedElementAssertion, StepErrorCode> {
   switch (assertion.kind) {
-    case 'hasClass': case 'lacksClass': case 'computedStyleEquals': case 'attributeAbsent':
+    case ElementAssertionKind.HasClass: case ElementAssertionKind.LacksClass: case ElementAssertionKind.ComputedStyleEquals: case ElementAssertionKind.AttributeAbsent:
       return success(assertion);
-    case 'attributeEquals': {
+    case ElementAssertionKind.AttributeEquals: {
       const value = resolveText(assertion.value, values, project.limits.maximumTextLength);
       return value.ok ? success({ kind: assertion.kind, name: assertion.name, value: value.value }) : value;
     }
-    case 'countEquals':
+    case ElementAssertionKind.CountEquals:
       return success(assertion);
-    case 'textEquals': case 'textContains': case 'valueEquals': case 'valueContains': case 'hrefEquals': {
+    case ElementTextKind.TextEquals: case ElementTextKind.TextContains: case ElementTextKind.ValueEquals: case ElementTextKind.ValueContains: case ElementAssertionKind.HrefEquals: {
       const value = resolveText(assertion.value, values, project.limits.maximumTextLength);
       return value.ok ? success({ kind: assertion.kind, value: value.value }) : value;
     }
@@ -228,10 +228,10 @@ export function resolveInputStep(step: InputStep, values: RunValues, project: Li
     return locator;
   }
   switch (step.type) {
-    case 'click': case 'hover': return success({ type: step.type, locator: locator.value });
-    case 'upload': return success({ type: step.type, locator: locator.value, fixture: step.fixture });
-    case 'press': return success({ ...step, locator: locator.value });
-    case 'select': {
+    case StepType.Click: case StepType.Hover: return success({ type: step.type, locator: locator.value });
+    case StepType.Upload: return success({ type: step.type, locator: locator.value, fixture: step.fixture });
+    case StepType.Press: return success({ ...step, locator: locator.value });
+    case StepType.Select: {
       const option = resolveText(step.option, values, project.limits.maximumTextLength);
       return option.ok ? success({ type: step.type, locator: locator.value, option: option.value }) : option;
     }
@@ -242,7 +242,7 @@ export function resolveInputStep(step: InputStep, values: RunValues, project: Li
 export function resolveActionStep(
   step: Extract<Step, { type: ResolvedActionStep['type'] }>, values: RunValues, project: LimitsOf,
 ): Result<ResolvedActionStep, StepErrorCode> {
-  if (step.type !== 'fill') {
+  if (step.type !== StepType.Fill) {
     return resolveInputStep(step, values, project);
   }
   const locator = resolveLocator(step.locator, values, project);

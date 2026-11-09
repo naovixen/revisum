@@ -17,7 +17,7 @@ import {
 import { FROM_FIELD } from '../schema/PlanFields.ts';
 import { STEP_FACTS, STEP_TYPES, UNSAFE_STEP_TYPES } from '../StepFacts.ts';
 import {
-  BARE, DIGITS, END, NUMBER, QUOTED, REFERENCE, URL_WORD,
+  TextErrorCode, BARE, DIGITS, END, NUMBER, QUOTED, REFERENCE, URL_WORD,
   better, choice, constant, countedWord, either, entry, field, group, isRecord, list, map, notThisStatement, oneOf, optional, orElse,
   phrases, record, reportedAs, skipSpaces, unitOf, wordAt, words, wordsFor,
   type EntrySyntax, type RecordPart, type Syntax,
@@ -72,7 +72,7 @@ const POSITION: Syntax = {
     const ordinal = /^([0-9]+)([A-Za-z]+)$/.exec(word);
     if (ordinal === null) return { ok: false, failure: notThisStatement(start) };
     const position = Number(ordinal[1]);
-    if ((ordinal[2] ?? '').toLowerCase() !== ordinalSuffix(position)) return { ok: false, failure: { code: 'bad-locator', column: start + 1, reach: start } };
+    if ((ordinal[2] ?? '').toLowerCase() !== ordinalSuffix(position)) return { ok: false, failure: { code: TextErrorCode.BadLocator, column: start + 1, reach: start } };
     return { ok: true, value: position, next: end, furthest: undefined };
   },
   write(value) {
@@ -117,7 +117,7 @@ const LOCATOR: Syntax = {
     if (!reading.ok || holdsStructuralLocator(reading.value)) return reading;
     const after = wordAt(line, reading.next);
     if (after.word.toLowerCase() !== 'inside') return reading;
-    return { ok: false, failure: { code: 'bad-locator', column: after.start + 1, reach: after.start } };
+    return { ok: false, failure: { code: TextErrorCode.BadLocator, column: after.start + 1, reach: after.start } };
   },
   write: (value) => ANY_LOCATOR.write(value),
 };
@@ -137,7 +137,7 @@ const KEY_CHORD: RecordPart = {
     for (const [place, name] of names.entries()) {
       const isKey = place === names.length - 1;
       const found = (isKey ? KEYS : MODIFIERS).find((candidate: string) => candidate.toLowerCase() === name.toLowerCase());
-      if (found === undefined) return { ok: false, failure: { code: 'unknown-key-name', column, reach: start } };
+      if (found === undefined) return { ok: false, failure: { code: TextErrorCode.UnknownKeyName, column, reach: start } };
       if (isKey) into['key'] = found;
       else modifiers.push(found);
       column += name.length + 1;
@@ -409,7 +409,12 @@ const STEP_FORMS: { readonly [Type in StepType]: readonly StepForm[] } = {
 };
 
 // The block a statement opens: a frame's or second tab's steps, or an inline script's source lines.
-export type StatementBlock = 'steps' | 'source';
+export const StatementBlock = {
+  Steps: 'steps',
+  Source: 'source',
+} as const;
+
+export type StatementBlock = (typeof StatementBlock)[keyof typeof StatementBlock];
 // A step statement: the step type it reads, its syntax as a whole line (without the ":" that opens
 // a block), and the block it opens, if any. A step type may have several, such as a named and an
 // inline page script.

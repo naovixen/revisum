@@ -8,6 +8,7 @@ import {
 } from "@revisum/contracts";
 import { codeOfFailedRead } from "../../CodeForThrow.ts";
 import type { StepExecutor, StepNeeds } from "../StepExecutor.ts";
+import { EventKind } from "../../logging/LoggingManifest.ts";
 
 function byRuleId(left: A11yFinding, right: A11yFinding): number {
     if (left.ruleId === right.ruleId) {
@@ -27,7 +28,7 @@ export const auditAccessibility: StepExecutor<
         return stepFailed(codeOfFailedRead(audited.error, context.logger));
     }
     const findings = [...audited.value].sort(byRuleId);
-    context.logger.log({ kind: "audit", stepIndex: context.index, findings: findings.length });
+    context.logger.log({ kind: EventKind.Audit, stepIndex: context.index, findings: findings.length });
     if (step.mode === AuditMode.Report || findings.length === 0) {
         return { outcome: StepOutcome.Passed, findings };
     }

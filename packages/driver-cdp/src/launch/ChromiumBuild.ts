@@ -1,7 +1,7 @@
 // Which Chromium build the CDP driver would launch, without launching it, so the engine can pin it
 // by hash. The driver runs the executable it was constructed with; it downloads nothing.
 import {
-    failure,
+    UnavailableReason, BuildFetchFailureCode, failure,
     success,
     type BrowserBuild,
     type BuildFailure,
@@ -39,14 +39,14 @@ function chromiumVersion(executablePath: string): string | null {
 export function chromiumBuild(executablePath: string): Result<BrowserBuild, BuildFailure> {
     if (!existsSync(executablePath) || !statSync(executablePath).isFile()) {
         return failure({
-            code: "lock-download-failed",
+            code: BuildFetchFailureCode.LockDownloadFailed,
             detail: `no Chromium executable at ${executablePath}; install the pinned build with npm run browsers`,
         });
     }
     const version = chromiumVersion(executablePath);
     if (version === null) {
         return failure({
-            code: "launch-failed",
+            code: UnavailableReason.LaunchFailed,
             detail: `cannot tell the Chromium version of ${executablePath} from its path`,
         });
     }

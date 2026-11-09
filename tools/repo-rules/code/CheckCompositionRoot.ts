@@ -21,6 +21,7 @@ import {
     type ModuleSpecifier,
 } from "../ListSourceFiles.ts";
 import { reportProblems } from "../ReadWorkspacePackages.ts";
+import { TokenKind } from "../naming/LintRepository.ts";
 
 export const COMPOSITION_ROOT = "packages/cli/src/wiring/BuildAdapters.ts";
 
@@ -191,7 +192,7 @@ function namesAFixedModule(tokens: readonly Token[], index: number): boolean {
     const argument = tokens[index + 2];
     const after = tokens[index + 3];
     return (
-        (argument?.kind === "string" || argument?.kind === "template") &&
+        (argument?.kind === TokenKind.String || argument?.kind === TokenKind.Template) &&
         (isPunctuator(after, ")") || isPunctuator(after, ","))
     );
 }

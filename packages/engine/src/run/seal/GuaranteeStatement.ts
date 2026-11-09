@@ -3,7 +3,7 @@
 // for the same conditions. The level is the summary: 'isolated' only when every guarantee holds.
 import {
   GUARANTEE_IDS, GuaranteeLevel,
-  type GuaranteeId, type GuaranteeLossReason, type GuaranteeStatement, type RunIsolation, type RunMode, type UnsafeFeature,
+  GuaranteeId, type GuaranteeLossReason, type GuaranteeStatement, type RunIsolation, RunMode, type UnsafeFeature,
 } from '@revisum/contracts';
 
 // The isolation of a run on the host, with no egress enforcement: what a run is handed when no
@@ -51,7 +51,7 @@ const LOST_TO_FEATURE: { readonly [Feature in UnsafeFeature]: readonly Guarantee
 // already lost the claim to egress, and its statement, and so its committed hashes, stay as they were.
 function conditionReasons(guarantee: GuaranteeId, conditions: GuaranteeConditions): GuaranteeLossReason[] {
   const reason = isolationReason(guarantee, conditions);
-  const replayOfPlan = guarantee === 'replay-identical' && conditions.mode === 'plan';
+  const replayOfPlan = guarantee === GuaranteeId.ReplayIdentical && conditions.mode === RunMode.Plan;
   const unpinned = replayOfPlan && conditions.determinismUnpinned === true;
   const notRecorded = replayOfPlan && conditions.egressEnforced && conditions.repliesNotRecorded === true;
   return [
@@ -65,21 +65,21 @@ function conditionReasons(guarantee: GuaranteeId, conditions: GuaranteeCondition
 function isolationReason(guarantee: GuaranteeId, conditions: GuaranteeConditions): GuaranteeLossReason | undefined {
   switch (guarantee) {
     // The team's own test code drives the page, finds elements and decides what passes.
-    case 'plan-closed': case 'actions-guarded': case 'semantic-locators': case 'observable-checks':
-      return conditions.mode === 'evidence' ? 'evidence-mode' : undefined;
+    case GuaranteeId.PlanClosed: case GuaranteeId.ActionsGuarded: case GuaranteeId.SemanticLocators: case GuaranteeId.ObservableChecks:
+      return conditions.mode === RunMode.Evidence ? 'evidence-mode' : undefined;
     // Suite code, the suite's browser and the app server it starts cannot be pinned; and without
     // egress control, nor can what a plan run's page reaches.
-    case 'replay-identical':
-      if (conditions.mode === 'evidence') return 'evidence-mode';
+    case GuaranteeId.ReplayIdentical:
+      if (conditions.mode === RunMode.Evidence) return 'evidence-mode';
       return conditions.egressEnforced ? undefined : 'egress-unenforceable';
     // Only the isolated runner routes every process through the proxy and keeps credentials out.
-    case 'egress-enforced': case 'no-ambient-credentials':
+    case GuaranteeId.EgressEnforced: case GuaranteeId.NoAmbientCredentials:
       return conditions.egressEnforced ? undefined : 'egress-unenforceable';
     // Every output passes through the redactor, whatever produced the text.
-    case 'secrets-redacted':
+    case GuaranteeId.SecretsRedacted:
       return undefined;
     // Revisum's own captures are masked; the suite's screenshots are not.
-    case 'pii-masked':
+    case GuaranteeId.PiiMasked:
       return conditions.unmaskedScreenshotsKept ? 'evidence-mode' : undefined;
   }
 }
@@ -99,5 +99,5 @@ export function guaranteeStatement(conditions: GuaranteeConditions): GuaranteeSt
     if (reasons.length === 0) holds.push(guarantee);
     else lost.push(...reasons.map((because) => ({ guarantee, because })));
   }
-  return { level: lost.length === 0 ? 'isolated' : 'host', holds, lost };
+  return { level: lost.length === 0 ? GuaranteeLevel.Isolated : GuaranteeLevel.Host, holds, lost };
 }

@@ -14,6 +14,7 @@ import type { DraftWarning, Locator, PageMap, PageMapNode, Plan, Step } from '@r
 import type { TextReading } from '../plan/readable/ReadPlanText.ts';
 import { STEP_FACTS } from '../plan/StepFacts.ts';
 import { MAXIMUM_PAGE_MAP_NAME_LENGTH } from './PageMapEntry.ts';
+import { StepType, SemanticLocatorKind } from '@revisum/contracts';
 
 // The roles a label names.
 const FORM_CONTROL_ROLES: readonly string[] = [
@@ -50,8 +51,8 @@ const allNodes = (tree: readonly PageMapNode[]): readonly PageMapNode[] => tree.
 function locatorWarning(locator: Locator, tree: readonly PageMapNode[]): DraftWarning['code'] | undefined {
   let roles: readonly string[];
   let wanted: string;
-  if (locator.by === 'role' && typeof locator.name === 'string') { roles = [locator.role]; wanted = locator.name; }
-  else if (locator.by === 'label' && typeof locator.label === 'string') { roles = FORM_CONTROL_ROLES; wanted = locator.label; }
+  if (locator.by === SemanticLocatorKind.Role && typeof locator.name === 'string') { roles = [locator.role]; wanted = locator.name; }
+  else if (locator.by === SemanticLocatorKind.Label && typeof locator.label === 'string') { roles = FORM_CONTROL_ROLES; wanted = locator.label; }
   else return undefined;
   let exact = 0;
   let possible = 0;
@@ -83,7 +84,7 @@ export function checkDraftLocators(plan: Plan, reading: TextReading, map: PageMa
   const warnings: DraftWarning[] = [];
   let page: readonly PageMapNode[] | undefined;
   for (const [index, step] of plan.steps.entries()) {
-    if (step.type === 'navigate') { page = pageOpened(step, map); continue; }
+    if (step.type === StepType.Navigate) { page = pageOpened(step, map); continue; }
     if (page === undefined) continue;
     if ('locator' in step) {
       const code = locatorWarning(step.locator, page);

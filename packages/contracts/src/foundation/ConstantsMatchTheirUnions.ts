@@ -17,6 +17,8 @@ import type { TerminalState } from '../run-result/TerminalState.ts';
 import type { BackendAssertion, BackendAssertionKind, ParameterKind, ParameterType } from '../plan/steps/ServiceCaller.ts';
 import type { SafeText } from '../plan/TextOrValue.ts';
 import type { StepType } from '../plan/StepType.ts';
+import type { WorkloadOutcome } from '../ports/WorkloadRunner.ts';
+import type { WorkloadOutcomeKind } from '../ports/WorkloadOutcomeKind.ts';
 
 type HoldSameValues<Constant, Union> = [Constant] extends [Union] ? ([Union] extends [Constant] ? true : false) : false;
 type MustHold<Check extends true> = Check;
@@ -34,6 +36,7 @@ export type ConstantsMatchTheirUnions = [
   MustHold<HoldSameValues<DownloadAssertionKind, DownloadAssertion['kind']>>,
   MustHold<HoldSameValues<RememberElementRead, Extract<RememberSource, { readonly element: unknown }>['read']>>,
   MustHold<HoldSameValues<StepType, Step['type']>>,
+  MustHold<HoldSameValues<WorkloadOutcomeKind, WorkloadOutcome['kind']>>,
   MustHold<HoldSameValues<DomReadKind, DomRead['kind']>>,
   MustHold<HoldSameValues<DomReadKind, DomValue['kind']>>,
   MustHold<HoldSameValues<ClipboardAssertionKind, ClipboardAssertion['kind']>>,

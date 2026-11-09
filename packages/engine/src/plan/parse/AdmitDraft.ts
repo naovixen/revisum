@@ -9,8 +9,8 @@
 // that basis. Core's own routes admit their drafts through admitCoreDraft, which records the route
 // as the source, basis core-recorded, under an actor of the engine's choosing.
 import {
-  DECLARABLE_PLAN_SOURCES, failure, success,
-  type DerivedActor, type EventSink, type Plan, type PlanDraft, type PlanProvenance, type PlanSource, type Result, type PlanError,
+  TrustErrorCode, AuditEventKind, PlanErrorCode, PlanFormat, ProvenanceBasis, DECLARABLE_PLAN_SOURCES, failure, success,
+  type DerivedActor, type EventSink, type Plan, type PlanDraft, type PlanProvenance, PlanSource, type Result, type PlanError,
 } from '@revisum/contracts';
 import { deriveActor, sourceActorId } from '../../approval/DeriveActor.ts';
 import { planHash } from '../../run/seal/BuildManifest.ts';
@@ -22,7 +22,7 @@ import { isRecord } from '../readable/Syntax.ts';
 // What planParser(project) returns.
 export type PlanParse = (input: unknown) => Result<Plan, readonly PlanError[]>;
 
-const HAND_WRITTEN: PlanProvenance = { source: 'hand-written', basis: 'declared' };
+const HAND_WRITTEN: PlanProvenance = { source: PlanSource.HandWritten, basis: ProvenanceBasis.Declared };
 const PROVENANCE_FIELDS = ['source', 'basis', 'reference'];
 // A spec path, issue id or session id, never content, so it is short.
 const MAXIMUM_REFERENCE_LENGTH = 200;
@@ -38,8 +38,8 @@ function declaredProvenance(declared: unknown): PlanProvenance | undefined {
   const source = DECLARABLE_PLAN_SOURCES.find((candidate) => candidate === declared['source']);
   if (source === undefined || declared['basis'] !== 'declared') return undefined;
   const reference = declared['reference'];
-  if (reference === undefined) return { source, basis: 'declared' };
-  return typeof reference === 'string' && usableReference(reference) ? { source, basis: 'declared', reference } : undefined;
+  if (reference === undefined) return { source, basis: ProvenanceBasis.Declared };
+  return typeof reference === 'string' && usableReference(reference) ? { source, basis: ProvenanceBasis.Declared, reference } : undefined;
 }
 
 type DraftInput = { readonly json: unknown; readonly positions: ReadonlyMap<string, TextPosition> | null };
@@ -47,18 +47,18 @@ type DraftInput = { readonly json: unknown; readonly positions: ReadonlyMap<stri
 // The plain JSON a draft holds, for the parser. Text is read against the largest plan any project
 // may allow; the parser then holds the plan to its own project's limit.
 function draftInput(draft: PlanDraft): Result<DraftInput, readonly DraftError[]> {
-  if (draft.format === 'text') {
+  if (draft.format === PlanFormat.Text) {
     const read = readPlanText(draft.content, LIMIT_CEILINGS);
     return read.ok ? success({ json: read.value.json, positions: read.value.positions }) : read;
   }
   if (new TextEncoder().encode(draft.content).length > LIMIT_CEILINGS.maximumPlanBytes) {
-    return failure([{ stage: 'plan', code: 'too_large', path: '$', position: null }]);
+    return failure([{ stage: 'plan', code: PlanErrorCode.TooLarge, path: '$', position: null }]);
   }
   try {
     return success({ json: JSON.parse(draft.content), positions: null });
   } catch {
     // Text that is not JSON at all holds no plan object.
-    return failure([{ stage: 'plan', code: 'not_object', path: '$', position: null }]);
+    return failure([{ stage: 'plan', code: PlanErrorCode.NotObject, path: '$', position: null }]);
   }
 }
 
@@ -66,8 +66,8 @@ export function admitDraft(draft: PlanDraft, parsePlan: PlanParse, events: Event
   const provenance = declaredProvenance(draft.provenance);
   if (provenance === undefined) {
     // The claim is exactly what is not trusted, so it is not recorded as the draft's provenance.
-    events.append({ kind: 'plan.rejected' }, actor);
-    return failure([{ stage: 'source', code: 'untrusted-source', position: null }]);
+    events.append({ kind: AuditEventKind.PlanRejected }, actor);
+    return failure([{ stage: 'source', code: TrustErrorCode.UntrustedSource, position: null }]);
   }
   return admitWithProvenance(draft, provenance, parsePlan, events, actor);
 }
@@ -84,7 +84,7 @@ type CoreRoute = { readonly source: CoreRouteSource; readonly reference?: string
 // behind the draft until one approves it.
 export function admitCoreDraft(draft: PlanDraft, route: CoreRoute, parsePlan: PlanParse, events: EventSink): Result<Plan, readonly DraftError[]> {
   const provenance: PlanProvenance = {
-    source: route.source, basis: 'core-recorded',
+    source: route.source, basis: ProvenanceBasis.CoreRecorded,
     ...(route.reference !== undefined && usableReference(route.reference) ? { reference: route.reference } : {}),
   };
   return admitWithProvenance(draft, provenance, parsePlan, events, deriveActor(sourceActorId(`${route.source} route`), 'agent'));
@@ -94,14 +94,14 @@ function admitWithProvenance(
   draft: PlanDraft, provenance: PlanProvenance, parsePlan: PlanParse, events: EventSink, actor: DerivedActor,
 ): Result<Plan, readonly DraftError[]> {
   const reject = (errors: readonly DraftError[]): Result<Plan, readonly DraftError[]> => {
-    events.append({ kind: 'plan.rejected', planProvenance: provenance }, actor);
+    events.append({ kind: AuditEventKind.PlanRejected, planProvenance: provenance }, actor);
     return failure(errors);
   };
   const input = draftInput(draft);
   if (!input.ok) return reject(input.error);
   const parsed = parsePlan(input.value.json);
   if (!parsed.ok) return reject(placedPlanErrors(parsed.error, input.value.positions));
-  const recorded = events.append({ kind: 'plan.submitted', subjectHash: planHash(parsed.value), planProvenance: provenance }, actor);
+  const recorded = events.append({ kind: AuditEventKind.PlanSubmitted, subjectHash: planHash(parsed.value), planProvenance: provenance }, actor);
   // A submission the audit sink did not record is not admitted.
   if (!recorded.ok) return failure([{ stage: 'audit', code: recorded.error.code, position: null }]);
   return success(parsed.value);

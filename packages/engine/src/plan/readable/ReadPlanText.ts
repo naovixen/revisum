@@ -11,17 +11,17 @@
 //
 // The writer writes exactly one text for a plan: LF line ends, a final newline, the headers in a
 // fixed order, a `Criterion:` line wherever the criterion id changes, and never `Origin:`.
-import { failure, success, type Plan, type Result, type SinkError, type StepType, type PlanError, type PlanErrorCode } from '@revisum/contracts';
+import { ClipboardRead, failure, success, type Plan, type Result, type SinkError, type StepType, type PlanError, type PlanErrorCode } from '@revisum/contracts';
 import { entriesInKeyOrder } from '../../foundation/Sha256.ts';
 import type { PlanLimits } from '../../project/ParseProject.ts';
 import { CRITERION_FIELD } from '../schema/PlanFields.ts';
 import { isAssertionStepType } from '../StepFacts.ts';
 import {
   CLEANUP_LINE, CRITERION_LINE, HEADERS, STEP_STATEMENTS, UNSAFE_MARK, VALUES_LINE, VALUE_DEFINITION, needsUnsafeMark,
-  type StatementBlock,
+  StatementBlock,
 } from './StepStatements.ts';
 import {
-  SCRIPT_LINE, better, isRecord, newMap, notThisStatement, skipSpaces, wordAt, type TextErrorCode, type TextFailure, type TextPosition,
+  SCRIPT_LINE, better, isRecord, newMap, notThisStatement, skipSpaces, wordAt, TextErrorCode, type TextFailure, type TextPosition,
 } from './Syntax.ts';
 
 export type { TextErrorCode, TextPosition } from './Syntax.ts';
@@ -92,7 +92,7 @@ const INLINE_STATEMENT_START = /^\s*(run|expect)\s+inline\b/i;
 // Reads readable text into plain JSON for the plan parser. Pure: it never builds a Plan.
 export function readPlanText(text: string, limits: PlanLimits): Result<TextReading, readonly DraftError[]> {
   // Text larger than any plan may be is refused whole, before any line is read.
-  if (new TextEncoder().encode(text).length > limits.maximumPlanBytes) return failure([{ stage: 'text', code: 'too-large', position: LINE_START }]);
+  if (new TextEncoder().encode(text).length > limits.maximumPlanBytes) return failure([{ stage: ClipboardRead.Text, code: TextErrorCode.TooLarge, position: LINE_START }]);
 
   const errors: DraftError[] = [];
   const warnings: TextWarning[] = [];
@@ -110,7 +110,7 @@ export function readPlanText(text: string, limits: PlanLimits): Result<TextReadi
   const blocks: Block[] = [{ kind: 'top' }];
 
   const at = (line: number): TextPosition => ({ line, column: 1 });
-  const refuse = (code: TextErrorCode, line: number, column: number): void => { errors.push({ stage: 'text', code, position: { line, column } }); };
+  const refuse = (code: TextErrorCode, line: number, column: number): void => { errors.push({ stage: ClipboardRead.Text, code, position: { line, column } }); };
   const refuseFor = (found: TextFailure, line: number): void => refuse(found.code, line, found.column);
 
   // A header is placed once, before the first step.
@@ -167,12 +167,12 @@ export function readPlanText(text: string, limits: PlanLimits): Result<TextReadi
         if (criterion === undefined) refuse('no-criterion', number, 1);
         else { step[CRITERION_FIELD] = criterion.id; positions.set(`${stepPath}.${CRITERION_FIELD}`, criterion.position); }
       }
-      if (opens === 'steps') {
+      if (opens === StatementBlock.Steps) {
         const nested: unknown[] = [];
         step[STEPS_FIELD] = nested;
         blocks.push({ kind: 'steps', steps: nested, path: `${stepPath}.${STEPS_FIELD}` });
       }
-      if (opens === 'source') {
+      if (opens === StatementBlock.Source) {
         const sourcePath = `${stepPath}.${SCRIPT_FIELD}.${INLINE_FIELD}.${SOURCE_FIELD}`;
         blocks.push({ kind: 'source', lines: [], inline: inlineScriptOf(step) ?? {}, path: sourcePath });
       }
@@ -229,7 +229,7 @@ export function readPlanText(text: string, limits: PlanLimits): Result<TextReadi
   // else is bad-string at its first character outside the quotes.
   function readScriptLine(block: Extract<Block, { kind: 'source' }>, line: string, indent: number, number: number): void {
     const reading = SCRIPT_LINE.read(line, indent);
-    if (!reading.ok) { refuse('bad-string', number, reading.failure.code === 'bad-string' ? reading.failure.column : indent + 1); return; }
+    if (!reading.ok) { refuse('bad-string', number, reading.failure.code === TextErrorCode.BadString ? reading.failure.column : indent + 1); return; }
     if (reading.next < line.length) { refuse('bad-string', number, reading.next + 1); return; }
     if (block.lines.length === 0) positions.set(block.path, at(number));
     block.lines.push(typeof reading.value === 'string' ? reading.value : '');
@@ -350,7 +350,7 @@ export function writePlanText(plan: Plan): string {
       for (const candidate of STEP_STATEMENTS) {
         if (candidate.type !== fields['type']) continue;
         type = candidate.type;
-        const { statement, source } = candidate.opens === 'source' ? withoutSource(fields) : { statement: fields, source: undefined };
+        const { statement, source } = candidate.opens === StatementBlock.Source ? withoutSource(fields) : { statement: fields, source: undefined };
         const text = candidate.syntax.write(statement);
         if (text !== undefined) { written = { text, opens: candidate.opens, source }; break; }
       }
@@ -361,8 +361,8 @@ export function writePlanText(plan: Plan): string {
       }
       const mark = needsUnsafeMark(fields) ? `${UNSAFE_MARK} ` : '';
       put(depth, `${mark}${written.text}${written.opens === undefined ? '' : ':'}`);
-      if (written.opens === 'steps' && Array.isArray(nested)) writeSteps(nested, depth + 1);
-      if (written.opens === 'source' && typeof written.source === 'string') {
+      if (written.opens === StatementBlock.Steps && Array.isArray(nested)) writeSteps(nested, depth + 1);
+      if (written.opens === StatementBlock.Source && typeof written.source === 'string') {
         for (const scriptLine of written.source.split(SCRIPT_LINE_BREAK)) put(depth + 1, SCRIPT_LINE.write(scriptLine));
       }
     }

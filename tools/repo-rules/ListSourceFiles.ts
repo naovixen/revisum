@@ -3,7 +3,7 @@
 // slashes, so lint messages and allow-lists read the same on every platform.
 import { readdirSync, type Dirent } from 'node:fs';
 import { join } from 'node:path';
-import { tokenize, type Token } from './naming/LintRepository.ts';
+import { TokenKind, tokenize, type Token } from './naming/LintRepository.ts';
 
 export const CODE_FILE = /\.(ts|mts|cts|js|mjs|cjs)$/;
 const SKIPPED_FOLDERS = new Set(['node_modules', 'dist']);
@@ -31,11 +31,11 @@ export function listSourceFiles(root: string, folders: readonly string[] = LINTE
 }
 
 // The tokens of a file that are code, without its comments, so prose never trips a rule.
-export const codeTokens = (source: string): Token[] => tokenize(source).filter((token) => token.kind !== 'comment');
+export const codeTokens = (source: string): Token[] => tokenize(source).filter((token) => token.kind !== TokenKind.Comment);
 
-export const isPunctuator = (token: Token | undefined, text: string): boolean => token?.kind === 'punctuator' && token.text === text;
-export const isIdentifier = (token: Token | undefined, text: string): boolean => token?.kind === 'identifier' && token.text === text;
-export const isString = (token: Token | undefined, text: string): boolean => token?.kind === 'string' && token.text === text;
+export const isPunctuator = (token: Token | undefined, text: string): boolean => token?.kind === TokenKind.Punctuator && token.text === text;
+export const isIdentifier = (token: Token | undefined, text: string): boolean => token?.kind === TokenKind.Identifier && token.text === text;
+export const isString = (token: Token | undefined, text: string): boolean => token?.kind === TokenKind.String && token.text === text;
 
 // The index of the ")" matching the "(" at `open`, or the last index past the tokens when it has none.
 export function closingParenthesis(tokens: readonly Token[], open: number): number {
@@ -81,14 +81,14 @@ export function moduleSpecifiers(source: string): ModuleSpecifier[] {
     const isStatementWord = !isMemberName && (isIdentifier(token, 'import') || isIdentifier(token, 'export'));
     if (!isMemberName && (isIdentifier(token, 'import') || isIdentifier(token, 'require')) && isPunctuator(next, '(')) {
       const argument = tokens[index + 2];
-      if ((argument?.kind === 'string' || argument?.kind === 'template') && argument.text !== '') {
+      if ((argument?.kind === TokenKind.String || argument?.kind === TokenKind.Template) && argument.text !== '') {
         found.push({ specifier: argument.text, line: argument.line, isTypeOnly: false, clause: undefined });
       }
-    } else if (isStatementWord && next?.kind === 'string') {
+    } else if (isStatementWord && next?.kind === TokenKind.String) {
       found.push({ specifier: next.text, line: next.line, isTypeOnly: false, clause: [] });
     } else if (isStatementWord && !isPunctuator(next, '.')) {
       statementStart = index;
-    } else if (statementStart !== undefined && isIdentifier(token, 'from') && next?.kind === 'string') {
+    } else if (statementStart !== undefined && isIdentifier(token, 'from') && next?.kind === TokenKind.String) {
       const clause = tokens.slice(statementStart + 1, index);
       found.push({ specifier: next.text, line: next.line, isTypeOnly: isTypeOnlyClause(clause), clause });
       statementStart = undefined;

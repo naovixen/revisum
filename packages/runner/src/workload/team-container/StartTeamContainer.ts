@@ -17,6 +17,7 @@ import { readyOutputFolder } from "../output/ReadyOutputFolder.ts";
 import { relayedHostNames } from "../RelayedHostNames.ts";
 import { teamImageContainer } from "./TeamImageContainer.ts";
 import { workloadRefused, type WorkloadLog, type WorkloadRefusal } from "../WorkloadRefusal.ts";
+import { MountKind } from "../../containers/ContainerEngine.ts";
 
 type TeamContainerFields = {
     readonly engine: ContainerEngine;
@@ -82,7 +83,7 @@ export async function startTeamContainer(
             mounts: [
                 ...mounts,
                 {
-                    kind: "folder",
+                    kind: MountKind.Folder,
                     source: checked.outputDirectory,
                     target: WORKLOAD_OUTPUT_PATH,
                     writable: true,

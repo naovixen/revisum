@@ -5,7 +5,7 @@
 // to disk. A refusal names an entry by its index, never by its name.
 import { Buffer } from 'node:buffer';
 import { crc32, inflateRawSync } from 'node:zlib';
-import { failure, success, type Result } from '@revisum/contracts';
+import { SuiteDecodeErrorCode, failure, success, type Result } from '@revisum/contracts';
 import { staysInside } from '../foundation/RepositoryPath.ts';
 
 type ZipLimits = {
@@ -34,7 +34,7 @@ const MAXIMUM_COMPRESSION_RATIO = 200;
 const RATIO_FREE_BYTES = 64 * 1024;
 
 const invalid = (path: string): Result<never, ZipProblem> => failure({ code: 'invalid', path });
-const tooLarge = (path: string): Result<never, ZipProblem> => failure({ code: 'too-large', path });
+const tooLarge = (path: string): Result<never, ZipProblem> => failure({ code: SuiteDecodeErrorCode.TooLarge, path });
 
 // Where the end-of-central-directory record starts, searching back over the largest comment.
 function endOfDirectory(bytes: Buffer): number | null {

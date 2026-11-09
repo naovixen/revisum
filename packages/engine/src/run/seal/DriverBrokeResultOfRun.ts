@@ -5,6 +5,7 @@ import type { BrokenDriver } from "../../target/GuardedDriver.ts";
 import { logKeepingTheResult } from "../after-the-verdict/ReadKeepingTheResult.ts";
 import { driverBrokeResult } from "./RefusedResult.ts";
 import { runTimeOfNothingRan, sealResult, type NothingRanContext } from "./SealResult.ts";
+import { EventKind } from "../logging/LoggingManifest.ts";
 
 export function driverBrokeResultOfRun(
     targetId: string,
@@ -12,7 +13,7 @@ export function driverBrokeResultOfRun(
     context: NothingRanContext,
 ): PlanRunResult {
     logKeepingTheResult(
-        { kind: "run.state", state: "Errored", targetId, detail: broken.brokeItsPromise },
+        { kind: EventKind.RunState, state: "Errored", targetId, detail: broken.brokeItsPromise },
         context.logger,
     );
     return sealResult(driverBrokeResult(targetId, runTimeOfNothingRan(context)), context);

@@ -11,14 +11,23 @@
 import { entriesInKeyOrder } from '../../foundation/Sha256.ts';
 
 // Why readable text was refused. None of them carries a value from the text.
-export type TextErrorCode = 'unknown-statement' | 'bad-locator' | 'bad-string' | 'bad-indent' | 'missing-header'
-  | 'duplicate-header' | 'no-criterion' | 'unknown-key-name' | 'too-large' | 'duplicate-key'
-  // A line's "Unsafe:" mark does not match what the line holds: a line holding an unsafe construct
-  // has no mark, or a marked line holds none.
-  | 'missing-unsafe-mark' | 'unneeded-unsafe-mark'
-  // Writing, not reading: the plan holds a construct the readable format has no form for, so it
-  // would stay JSON (readablePlanText). Every construct of the language has a form today.
-  | 'no-readable-form';
+export const TextErrorCode = {
+  UnknownStatement: 'unknown-statement',
+  BadLocator: 'bad-locator',
+  BadString: 'bad-string',
+  BadIndent: 'bad-indent',
+  MissingHeader: 'missing-header',
+  DuplicateHeader: 'duplicate-header',
+  NoCriterion: 'no-criterion',
+  UnknownKeyName: 'unknown-key-name',
+  TooLarge: 'too-large',
+  DuplicateKey: 'duplicate-key',
+  MissingUnsafeMark: 'missing-unsafe-mark',
+  UnneededUnsafeMark: 'unneeded-unsafe-mark',
+  NoReadableForm: 'no-readable-form',
+} as const;
+
+export type TextErrorCode = (typeof TextErrorCode)[keyof typeof TextErrorCode];
 
 // A place in readable text: a 1-based line and a 1-based column.
 export type TextPosition = { readonly line: number; readonly column: number };
@@ -96,7 +105,7 @@ export function wordAt(line: string, index: number): { readonly word: string; re
 }
 
 // A line that is not the statement it was read as. A statement's own error is at column 1.
-export const notThisStatement = (reach: number): TextFailure => ({ code: 'unknown-statement', column: 1, reach });
+export const notThisStatement = (reach: number): TextFailure => ({ code: TextErrorCode.UnknownStatement, column: 1, reach });
 const refused = (failure: TextFailure): { readonly ok: false; readonly failure: TextFailure } => ({ ok: false, failure });
 const read = <Value>(value: Value, next: number, furthest?: TextFailure): Reading<Value> => ({ ok: true, value, next, furthest });
 
@@ -106,7 +115,7 @@ export function better(left: TextFailure | undefined, right: TextFailure | undef
   if (left === undefined) return right;
   if (right === undefined) return left;
   if (left.reach !== right.reach) return left.reach > right.reach ? left : right;
-  return left.code === 'unknown-statement' ? right : left;
+  return left.code === TextErrorCode.UnknownStatement ? right : left;
 }
 
 // ---- Values -------------------------------------------------------------------------------------
@@ -148,7 +157,7 @@ function quotedWith(escapes: Readonly<Record<string, string>>): Syntax {
         if (character === '\\') {
           const letter = line[at + 1] ?? '';
           const escaped = Object.hasOwn(escapes, letter) ? escapes[letter] : undefined;
-          if (escaped === undefined) return refused({ code: 'bad-string', column: at + 1, reach: at });
+          if (escaped === undefined) return refused({ code: TextErrorCode.BadString, column: at + 1, reach: at });
           text += escaped;
           at += 1;
         } else {
@@ -156,7 +165,7 @@ function quotedWith(escapes: Readonly<Record<string, string>>): Syntax {
         }
       }
       // Never closed: the rest of the line is inside the string, so no other reading gets further.
-      return refused({ code: 'bad-string', column: start + 1, reach: line.length });
+      return refused({ code: TextErrorCode.BadString, column: start + 1, reach: line.length });
     },
     write: (value) => (typeof value === 'string' ? `"${[...value].map((character) => escapeOf.get(character) ?? character).join('')}"` : undefined),
   };
@@ -176,7 +185,7 @@ export const REFERENCE: Syntax = {
     const start = skipSpaces(line, index);
     if (line[start] !== '{') return refused(notThisStatement(start));
     const end = bareWordEnd(line, start + 1);
-    if (end === start + 1 || line[end] !== '}') return refused({ code: 'bad-string', column: start + 1, reach: end });
+    if (end === start + 1 || line[end] !== '}') return refused({ code: TextErrorCode.BadString, column: start + 1, reach: end });
     return read({ valueName: line.slice(start + 1, end) }, end + 1);
   },
   write(value) {
@@ -520,7 +529,7 @@ export function map(item: EntrySyntax): Syntax {
         if (!reading.ok) return refused(better(furthest, reading.failure) ?? reading.failure);
         const { name, value, nameColumn } = reading.value;
         // A duplicate is certain once read, so it outweighs any other failure on the line.
-        if (Object.hasOwn(entries, name)) return refused({ code: 'duplicate-key', column: nameColumn, reach: line.length + 1 });
+        if (Object.hasOwn(entries, name)) return refused({ code: TextErrorCode.DuplicateKey, column: nameColumn, reach: line.length + 1 });
         entries[name] = value;
         at = reading.next;
         furthest = better(furthest, reading.furthest);
@@ -539,7 +548,7 @@ export function map(item: EntrySyntax): Syntax {
 // at the place it starts, such as bad-locator for any locator that cannot be read.
 export function reportedAs(code: TextErrorCode, syntax: Syntax): Syntax {
   const restate = (start: number, failure: TextFailure | undefined): TextFailure | undefined =>
-    (failure?.code === 'unknown-statement' ? { code, column: start + 1, reach: failure.reach } : failure);
+    (failure?.code === TextErrorCode.UnknownStatement ? { code, column: start + 1, reach: failure.reach } : failure);
   return {
     read(line, index) {
       const start = skipSpaces(line, index);

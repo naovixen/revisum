@@ -12,6 +12,7 @@ import {
   DECISIONS_FILE, LOOKUPS_FILE, LOOKUPS_VARIABLE, RECORDS_LOST, RECORDS_STATE_FILE, REWRITES_FILE, RULES_VARIABLE, PROXY_PORT, RUN_ADDRESSES_VARIABLE, SERVICE_PROXY_PORT, readAppliedRewrite, readProxyDecision,
 } from '../egress/StartRecordKeeping.ts';
 import { readInContainer } from './WithinReadBound.ts';
+import { MountKind } from './ContainerEngine.ts';
 
 // Where Revisum's own files appear inside the run image's containers.
 export const WORKSPACE = '/workspace';
@@ -69,11 +70,11 @@ export const dependenciesVolumeFor = (chosen: string | null | undefined): string
 
 // Revisum's own code and dependencies, read-only, for the run image's containers.
 export const ownCodeMounts = (root: string, dependenciesVolume: string | null): ContainerMount[] => [
-  { kind: 'folder', source: join(root, 'packages'), target: `${WORKSPACE}/packages` },
-  { kind: 'file', source: join(root, 'package.json'), target: `${WORKSPACE}/package.json` },
+  { kind: MountKind.Folder, source: join(root, 'packages'), target: `${WORKSPACE}/packages` },
+  { kind: MountKind.File, source: join(root, 'package.json'), target: `${WORKSPACE}/package.json` },
   dependenciesVolume === null
-    ? { kind: 'folder', source: join(root, 'node_modules'), target: `${WORKSPACE}/node_modules` }
-    : { kind: 'volume', source: dependenciesVolume, target: `${WORKSPACE}/node_modules` },
+    ? { kind: MountKind.Folder, source: join(root, 'node_modules'), target: `${WORKSPACE}/node_modules` }
+    : { kind: MountKind.Volume, source: dependenciesVolume, target: `${WORKSPACE}/node_modules` },
 ];
 
 // A container of the run image, started as its own user under the pinned seccomp profile.

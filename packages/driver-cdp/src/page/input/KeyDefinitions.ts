@@ -2,6 +2,7 @@
 // the modifier keys held.
 import type { Key } from "@revisum/contracts";
 import type { HeldModifierKey } from "./HeldModifierKeys.ts";
+import { Modifier } from "@revisum/contracts";
 
 export type KeyDefinition = {
     readonly key: string;
@@ -149,7 +150,7 @@ export function heldKeyDefinition(
     definition: KeyDefinition,
     held: readonly HeldModifierKey[],
 ): KeyDefinition {
-    if (held.some((modifier) => modifier !== "Shift")) {
+    if (held.some((modifier) => modifier !== Modifier.Shift)) {
         return { key: definition.key, code: definition.code, keyCode: definition.keyCode };
     }
     if (!held.includes("Shift") || definition.text === undefined) {

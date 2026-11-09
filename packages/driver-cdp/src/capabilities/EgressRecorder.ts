@@ -3,7 +3,7 @@
 // outside the browser sees only hosts and ports over HTTPS, so these records give its decisions
 // their channels. Only network schemes are recorded; data:, blob: and the like never leave, and
 // neither does a request a declared stub answered inside the browser, so it is left out.
-import type { BrowserChannel, BrowserRequestRecord } from "@revisum/contracts";
+import type { BrowserRequestRecord } from "@revisum/contracts";
 import { errorText } from "../connection/ErrorText.ts";
 import {
     ATTACHED_TO_TARGET,
@@ -14,6 +14,7 @@ import { ENABLE_NETWORK, SET_AUTO_ATTACH } from "../connection/BrowserCommand.ts
 import { RUN_IF_WAITING_FOR_DEBUGGER } from "../connection/domains/RuntimeDomain.ts";
 import type { CdpConnection } from "../connection/CdpConnection.ts";
 import { holdUnreadableEvent, type SessionFailures } from "../page/PageWatch.ts";
+import { BrowserChannel } from "@revisum/contracts";
 
 // How a command to a worker fails when the worker has already ended, or the browser or session has gone.
 const WORKER_ALREADY_GONE =
@@ -84,7 +85,7 @@ export class EgressRecorder {
         const origin = networkOrigin(url);
         if (origin !== null) {
             this.#records.push({
-                record: { origin, channel: "popup", undeclared: true },
+                record: { origin, channel: BrowserChannel.Popup, undeclared: true },
                 requestId: null,
             });
         }

@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import type { Token } from '../naming/LintRepository.ts';
 import { closingParenthesis, codeTokens, isIdentifier, isPunctuator, listSourceFiles } from '../ListSourceFiles.ts';
 import { reportProblems } from '../ReadWorkspacePackages.ts';
+import { TokenKind } from '../naming/LintRepository.ts';
 
 const REVEAL = 'reveal';
 const THEN = 'then';
@@ -56,13 +57,13 @@ function propertyNameAt(tokens: readonly Token[], index: number): string | undef
   const start = isOptionalRead || isPunctuator(tokens[index], '!') ? index + 1 : index;
   const isDotted = isPunctuator(tokens[start], '.');
   const named = tokens[start + 1];
-  if (isDotted && named?.kind === 'identifier') {
+  if (isDotted && named?.kind === TokenKind.Identifier) {
     return named.text;
   }
   const bracket = isDotted ? start + 1 : start;
   const key = tokens[bracket + 1];
   const isOneKey = isPunctuator(tokens[bracket], '[') && isPunctuator(tokens[bracket + 2], ']');
-  return isOneKey && (key?.kind === 'string' || key?.kind === 'template') ? key.text : undefined;
+  return isOneKey && (key?.kind === TokenKind.String || key?.kind === TokenKind.Template) ? key.text : undefined;
 }
 
 // True when the tokens from `index` start a dynamic import that gives the module whole: `import(…)`,
@@ -134,7 +135,7 @@ function dynamicImportUse(tokens: readonly Token[], importIndex: number): Dynami
   if (isPunctuator(first, '{')) {
     return { lines: revealKeysInPattern(tokens, parameter, closingBrace(tokens, parameter)), namespace: undefined };
   }
-  return { lines: [], namespace: first?.kind === 'identifier' ? first.text : undefined };
+  return { lines: [], namespace: first?.kind === TokenKind.Identifier ? first.text : undefined };
 }
 
 // Lines where `tokens` import or re-export reveal, read it from a namespace or a dynamic import, or
@@ -144,7 +145,7 @@ function revealUses(tokens: readonly Token[]): number[] {
   const namespaces = new Set<string>();
   tokens.forEach((token, index) => {
     // `const name = await import(…)` makes a namespace as `import * as name` does.
-    if (token.kind === 'identifier' && isAssignment(tokens, index + 1) && startsDynamicImport(tokens, index + 2)) namespaces.add(token.text);
+    if (token.kind === TokenKind.Identifier && isAssignment(tokens, index + 1) && startsDynamicImport(tokens, index + 2)) namespaces.add(token.text);
     if (!isIdentifier(token, 'import') && !isIdentifier(token, 'export')) return;
     if (isPunctuator(tokens[index - 1], '.')) return;
     if (isIdentifier(token, 'import') && isPunctuator(tokens[index + 1], '(')) {
@@ -158,12 +159,12 @@ function revealUses(tokens: readonly Token[]): number[] {
     let next = index + 1;
     if (isIdentifier(tokens[next], 'type')) next += 1;
     // `import * as name from …`
-    if (isPunctuator(tokens[next], '*') && isIdentifier(tokens[next + 1], 'as') && tokens[next + 2]?.kind === 'identifier') {
+    if (isPunctuator(tokens[next], '*') && isIdentifier(tokens[next + 1], 'as') && tokens[next + 2]?.kind === TokenKind.Identifier) {
       namespaces.add(tokens[next + 2]?.text ?? '');
       return;
     }
     // `import name, { … } from …`
-    if (tokens[next]?.kind === 'identifier' && isPunctuator(tokens[next + 1], ',')) next += 2;
+    if (tokens[next]?.kind === TokenKind.Identifier && isPunctuator(tokens[next + 1], ',')) next += 2;
     if (!isPunctuator(tokens[next], '{')) return;
     const end = closingBrace(tokens, next);
     for (let inside = next + 1; inside < end; inside++) {
@@ -172,7 +173,7 @@ function revealUses(tokens: readonly Token[]): number[] {
     }
   });
   tokens.forEach((token, index) => {
-    if (token.kind === 'identifier' && namespaces.has(token.text) && propertyNameAt(tokens, index + 1) === REVEAL) {
+    if (token.kind === TokenKind.Identifier && namespaces.has(token.text) && propertyNameAt(tokens, index + 1) === REVEAL) {
       lines.push(token.line);
     }
     // `{ … } = namespace` or `{ … } = await import(…)`: the pattern names what it takes.
@@ -180,7 +181,7 @@ function revealUses(tokens: readonly Token[]): number[] {
     const end = closingBrace(tokens, index);
     if (!isAssignment(tokens, end + 1)) return;
     const source = tokens[end + 2];
-    const fromNamespace = source?.kind === 'identifier' && namespaces.has(source.text) && !isPunctuator(tokens[end + 3], '.');
+    const fromNamespace = source?.kind === TokenKind.Identifier && namespaces.has(source.text) && !isPunctuator(tokens[end + 3], '.');
     if (fromNamespace || startsDynamicImport(tokens, end + 2)) lines.push(...revealKeysInPattern(tokens, index, end));
   });
   return lines;

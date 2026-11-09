@@ -1,6 +1,6 @@
 // A read-only look at the element a locator matches in one document.
 import {
-    isSeveralElements,
+    DomReadKind, isSeveralElements,
     UnreadablePage,
     type DomRead,
     type DomValue,
@@ -77,15 +77,15 @@ function decodeLinkAndCurrent(text: string): {
 function decodeDomValue(text: string, read: DomRead): DomValue | undefined {
     const { classes, value } = fieldsOf(JSON.parse(text));
     switch (read.kind) {
-        case "classes":
+        case DomReadKind.Classes:
             return Array.isArray(classes) && classes.every((token) => typeof token === "string")
-                ? { kind: "classes", classes: classes.filter((token) => typeof token === "string") }
+                ? { kind: DomReadKind.Classes, classes: classes.filter((token) => typeof token === "string") }
                 : undefined;
-        case "computedStyle":
-            return typeof value === "string" ? { kind: "computedStyle", value } : undefined;
-        case "attribute":
+        case DomReadKind.ComputedStyle:
+            return typeof value === "string" ? { kind: DomReadKind.ComputedStyle, value } : undefined;
+        case DomReadKind.Attribute:
             return typeof value === "string" || value === null
-                ? { kind: "attribute", value }
+                ? { kind: DomReadKind.Attribute, value }
                 : undefined;
     }
 }
@@ -93,11 +93,11 @@ function decodeDomValue(text: string, read: DomRead): DomValue | undefined {
 // The style property or attribute a DOM read names; empty for the class list.
 const domReadName = (read: DomRead): string => {
     switch (read.kind) {
-        case "computedStyle":
+        case DomReadKind.ComputedStyle:
             return read.property;
-        case "attribute":
+        case DomReadKind.Attribute:
             return read.name;
-        case "classes":
+        case DomReadKind.Classes:
             return "";
     }
 };

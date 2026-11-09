@@ -2,7 +2,7 @@
 // these for every step type. Each construct is placed at the field that names its feature, the same
 // path the plan parser refuses a disabled one at.
 import {
-    DOM_CHECK_KINDS,
+    RememberElementRead, StructuralLocatorKind, DOM_CHECK_KINDS,
     type DatabaseCommandStep,
     type Locator,
     type PageScriptStep,
@@ -24,7 +24,7 @@ export type UnsafeConstruct = { readonly feature: UnsafeFeature; readonly path: 
 
 // A locator's own feature, then those of the locators it is evaluated inside.
 function locatorConstructs(locator: Locator, path: string): UnsafeConstruct[] {
-    if (locator.by !== "css" && locator.by !== "xpath") {
+    if (locator.by !== StructuralLocatorKind.Css && locator.by !== StructuralLocatorKind.Xpath) {
         return [];
     }
     const own = { feature: LOCATOR_FEATURES[locator.by], path: `${path}.by` };
@@ -63,7 +63,7 @@ export function rememberStepConstructs(
         return [];
     }
     const read =
-        step.from.read === "attribute"
+        step.from.read === RememberElementRead.Attribute
             ? [{ feature: DOM_CHECKS_FEATURE, path: `${path}.from.read` }]
             : [];
     return [...read, ...locatorConstructs(step.from.element, `${path}.from.element`)];

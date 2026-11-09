@@ -12,7 +12,13 @@ export type DependencyCheck =
   | 'gapsClosable'         // any accessibility coverage gap can be closed around it
   | 'roadmapFits';         // its roadmap can't break the product's guarantees
 
-export type DependencyCheckResult = 'pass' | 'fail' | 'partial';
+export const DependencyCheckResult = {
+  Pass: 'pass',
+  Fail: 'fail',
+  Partial: 'partial',
+} as const;
+
+export type DependencyCheckResult = (typeof DependencyCheckResult)[keyof typeof DependencyCheckResult];
 
 // One review per third-party component on the trust path.
 export type DependencyReview = {
@@ -32,16 +38,16 @@ export const DEPENDENCY_REVIEWS: readonly DependencyReview[] = [
     version: '4.14.0',
     results: {
       // MPL-2.0, file-level copyleft; the files ship unmodified.
-      licenceAllowsUse: 'pass',
+      licenceAllowsUse: DependencyCheckResult.Pass,
       // Runs in any web page, on every browser engine.
-      reachesAllTargets: 'pass',
-      versionPinned: 'pass',
+      reachesAllTargets: DependencyCheckResult.Pass,
+      versionPinned: DependencyCheckResult.Pass,
       // Needs no browser build of its own.
-      stockBrowsersOnly: 'pass',
+      stockBrowsersOnly: DependencyCheckResult.Pass,
       // Its keyboard and focus gap is closed by the own engine's probes running beside it.
-      gapsClosable: 'pass',
+      gapsClosable: DependencyCheckResult.Pass,
       // Watched: contributions go through a vendor licence agreement.
-      roadmapFits: 'pass',
+      roadmapFits: DependencyCheckResult.Pass,
     },
     decision: 'default',
     evidence: [

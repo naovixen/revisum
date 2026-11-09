@@ -5,7 +5,13 @@ import { PRODUCT } from '@revisum/contracts';
 
 export const SEVERITIES = ['P1', 'P2', 'P3', 'P4'] as const;
 export type Severity = (typeof SEVERITIES)[number];
-export type Verdict = 'passed' | 'failed' | 'needs-review';
+export const Verdict = {
+  Passed: 'passed',
+  Failed: 'failed',
+  NeedsReview: 'needs-review',
+} as const;
+
+export type Verdict = (typeof Verdict)[keyof typeof Verdict];
 export type ReportKind = 'a11y' | 'functional' | 'api';
 export const MAXIMUM_CAPTION_WORDS = 15;
 

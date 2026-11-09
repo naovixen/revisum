@@ -5,6 +5,7 @@
 import type { SafeText } from "@revisum/contracts";
 import { brand } from "../foundation/Brand.ts";
 import { INVALID, isUnsafeText, type Issues, type Parsed } from "./parse/ReadRecord.ts";
+import { PlanErrorCode } from "@revisum/contracts";
 
 export function readUnscannedText(
     input: unknown,
@@ -14,19 +15,19 @@ export function readUnscannedText(
     minimumLength = 1,
 ): Parsed<SafeText> {
     if (typeof input !== "string") {
-        issues.push({ code: "wrong_type", path });
+        issues.push({ code: PlanErrorCode.WrongType, path });
         return INVALID;
     }
     if (input.length < minimumLength) {
-        issues.push({ code: "empty", path });
+        issues.push({ code: PlanErrorCode.Empty, path });
         return INVALID;
     }
     if (input.length > maximumLength) {
-        issues.push({ code: "too_long", path });
+        issues.push({ code: PlanErrorCode.TooLong, path });
         return INVALID;
     }
     if (isUnsafeText(input)) {
-        issues.push({ code: "unsafe_text", path });
+        issues.push({ code: PlanErrorCode.UnsafeText, path });
         return INVALID;
     }
     return brand<string, "SafeText">(input);

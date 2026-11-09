@@ -12,10 +12,10 @@
 // Each request sent is logged by step, outcome, code, response sha256 and duration only: never an
 // argument, a header or the response itself. A body cut short or holding a secret has no sha256.
 import {
-  failure, StepCode, StepOutcome, stepFailed, success,
+  StepType, CallEffect, BackendAssertionKind, failure, StepCode, StepOutcome, stepFailed, success,
   type BackendAssertion, type CallArguments, type CallDeclaration, type CallName, type CallStep, type CleanupStep, type Clock, type DeclaredService, type JsonPointer, type ResponseReadErrorCode, type Result,
   type SafeText,
-  type CleanupResult, type ScriptArguments, type SecretStore, type ServiceCallErrorCode, type ServiceCallRecord, type ServiceCaller, type ServiceRequest, type ServiceResponse,
+  type CleanupResult, type ScriptArguments, type SecretStore, ServiceCallErrorCode, type ServiceCallRecord, type ServiceCaller, type ServiceRequest, type ServiceResponse,
   type Step, type ValueName,
 } from '@revisum/contracts';
 import { runDatabaseStep, type DatabaseCommandContext } from '../database-commands/RunDatabaseStep.ts';
@@ -28,6 +28,7 @@ import { isJudgedLookDone, pollUntil, type JudgedLook } from '../../PollUntil.ts
 import { sha256UnlessHoldingASecret } from '../../../secrets/ResolvePlanSecrets.ts';
 import { buildServiceRequest } from './BuildServiceRequest.ts';
 import { checkBackendField, fieldAt, fieldText, isGatewayStatus, isPendingStatus, isSuccessStatus, responseJson } from './CheckBackendField.ts';
+import { EventKind } from '../../logging/LoggingManifest.ts';
 
 // How long a backend check waits between two reads of its call.
 const BACKEND_POLL_INTERVAL_MILLISECONDS = 250;
@@ -81,19 +82,19 @@ type JudgeStatus = (declaration: CallDeclaration, response: ServiceResponse) => 
 
 // A call is sent once, so it has nothing to wait for: only its success statuses count.
 const judgeForCall: JudgeStatus = (declaration, response) =>
-  isSuccessStatus(declaration, response) ? { outcome: 'passed' } : { outcome: 'failed', code: 'unexpected-status' };
+  isSuccessStatus(declaration, response) ? { outcome: StepOutcome.Passed } : { outcome: StepOutcome.Failed, code: ServiceCallErrorCode.UnexpectedStatus };
 
 // What a backend check's declaration lists wins. Beyond that, a gateway's status says nothing about
 // the product, so it is the code of a call the service did not answer, and the run could not test.
 const judgeForBackendCheck: JudgeStatus = (declaration, response) => {
   if (isSuccessStatus(declaration, response)) {
-    return { outcome: 'passed' };
+    return { outcome: StepOutcome.Passed };
   }
   const isGateway = isGatewayStatus(response);
   if (isPendingStatus(declaration, response)) {
-    return { outcome: 'pending', code: isGateway ? 'service-unreachable' : 'assertion-failed' };
+    return { outcome: 'pending', code: isGateway ? ServiceCallErrorCode.ServiceUnreachable : StepCode.AssertionFailed };
   }
-  return { outcome: 'failed', code: isGateway ? 'service-unreachable' : 'unexpected-status' };
+  return { outcome: StepOutcome.Failed, code: isGateway ? ServiceCallErrorCode.ServiceUnreachable : ServiceCallErrorCode.UnexpectedStatus };
 };
 
 // What a run keeps of one answer, even when its status failed the judgement, since that call is the
@@ -114,15 +115,15 @@ type SentRequest =
 function judgeOverTheCap(response: ServiceResponse, found: Declared, judgeStatus: JudgeStatus): SentRequest {
   const judged = judgeStatus(found.declaration, response);
   return judged.outcome === 'failed' && NO_ANSWER_CODES.includes(judged.code)
-    ? { outcome: 'failed', code: judged.code, kept: { status: response.status, responseSha256: null } }
-    : { outcome: 'failed', code: 'response-too-large', kept: NO_ANSWER };
+    ? { outcome: StepOutcome.Failed, code: judged.code, kept: { status: response.status, responseSha256: null } }
+    : { outcome: StepOutcome.Failed, code: ServiceCallErrorCode.ResponseTooLarge, kept: NO_ANSWER };
 }
 
 function judgeAnswer(
   answered: Result<ServiceResponse, ServiceCallErrorCode>, request: ServiceRequest, found: Declared, judgeStatus: JudgeStatus, context: CallStepContext,
 ): SentRequest {
   if (!answered.ok) {
-    return { outcome: 'failed', code: answered.error, kept: NO_ANSWER };
+    return { outcome: StepOutcome.Failed, code: answered.error, kept: NO_ANSWER };
   }
   const response = answered.value;
   if (response.body.length > request.maximumResponseBytes) {
@@ -130,7 +131,7 @@ function judgeAnswer(
   }
   const kept: KeptAnswer = { status: response.status, responseSha256: sha256UnlessHoldingASecret(response.body, context.holdsSecret) };
   const judged = judgeStatus(found.declaration, response);
-  return judged.outcome === 'passed' ? { outcome: 'passed', kept, received: response } : { ...judged, kept };
+  return judged.outcome === 'passed' ? { outcome: StepOutcome.Passed, kept, received: response } : { ...judged, kept };
 }
 
 // Sends one request, logs it, and judges its status. A pending answer logs as neither passed nor
@@ -142,7 +143,7 @@ async function send(
   const answered = await context.caller.call(request);
   const sent = judgeAnswer(answered, request, found, judgeStatus, context);
   context.logger.log({
-    kind: 'service.call', stepIndex, stepType, outcome: sent.outcome,
+    kind: EventKind.ServiceCall, stepIndex, stepType, outcome: sent.outcome,
     ...(sent.outcome === 'failed' ? { code: sent.code } : {}),
     ...(sent.kept.responseSha256 === null ? {} : { sha256: sent.kept.responseSha256 }),
     durationMilliseconds: context.clock.now() - startedAt,
@@ -192,7 +193,7 @@ export async function runCallStep(step: CallStep, stepIndex: number, context: Ca
   const texts = textsToRemember(step, found.declaration, sent.received, request.value.maximumResponseBytes);
   if (!texts.ok) return failedWith(texts.error, serviceCall);
   const kept = context.remembered.keepUnrecorded(texts.value);
-  return kept.ok ? { outcome: 'passed', serviceCall } : failedWith(kept.error, serviceCall);
+  return kept.ok ? { outcome: StepOutcome.Passed, serviceCall } : failedWith(kept.error, serviceCall);
 }
 
 // What a backend check made of one answer: it passed, or why it has not passed yet.
@@ -210,7 +211,7 @@ function checkAnswer(
   if (checkBackendField(assertion, field.ok ? { value: field.value } : undefined, expected)) {
     return success(null);
   }
-  return failure(!field.ok && assertion.kind !== 'present' && assertion.kind !== 'absent' ? 'field-missing' : 'assertion-failed');
+  return failure(!field.ok && assertion.kind !== BackendAssertionKind.Present && assertion.kind !== BackendAssertionKind.Absent ? 'field-missing' : 'assertion-failed');
 }
 
 // A backend check: its read call repeated while the service answers with a pending status, or with a
@@ -221,7 +222,7 @@ export async function runBackendCheck(step: Extract<Step, { type: 'expectBackend
   if (found === undefined) return failedWith('egress-blocked');
   // The parser refuses this, but a plan parsed under another project gets here. A check polls, and a
   // write is never sent twice, so it is not sent at all.
-  if (found.declaration.effect === 'write') {
+  if (found.declaration.effect === CallEffect.Write) {
     return failedWith('unsupported-step', record(step, found, NO_ANSWER, 0));
   }
   const expected = 'value' in step.assert && typeof step.assert.value !== 'number'
@@ -248,7 +249,7 @@ export async function runBackendCheck(step: Extract<Step, { type: 'expectBackend
       ? failure(sent.code)
       : checkAnswer(step.assert, sent.received, pointer, expected.value, request.value.maximumResponseBytes);
     return checked.ok
-      ? { outcome: { outcome: 'passed', serviceCall }, isDone: true }
+      ? { outcome: { outcome: StepOutcome.Passed, serviceCall }, isDone: true }
       : { outcome: failedWith(checked.error, serviceCall), isDone: false };
   });
   return last.outcome;
@@ -267,7 +268,7 @@ export async function runCleanup(
 ): Promise<readonly CleanupResult[]> {
   const results: CleanupResult[] = [];
   for (const [index, step] of cleanup.entries()) {
-    if (step.type === 'database') {
+    if (step.type === StepType.Database) {
       const base = { index, command: step.command } as const;
       if (needsUnsetValue(step.arguments, commands.values)) { results.push({ ...base, outcome: StepOutcome.Skipped }); continue; }
       let done: Awaited<ReturnType<typeof runDatabaseStep>>;

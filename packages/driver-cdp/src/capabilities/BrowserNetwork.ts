@@ -15,7 +15,7 @@
 //   - While any stub or check is active, the pages bypass their service workers, so every matching
 //     request is seen and answered the same way, whatever a worker would have done with it.
 import {
-    failure,
+    DriverErrorCode, PathMatch, failure,
     success,
     type DriverError,
     type NetworkPort,
@@ -69,7 +69,7 @@ function matchesRequest(matcher: RequestMatcher, method: string, url: string): b
     if (parsed.origin !== matcher.origin || method.toUpperCase() !== matcher.method) {
         return false;
     }
-    return matcher.match === "exact"
+    return matcher.match === PathMatch.Exact
         ? parsed.pathname === matcher.path
         : parsed.pathname.startsWith(matcher.path);
 }
@@ -303,7 +303,7 @@ export class BrowserNetwork implements NetworkPort {
     ): Promise<Result<void, DriverError>> {
         const observation = this.#observations.get(name);
         if (observation === undefined) {
-            return failure({ code: "unsupported-step", detail: "the request is not observed" });
+            return failure({ code: DriverErrorCode.UnsupportedStep, detail: "the request is not observed" });
         }
         const startedAt = Date.now();
         const deadline = startedAt + timeoutMilliseconds;
@@ -317,7 +317,7 @@ export class BrowserNetwork implements NetworkPort {
             }
             if (now >= deadline) {
                 return failure({
-                    code: "timeout",
+                    code: DriverErrorCode.Timeout,
                     detail: `a matching request was still in flight after ${timeoutMilliseconds} ms`,
                 });
             }
@@ -420,7 +420,7 @@ export class BrowserNetwork implements NetworkPort {
             return success(undefined);
         } catch (error) {
             return failure({
-                code: "not-actionable",
+                code: DriverErrorCode.NotActionable,
                 detail: `service workers could not be bypassed: ${error instanceof Error ? error.message : String(error)}`.slice(
                     0,
                     200,

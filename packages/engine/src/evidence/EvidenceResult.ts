@@ -7,7 +7,7 @@ import {
   EvidenceOutcomeCode, RefusalCode, RunMode, RunReviewItemCode, SUITE_CRITERION_LINK, SuitePass, SuiteDecodeErrorCode, TerminalState,
   type A11yFinding, type CriterionId, type EvidenceRunManifest, type EvidenceSuiteDeclaration, type Redactor, type RunResult,
   type RunReviewItem, type SafeText, type SuiteDecodeError, type SuiteFinding, type SuiteLocation, type SuiteRanResult, type SuiteRefusal,
-  type SuiteRefusedResult, type SuiteTestId, type SuiteTestOutcome, type SuiteTestResult,
+  type SuiteRefusedResult, type SuiteTestId, SuiteTestOutcome, type SuiteTestResult,
 } from '@revisum/contracts';
 import { brand } from '../foundation/Brand.ts';
 import { guaranteeStatement } from '../run/seal/GuaranteeStatement.ts';
@@ -123,7 +123,7 @@ function evidenceState(
 // The guarantee statement every evidence result carries. A suite runs only inside the isolated
 // runner, behind its egress proxy; without it the run is refused before any suite code runs.
 const evidenceGuarantees = (context: EvidenceContext) => guaranteeStatement({
-  mode: 'evidence', egressEnforced: context.egress.kind === RecordReadKind.Read, unmaskedScreenshotsKept: context.suite.keepSuiteScreenshots, unsafeFeatures: [],
+  mode: RunMode.Evidence, egressEnforced: context.egress.kind === RecordReadKind.Read, unmaskedScreenshotsKept: context.suite.keepSuiteScreenshots, unsafeFeatures: [],
 });
 
 // Each blocked origin once, redacted, in a stable order.
@@ -139,7 +139,7 @@ function outcomeCodeOf(context: EvidenceContext, outcomes: readonly SuiteTestOut
   if (context.egress.kind === RecordReadKind.Unread) {
     return EvidenceOutcomeCode.EgressUnread;
   }
-  return outcomes.every((outcome) => outcome === 'skipped') ? EvidenceOutcomeCode.Vacuous : undefined;
+  return outcomes.every((outcome) => outcome === SuiteTestOutcome.Skipped) ? EvidenceOutcomeCode.Vacuous : undefined;
 }
 
 function unreadOutcomeCode(context: EvidenceContext, reportCode: UnreadReportCode | undefined): EvidenceOutcomeCode {
@@ -161,7 +161,7 @@ export function evidenceResult(
     const id = suiteTestId(test);
     const { criterionIds, invalid } = linkedCriteria(test, redactor);
     for (const annotationIndex of invalid) reviewItems.push({ code: RunReviewItemCode.SpecAmbiguous, testId: id, annotationIndex });
-    if (test.outcome === 'expected-failure') reviewItems.push({ code: RunReviewItemCode.ExpectedFailure, testId: id });
+    if (test.outcome === SuiteTestOutcome.ExpectedFailure) reviewItems.push({ code: RunReviewItemCode.ExpectedFailure, testId: id });
     const isFinding = FINDING_OUTCOMES.includes(test.outcome);
     const actions = isFinding ? traceActions(test, traces) : [];
     if (actions.length > MAXIMUM_FINDING_STEPS) {

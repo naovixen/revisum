@@ -1,7 +1,7 @@
 // An action in one document: the wait for its element, the runtime guard, the input, and what the
 // input started.
 import {
-    failure,
+    StepType, DriverErrorCode, failure,
     success,
     type ActionGuard,
     type DriverError,
@@ -98,23 +98,23 @@ function outcomeOfThePress(
             return success(undefined);
         case HitCheckOutcome.Miss:
             return failure({
-                code: "not-actionable",
+                code: DriverErrorCode.NotActionable,
                 detail: "the click landed on another element",
             });
         case HitCheckOutcome.None:
             return failure({
-                code: "not-actionable",
+                code: DriverErrorCode.NotActionable,
                 detail: "no part of the press had reached the element when the step ended",
             });
         case HitCheckOutcome.NoClick:
             return failure({
-                code: "not-actionable",
+                code: DriverErrorCode.NotActionable,
                 detail: "the page stopped the click before it reached the element",
             });
         case HitCheckOutcome.MovedBeforeThePress:
             if (Date.now() >= stepDeadline) {
                 return failure({
-                    code: "not-actionable",
+                    code: DriverErrorCode.NotActionable,
                     detail: `the element was still moving as the pointer reached it after ${timeout} ms, so no press was sent`,
                 });
             }
@@ -165,14 +165,14 @@ async function sendInput<Handle>(
 ): Promise<Result<void, DriverError>> {
     const input = scope.clickChecks.input;
     switch (action.type) {
-        case "hover":
+        case StepType.Hover:
             await input.hover(at, hasStepEnded);
             return success(undefined);
-        case "fill":
+        case StepType.Fill:
             await typeFill(input, element, action.value, hasStepEnded);
             return success(undefined);
         // Enter on a form or a link starts a navigation as a click does.
-        case "press":
+        case StepType.Press:
             await input.press(
                 element,
                 action.key,
@@ -180,17 +180,17 @@ async function sendInput<Handle>(
                 hasStepEnded,
             );
             return success(undefined);
-        case "select": {
+        case StepType.Select: {
             const chosen = await input.select(element, action.option, hasStepEnded);
             switch (chosen) {
                 case SelectOutcome.NoOption:
                     return failure({
-                        code: "not-found",
+                        code: DriverErrorCode.NotFound,
                         detail: "the select has no option with that text or value",
                     });
                 case SelectOutcome.NotASelect:
                     return failure({
-                        code: "not-actionable",
+                        code: DriverErrorCode.NotActionable,
                         detail: "the element is not a select",
                     });
                 case SelectOutcome.Selected:
@@ -208,10 +208,10 @@ async function perform<Handle>(
     beforePress: BeforePress<Handle>,
     stepDeadline: number,
 ): Promise<Result<void, DriverError>> {
-    if (action.type === "click") {
+    if (action.type === StepType.Click) {
         return click(scope, action.locator, guard, beforePress, stepDeadline);
     }
-    if (action.type === "upload") {
+    if (action.type === StepType.Upload) {
         return upload(scope, action, guard, stepDeadline);
     }
     const { operations } = scope;
@@ -232,7 +232,7 @@ async function perform<Handle>(
         return failure(denied);
     }
     // Noted before typing: a fill that fails part way may still have typed some of it.
-    if (action.type === "fill" && isSecretFill(action)) {
+    if (action.type === StepType.Fill && isSecretFill(action)) {
         scope.details.secretTypedFields.push({
             locator: action.locator,
             isGone: () => operations.isElementGone(element),
@@ -279,7 +279,7 @@ export async function actBeforePress<Handle>(
     if (alreadyRefused !== null) {
         return failure(alreadyRefused);
     }
-    if (action.type === "dialog") {
+    if (action.type === StepType.Dialog) {
         try {
             return await answerDialog(scope, action, guard);
         } catch (error) {
@@ -301,7 +301,7 @@ export async function actBeforePress<Handle>(
         acted = failure(failureOfThrow(scope, error));
     }
     // The audit log holds this denial, so nothing noticed in the same moment may take its place.
-    if (!acted.ok && acted.error.code === "policy-denied") {
+    if (!acted.ok && acted.error.code === DriverErrorCode.PolicyDenied) {
         return acted;
     }
     if (events.crashed()) {
@@ -313,7 +313,7 @@ export async function actBeforePress<Handle>(
     }
     if (events.unsupportedOpenings() > openingsBefore) {
         return failure({
-            code: "unsupported-step",
+            code: DriverErrorCode.UnsupportedStep,
             detail: "the step opened a popup or a second page, or started a download",
         });
     }

@@ -2,7 +2,7 @@
 // whether it succeeded, its data and its typed errors. Each error links to its heading in
 // docs/errors.md. The full command line lives elsewhere; the types are here, in the package that owns
 // the command line.
-import { schemaId, type CliErrorCode, type ExitCode } from '@revisum/engine';
+import { schemaId, CliErrorCode, type ExitCode } from '@revisum/engine';
 
 export type Command = 'validate' | 'lock' | 'run' | 'export' | 'review' | 'approve' | 'doctor' | 'convert' | 'draft';
 // `reason` says what went wrong, when that holds no input value and helps a person more than the code.
@@ -27,13 +27,13 @@ export const cliError = (code: CliErrorCode, path?: string): CliError => ({ code
 // command before it can do its work is 4.
 export function exitCodeFor(code: CliErrorCode): ExitCode {
   switch (code) {
-    case 'plan-rejected': case 'approval-refused': case 'after-plan-unapproved':
+    case CliErrorCode.PlanRejected: case CliErrorCode.ApprovalRefused: case CliErrorCode.AfterPlanUnapproved:
       return 2;
-    case 'target-unavailable':
+    case CliErrorCode.TargetUnavailable:
       return 3;
-    case 'usage': case 'config-invalid': case 'untrusted-source': case 'lock-download-failed': case 'lock-offline': case 'replay-mismatch':
-    case 'internal': case 'planner-endpoint-not-loopback': case 'planner-call-failed':
-    case 'explore-origin-refused': case 'explore-runner-unavailable': case 'explore-start-unreachable':
+    case CliErrorCode.Usage: case CliErrorCode.ConfigInvalid: case CliErrorCode.UntrustedSource: case CliErrorCode.LockDownloadFailed: case CliErrorCode.LockOffline: case CliErrorCode.ReplayMismatch:
+    case CliErrorCode.Internal: case CliErrorCode.PlannerEndpointNotLoopback: case CliErrorCode.PlannerCallFailed:
+    case CliErrorCode.ExploreOriginRefused: case CliErrorCode.ExploreRunnerUnavailable: case CliErrorCode.ExploreStartUnreachable:
       return 4;
   }
 }

@@ -3,7 +3,8 @@
 // this, and a cleared run's origins are opened by it, so the two cannot disagree.
 import type { PlanStanding } from "../approval/PlanStanding.ts";
 import type { ProjectPolicy } from "../project/ParseProject.ts";
+import { PlanStandingMode } from "../approval/PlanStandingMode.ts";
 
 // The standing must already be the plan's own (ownStanding), never another plan's.
 export const isProductionAllowed = (standing: PlanStanding, policy: ProjectPolicy): boolean =>
-    standing.mode === "approved" && policy.allowProductionForApprovedPlans;
+    standing.mode === PlanStandingMode.Approved && policy.allowProductionForApprovedPlans;

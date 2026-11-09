@@ -11,8 +11,8 @@
 // are read. Neither the text nor a field's value is kept: the result and the log record the
 // text's sha256, and a remembered value's name and sha256.
 import {
-  failure, stepFailed, success, type StepOutcome,
-  type StepCode, type BackendAssertion, type CallEffect, type Clock, type DocumentSession, type EvaluateStep, type ExpectScriptStep, type FieldName,
+  BackendAssertionKind, failure, stepFailed, success, StepOutcome,
+  type StepCode, type BackendAssertion, CallEffect, type Clock, type DocumentSession, type EvaluateStep, type ExpectScriptStep, type FieldName,
   type JsonPointer, type ParameterName, type Result, type SafeText, type ScriptArguments, type ScriptChoice, type ScriptName,
   type PageScriptRecord, type ScriptParameterType, type ValueName,
 } from '@revisum/contracts';
@@ -28,6 +28,7 @@ import { checkBackendField, fieldAt, fieldText } from '../service-calls/CheckBac
 import type { NamedScripts } from './NamedScriptSources.ts';
 import { decodeScriptResult } from './DecodeScriptResult.ts';
 import { isJudgedLookDone, pollUntil, type JudgedLook } from '../../PollUntil.ts';
+import { EventKind } from '../../logging/LoggingManifest.ts';
 
 // A declared script's limits when its declaration sets none: 5 seconds and 256 KiB.
 const DEFAULT_SCRIPT_TIMEOUT_MILLISECONDS = 5000;
@@ -143,7 +144,7 @@ async function runOnce(
   // Only a result text accepted in full is hashed: an oversized one may have been cut short.
   const resultSha256 = ran.ok && result.ok ? sha256UnlessHoldingASecret(ran.value, context.holdsSecret) : null;
   context.logger.log({
-    kind: 'page.script', stepIndex, stepType, outcome: result.ok ? 'passed' : 'failed',
+    kind: EventKind.PageScript, stepIndex, stepType, outcome: result.ok ? 'passed' : 'failed',
     ...(result.ok ? {} : { code: result.error }), ...(resultSha256 === null ? {} : { sha256: resultSha256 }),
     durationMilliseconds: context.clock.now() - startedAt,
   });
@@ -181,7 +182,7 @@ export async function runEvaluate(step: EvaluateStep, stepIndex: number, session
   if (!texts.ok) return failedWith(texts.error, pageScript);
   const remembered = context.remembered.rememberAll(texts.value, stepIndex);
   if (!remembered.ok) return failedWith(remembered.error, pageScript);
-  return { outcome: 'passed', pageScript, ...recordsOfRemembered(remembered.value) };
+  return { outcome: StepOutcome.Passed, pageScript, ...recordsOfRemembered(remembered.value) };
 }
 
 // The text a check compares against, with a value reference resolved; null for a check of no text.
@@ -208,10 +209,10 @@ export async function runScriptCheck(step: ExpectScriptStep, stepIndex: number, 
     // A script that throws, hangs or gives no usable result would do the same again: it stops here.
     if (!once.result.ok) return { outcome: failedWith(once.result.error, pageScript), isDone: true };
     const field = resultField(once.result.value, script.value, step.field);
-    if (checkBackendField(step.assert, field.ok ? { value: field.value } : undefined, expected.value)) return { outcome: { outcome: 'passed', pageScript }, isDone: true };
-    const code = !field.ok && step.assert.kind !== 'present' && step.assert.kind !== 'absent' ? 'field-missing' : 'assertion-failed';
+    if (checkBackendField(step.assert, field.ok ? { value: field.value } : undefined, expected.value)) return { outcome: { outcome: StepOutcome.Passed, pageScript }, isDone: true };
+    const code = !field.ok && step.assert.kind !== BackendAssertionKind.Present && step.assert.kind !== BackendAssertionKind.Absent ? 'field-missing' : 'assertion-failed';
     // The parser lets only a read script stand in a check; a write one is never run twice all the same.
-    return { outcome: failedWith(code, pageScript), isDone: script.value.effect === 'write' };
+    return { outcome: failedWith(code, pageScript), isDone: script.value.effect === CallEffect.Write };
   });
   return last.outcome;
 }

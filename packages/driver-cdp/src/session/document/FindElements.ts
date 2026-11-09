@@ -1,5 +1,5 @@
 // The elements a locator matches in one document.
-import { DEFAULT_TEST_ID_ATTRIBUTE, type Position, type ResolvedLocator } from "@revisum/contracts";
+import { StructuralLocatorKind, SemanticLocatorKind, DEFAULT_TEST_ID_ATTRIBUTE, type Position, type ResolvedLocator } from "@revisum/contracts";
 import {
     findByLabel,
     findByTestId,
@@ -71,22 +71,22 @@ async function matches<Handle>(
 ): Promise<Handle[]> {
     switch (locator.by) {
         // The browser compares names with their white space collapsed, so a plan's name must be too.
-        case "role":
+        case SemanticLocatorKind.Role:
             return ownElements(
                 operations,
                 await operations.byRole(locator.role, normalise(locator.name)),
             );
-        case "label":
+        case SemanticLocatorKind.Label:
             return operations.callForElements(findByLabel, [locator.label]);
-        case "text":
+        case SemanticLocatorKind.Text:
             return operations.callForElements(findByText, [locator.text]);
-        case "testId":
+        case SemanticLocatorKind.TestId:
             return operations.callForElements(findByTestId, [
                 locator.testId,
                 locator.attribute ?? DEFAULT_TEST_ID_ATTRIBUTE,
             ]);
-        case "css":
-        case "xpath": {
+        case StructuralLocatorKind.Css:
+        case StructuralLocatorKind.Xpath: {
             // Inside another locator, the selector is evaluated in the one element that one finds, or
             // nowhere.
             const scope =
@@ -94,7 +94,7 @@ async function matches<Handle>(
             if (locator.inside !== undefined && scope.length !== 1) {
                 return [];
             }
-            const text = locator.by === "css" ? locator.selector : locator.expression;
+            const text = locator.by === StructuralLocatorKind.Css ? locator.selector : locator.expression;
             return operations.callForElements(findStructural, [
                 locator.by,
                 text,
@@ -115,10 +115,10 @@ export async function rejectsSelector<Handle>(
     operations: PageOperations<Handle>,
     locator: ResolvedLocator,
 ): Promise<boolean> {
-    if (locator.by !== "css" && locator.by !== "xpath") {
+    if (locator.by !== StructuralLocatorKind.Css && locator.by !== StructuralLocatorKind.Xpath) {
         return false;
     }
-    const text = locator.by === "css" ? locator.selector : locator.expression;
+    const text = locator.by === StructuralLocatorKind.Css ? locator.selector : locator.expression;
     let validity: string = SelectorValidity.Valid;
     try {
         validity = await operations.callForString(structuralSelectorValidity, [locator.by, text]);

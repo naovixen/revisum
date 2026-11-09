@@ -1,6 +1,6 @@
 // Screenshots of one document's viewport, with what must stay hidden painted solid black.
 import {
-    failure,
+    DriverErrorCode, failure,
     success,
     type DriverError,
     type PageReadFailure,
@@ -105,7 +105,7 @@ async function screenshotWithFieldsHidden<Handle>(
         }
         if (!isFound && !(isEveryDocumentRead && (await canBeLeftUnmasked(field)))) {
             return failure({
-                code: "not-found",
+                code: DriverErrorCode.NotFound,
                 detail: "a field a secret was typed into cannot be found to hide it",
             });
         }

@@ -2,15 +2,27 @@
 // and a follow-up action, then it should react. Merged, they describe a behaviour.
 import type { Rule } from "eslint";
 
-type Phase = "subject" | "context" | "action" | "unknown";
+const Phase = {
+    Subject: "subject",
+    Context: "context",
+    Action: "action",
+    Unknown: "unknown",
+} as const;
+
+type Phase = (typeof Phase)[keyof typeof Phase];
 type Frame = { readonly call: Rule.Node; readonly phase: Phase };
-type CallKind = "describe" | "test";
+const CallKind = {
+    Describe: "describe",
+    Test: "test",
+} as const;
+
+type CallKind = (typeof CallKind)[keyof typeof CallKind];
 
 const DEEPEST_LEVEL = 5;
 const CALL_KINDS: Readonly<Record<string, CallKind>> = {
-    describe: "describe",
-    test: "test",
-    it: "test",
+    describe: CallKind.Describe,
+    test: CallKind.Test,
+    it: CallKind.Test,
 };
 const CALL_MODIFIERS = new Set(["only", "skip", "todo"]);
 
@@ -50,19 +62,19 @@ function titleOpening(call: Rule.Node): string | null {
 
 // The phase a nested describe moves to, or null when its keyword doesn't belong under its parent.
 function nextPhase(parent: Phase, title: string): Phase | null {
-    if (parent === "unknown") {
+    if (parent === Phase.Unknown) {
         return "unknown";
     }
-    if (parent === "subject" && title.startsWith("given ")) {
+    if (parent === Phase.Subject && title.startsWith("given ")) {
         return "context";
     }
-    if (parent === "context" && title.startsWith("and ")) {
+    if (parent === Phase.Context && title.startsWith("and ")) {
         return "context";
     }
-    if (parent !== "action" && title.startsWith("when ")) {
+    if (parent !== Phase.Action && title.startsWith("when ")) {
         return "action";
     }
-    if (parent === "action" && title.startsWith("and ")) {
+    if (parent === Phase.Action && title.startsWith("and ")) {
         return "action";
     }
     return null;
@@ -100,11 +112,11 @@ export const testTitleFormat: Rule.RuleModule = {
                 if (title !== null && !title.startsWith("Using ")) {
                     context.report({ node: call, messageId: "outermostTitle" });
                 }
-                frames.push({ call, phase: "subject" });
+                frames.push({ call, phase: Phase.Subject });
                 return;
             }
             if (title === null) {
-                frames.push({ call, phase: "unknown" });
+                frames.push({ call, phase: Phase.Unknown });
                 return;
             }
             const phase = nextPhase(parent.phase, title);
@@ -124,7 +136,7 @@ export const testTitleFormat: Rule.RuleModule = {
             if (title !== null && !title.startsWith("then it should ")) {
                 context.report({ node: call, messageId: "testTitle" });
             }
-            if (parent.phase === "subject" || parent.phase === "context") {
+            if (parent.phase === Phase.Subject || parent.phase === Phase.Context) {
                 context.report({ node: call, messageId: "testWithoutAction" });
             }
         }
@@ -132,10 +144,10 @@ export const testTitleFormat: Rule.RuleModule = {
         return {
             CallExpression(node) {
                 const kind = callKind(node);
-                if (kind === "describe") {
+                if (kind === CallKind.Describe) {
                     checkDescribe(node);
                 }
-                if (kind === "test") {
+                if (kind === CallKind.Test) {
                     checkTest(node);
                 }
             },

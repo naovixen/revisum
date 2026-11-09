@@ -9,7 +9,7 @@
 // begins after the press was sent, in the frame the press acted in, and the press could start
 // something at all, so a file a page's timer starts on a press with a handler still passes.
 import {
-    failure,
+    DriverErrorCode, failure,
     success,
     type DownloadedFile,
     type DriverError,
@@ -25,7 +25,7 @@ import {
     DOWNLOAD_PROGRESS,
     RESPONSE_MEDIA_TYPE,
     type DownloadBegun,
-    type DownloadState,
+    DownloadState,
 } from "../connection/BrowserEvent.ts";
 import type { CdpConnection } from "../connection/CdpConnection.ts";
 import type { ArmedDownload, DownloadCapture, DownloadPress } from "./DownloadCapture.ts";
@@ -132,7 +132,7 @@ export class DownloadFolder implements DownloadCapture {
             return true;
         }
         if (armed.claimed === null && begun.frameId === press.frameId) {
-            armed.claimed = { ...begun, state: "inProgress", receivedBytes: 0 };
+            armed.claimed = { ...begun, state: DownloadState.InProgress, receivedBytes: 0 };
             return true;
         }
         armed.discardsAside.push(
@@ -258,7 +258,7 @@ export class DownloadFolder implements DownloadCapture {
     ): Promise<Result<DownloadedFile, DriverError>> {
         const beginBy = Date.now() + beginTimeoutMilliseconds;
         const noDownload = failure<DriverError>({
-            code: "no-download",
+            code: DriverErrorCode.NoDownload,
             detail: `the click started no download within ${beginTimeoutMilliseconds} ms`,
         });
         while (armed.claimed === null) {
@@ -271,19 +271,19 @@ export class DownloadFolder implements DownloadCapture {
         const finishBy =
             Date.now() + Math.max(beginTimeoutMilliseconds, SHORTEST_FINISH_MILLISECONDS);
         const tooLarge: DriverError = {
-            code: "download-too-large",
+            code: DriverErrorCode.DownloadTooLarge,
             detail: `the file is larger than ${maximumBytes} bytes`,
         };
         // The bytes on disk are watched as well as the browser's progress events, which it sends
         // only now and then, so a file over the limit is stopped soon after it passes it.
-        while (claimed.state !== "completed") {
+        while (claimed.state !== DownloadState.Completed) {
             if (shouldStopWaiting()) {
                 return noDownload;
             }
-            if (claimed.state === "canceled") {
+            if (claimed.state === DownloadState.Canceled) {
                 await this.#discard(claimed.downloadId);
                 return failure({
-                    code: "no-download",
+                    code: DriverErrorCode.NoDownload,
                     detail: "the download was cancelled before it finished",
                 });
             }
@@ -296,7 +296,7 @@ export class DownloadFolder implements DownloadCapture {
             }
             if (Date.now() >= finishBy) {
                 await this.#discard(claimed.downloadId);
-                return failure({ code: "timeout", detail: "the download did not finish in time" });
+                return failure({ code: DriverErrorCode.Timeout, detail: "the download did not finish in time" });
             }
             await pause(POLL_INTERVAL_MILLISECONDS);
         }
@@ -305,7 +305,7 @@ export class DownloadFolder implements DownloadCapture {
             bytes = readFileSync(join(folder, claimed.downloadId));
         } catch {
             return failure({
-                code: "no-download",
+                code: DriverErrorCode.NoDownload,
                 detail: "the browser kept no file for the download",
             });
         }
@@ -369,13 +369,13 @@ export class DownloadFolder implements DownloadCapture {
     async #discard(downloadId: string): Promise<void> {
         const folder = this.#folder;
         if (
-            this.#states.get(downloadId) !== "completed" &&
+            this.#states.get(downloadId) !== DownloadState.Completed &&
             !(await this.#isAlreadyGoneWhenCancelled(downloadId))
         ) {
             const stopBy = Date.now() + CANCEL_WAIT_MILLISECONDS;
             while (
-                this.#states.get(downloadId) !== "canceled" &&
-                this.#states.get(downloadId) !== "completed" &&
+                this.#states.get(downloadId) !== DownloadState.Canceled &&
+                this.#states.get(downloadId) !== DownloadState.Completed &&
                 Date.now() < stopBy
             ) {
                 await pause(POLL_INTERVAL_MILLISECONDS);

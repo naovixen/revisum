@@ -3,6 +3,7 @@
 // so a unit is converted in this one place only.
 import type { ClockAdvance, ClockUnit, Plan } from '@revisum/contracts';
 import { visitSteps } from '../../../plan/VisitSteps.ts';
+import { StepType } from '@revisum/contracts';
 
 // Elapsed time, not calendar time: a day is always 86,400,000 ms, also across a daylight-saving change.
 const MILLISECONDS_PER_UNIT: { readonly [Unit in ClockUnit]: number } = {
@@ -23,7 +24,7 @@ export const clockAdvanceMilliseconds = (by: ClockAdvance): number => by.amount 
 export function totalClockAdvanceMilliseconds(plan: Plan): number {
   let total = 0;
   visitSteps(plan.steps, (step) => {
-    if (step.type === 'advanceClock') {
+    if (step.type === StepType.AdvanceClock) {
       total += clockAdvanceMilliseconds(step.by);
     }
   });

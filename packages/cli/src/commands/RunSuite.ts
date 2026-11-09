@@ -17,6 +17,7 @@ import {
   type WorkloadErrorCode, type WorkloadOutcome, type WorkloadRequest, type WorkloadRunner, type WorkloadVariable,
 } from '@revisum/engine';
 import { buildEgressPolicy } from '@revisum/runner';
+import { RefusalCode, SuiteDecodeErrorCode, EgressChannel, EgressDecision, WorkloadOutcomeKind } from '@revisum/contracts';
 
 export type SuiteRunPorts = {
   readonly workload: WorkloadRunner;
@@ -38,7 +39,7 @@ const TRACE_ATTACHMENT = 'trace';
 // A suite stopped at its timeout has no exit code, and the published result's field is a number: its
 // outcome code says why, and nothing compares this one with the outcomes.
 const STOPPED_SUITE_EXIT_CODE = -1;
-const exitCodeOf = (outcome: WorkloadOutcome): number => (outcome.kind === 'exited' ? outcome.exitCode : STOPPED_SUITE_EXIT_CODE);
+const exitCodeOf = (outcome: WorkloadOutcome): number => (outcome.kind === WorkloadOutcomeKind.Exited ? outcome.exitCode : STOPPED_SUITE_EXIT_CODE);
 const host = (): HostInfo => ({ platform: process.platform, arch: process.arch });
 
 // The suite may reach the project's own origins, never its production ones, and no service.
@@ -132,8 +133,8 @@ const egressOf = (outcome: WorkloadOutcome): RecordRead<readonly string[]> =>
 
 // Each refusal once. Only the browser's own records carry a form the browser saw.
 function blockedOriginsOf(events: readonly EgressEvent[]): readonly string[] {
-  const blocked = events.filter((event) => event.decision === 'blocked');
-  const isFromBrowser = (event: EgressEvent): boolean => event.channel !== 'unattributed' && event.channel !== 'process';
+  const blocked = events.filter((event) => event.decision === EgressDecision.Blocked);
+  const isFromBrowser = (event: EgressEvent): boolean => event.channel !== EgressChannel.Unattributed && event.channel !== EgressChannel.Process;
   return mergeRefusedOrigins(
     blocked.filter(isFromBrowser).map((event) => event.origin),
     blocked.filter((event) => !isFromBrowser(event)).map((event) => event.origin),
@@ -164,21 +165,21 @@ type ReadReport = { readonly ok: true; readonly report: SuiteReport } | { readon
 function readReport(outputDirectory: string, limits: EvidenceLimits): ReadReport {
   const file = outputFile(outputDirectory, SUITE_REPORT_FILE);
   if (!file.ok) {
-    return { ok: false, errors: [{ code: file.error === 'refused' ? 'suite-report-invalid' : 'suite-report-missing', path: '$' }] };
+    return { ok: false, errors: [{ code: file.error === 'refused' ? SuiteDecodeErrorCode.SuiteReportInvalid : SuiteDecodeErrorCode.SuiteReportMissing, path: '$' }] };
   }
   let parsed: unknown;
   try {
     // A suite still running can remove the report at any moment here, so nothing is looked at twice.
     const found = statSync(file.value, { throwIfNoEntry: false });
     if (found === undefined || !found.isFile()) {
-      return { ok: false, errors: [{ code: 'suite-report-missing', path: '$' }] };
+      return { ok: false, errors: [{ code: SuiteDecodeErrorCode.SuiteReportMissing, path: '$' }] };
     }
     if (found.size > limits.maximumReportBytes) {
-      return { ok: false, errors: [{ code: 'too-large', path: '$' }] };
+      return { ok: false, errors: [{ code: SuiteDecodeErrorCode.TooLarge, path: '$' }] };
     }
     parsed = JSON.parse(readFileSync(file.value, 'utf8'));
   } catch (error) {
-    return { ok: false, errors: [{ code: isFileGone(error) ? 'suite-report-missing' : 'suite-report-invalid', path: '$' }] };
+    return { ok: false, errors: [{ code: isFileGone(error) ? SuiteDecodeErrorCode.SuiteReportMissing : SuiteDecodeErrorCode.SuiteReportInvalid, path: '$' }] };
   }
   const decoded = parseSuiteReport(parsed, limits, { outputDirectory: WORKLOAD_OUTPUT_PATH });
   return decoded.ok ? { ok: true, report: decoded.value } : { ok: false, errors: decoded.error };
@@ -189,7 +190,7 @@ type ReadTraces = { readonly traces: readonly SuiteTrace[]; readonly decodeError
 // One trace's bytes decoded, or why they could not be. No error holds the report's text for the
 // path, which the suite wrote.
 function readTrace(outputDirectory: string, path: string, limits: EvidenceLimits): Result<SuiteTrace, SuiteDecodeError> {
-  const unreadable = failure<SuiteDecodeError>({ code: 'trace-invalid', path: '$' });
+  const unreadable = failure<SuiteDecodeError>({ code: SuiteDecodeErrorCode.TraceInvalid, path: '$' });
   // The decoder has checked each path stays inside the output folder as written; this follows links.
   const file = outputFile(outputDirectory, path);
   if (!file.ok) {
@@ -201,7 +202,7 @@ function readTrace(outputDirectory: string, path: string, limits: EvidenceLimits
       return unreadable;
     }
     if (found.size > limits.maximumTraceBytes) {
-      return failure({ code: 'too-large', path: '$' });
+      return failure({ code: SuiteDecodeErrorCode.TooLarge, path: '$' });
     }
     return parseSuiteTrace(new Uint8Array(readFileSync(file.value)), limits, path);
   } catch {
@@ -235,9 +236,9 @@ export async function runSuite(project: Project, suiteName: string, ports: Suite
   if (!chosen.ok) return refusedSuiteResult(suiteName, chosen.error);
   const suite = chosen.value;
   const limits = project.evidenceMode?.limits;
-  if (limits === undefined) return refusedSuiteResult(suiteName, { code: 'evidence-mode-disabled' });
+  if (limits === undefined) return refusedSuiteResult(suiteName, { code: RefusalCode.EvidenceModeDisabled });
   const environment = suiteEnvironment(suite, ports.secrets);
-  if (!environment.ok) return refusedSuiteResult(suiteName, { code: 'secret-missing', secretName: environment.error });
+  if (!environment.ok) return refusedSuiteResult(suiteName, { code: RefusalCode.SecretMissing, secretName: environment.error });
 
   // The suite files are pinned before anything runs, so the manifest says what was run.
   const files = suiteFiles(ports.checkout, suite);
@@ -266,10 +267,10 @@ export async function runSuite(project: Project, suiteName: string, ports: Suite
   if (suite.setupCommand !== undefined) {
     const setup = await ports.workload.run(request(suite.setupCommand, environment.value.variables));
     if (!setup.ok) return refusedSuiteResult(suiteName, refusalFor(setup.error));
-    if (setup.value.kind === 'timed-out' || setup.value.exitCode !== 0) {
+    if (setup.value.kind === WorkloadOutcomeKind.TimedOut || setup.value.exitCode !== 0) {
       // The suite never ran, but its setup ran behind the egress proxy, so its result says what the
       // proxy refused, or that the proxy's record could not be read.
-      return unreadSuiteResult(context(exitCodeOf(setup.value), setup.value.kind === 'timed-out', manifestFor(null, []), egressOf(setup.value)), EvidenceOutcomeCode.SetupFailed);
+      return unreadSuiteResult(context(exitCodeOf(setup.value), setup.value.kind === WorkloadOutcomeKind.TimedOut, manifestFor(null, []), egressOf(setup.value)), EvidenceOutcomeCode.SetupFailed);
     }
     if (setup.value.egressRecordUnread === true) {
       return unreadSuiteResult(context(exitCodeOf(setup.value), false, manifestFor(null, []), RECORD_UNREAD));
@@ -290,7 +291,7 @@ export async function runSuite(project: Project, suiteName: string, ports: Suite
   const ran = await ports.workload.run(request(built.argv, variables));
   if (!ran.ok) return refusedSuiteResult(suiteName, refusalFor(ran.error));
   const exitCode = exitCodeOf(ran.value);
-  const timedOut = ran.value.kind === 'timed-out';
+  const timedOut = ran.value.kind === WorkloadOutcomeKind.TimedOut;
   const egress = egressOf(ran.value);
 
   const read = readReport(ports.outputDirectory, limits);

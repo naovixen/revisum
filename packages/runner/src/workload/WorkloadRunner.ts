@@ -6,11 +6,11 @@
 // the proxy is still seen. A database command's request names the one service its policy allows over
 // TCP: the proxy relays that port and the team's container maps the service's name to the proxy.
 import {
-    PRODUCT,
+    WorkloadOutcomeKind, PRODUCT,
     failure,
     success,
     type Result,
-    type WorkloadErrorCode,
+    WorkloadErrorCode,
     type WorkloadOutcome,
     type WorkloadRequest,
     type WorkloadRunner,
@@ -87,9 +87,9 @@ async function runInScope(
         stderr: capturedOutput(ended.printed.stderr, checked.outputLimit),
     };
     return success(
-        ended.kind === "exited"
-            ? { kind: "exited", exitCode: ended.exitCode, ...records }
-            : { kind: "timed-out", stop: ended.stop, ...records },
+        ended.kind === WorkloadOutcomeKind.Exited
+            ? { kind: WorkloadOutcomeKind.Exited, exitCode: ended.exitCode, ...records }
+            : { kind: WorkloadOutcomeKind.TimedOut, stop: ended.stop, ...records },
     );
 }
 
@@ -133,11 +133,11 @@ export function workloadRunner(options: WorkloadRunnerOptions): WorkloadRunner {
             return refuse(
                 scoped.error.kind === NetworkFailureKind.InternalRefused
                     ? {
-                          code: "egress-unenforceable",
+                          code: WorkloadErrorCode.EgressUnenforceable,
                           detail: `Docker could not create a network with no route out: ${scoped.error.detail}`,
                       }
                     : {
-                          code: "workload-start-failed",
+                          code: WorkloadErrorCode.WorkloadStartFailed,
                           detail: `the run's network could not be made: ${scoped.error.detail}`,
                       },
             );

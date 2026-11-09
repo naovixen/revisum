@@ -1,8 +1,8 @@
 // The assertion oracle: pure functions from a probe to a verdict. It lives in the engine so that
 // neither a driver nor an AI can change what "passed" means.
 import {
-  literalText, oneElementOf, type AccessibleStates, type DomCheckWith, type DomRead, type ElementProbe, type OneElementRead, type PageAssertion, type PageProbe,
-  type ResolvedElementAssertion, type SafeText, type UnreadablePage,
+  PageAssertionKind, PageTextKind, ElementStateKind, DomCheckKind, DomReadKind, ElementAssertionKind, StepCode, literalText, oneElementOf, type AccessibleStates, type DomCheckWith, type DomRead, type ElementProbe, type OneElementRead, type PageAssertion, type PageProbe,
+  type ResolvedElementAssertion, type SafeText, UnreadablePage,
 } from '@revisum/contracts';
 
 // state-not-exposed: the element does not expose the state a check asks about, so the check can
@@ -16,16 +16,16 @@ type CheckFailure = 'not-found' | 'ambiguous' | 'assertion-failed' | 'state-not-
 export type Verdict = { readonly pass: true } | { readonly pass: false; readonly code: CheckFailure };
 
 const PASSED: Verdict = { pass: true };
-const FAILED: Verdict = { pass: false, code: 'assertion-failed' };
-const STATE_NOT_EXPOSED: Verdict = { pass: false, code: 'state-not-exposed' };
-const NAVIGATION_FAILED: Verdict = { pass: false, code: 'navigation-failed' };
+const FAILED: Verdict = { pass: false, code: StepCode.AssertionFailed };
+const STATE_NOT_EXPOSED: Verdict = { pass: false, code: StepCode.StateNotExposed };
+const NAVIGATION_FAILED: Verdict = { pass: false, code: UnreadablePage.BrowserErrorPage };
 
 // What a DOM check needs the probe to read of the element; null for every other check.
 export function domReadFor(assertion: ResolvedElementAssertion): DomRead | null {
   switch (assertion.kind) {
-    case 'hasClass': case 'lacksClass': return { kind: 'classes' };
-    case 'computedStyleEquals': return { kind: 'computedStyle', property: assertion.property };
-    case 'attributeEquals': case 'attributeAbsent': return { kind: 'attribute', name: assertion.name };
+    case ElementAssertionKind.HasClass: case ElementAssertionKind.LacksClass: return { kind: DomReadKind.Classes };
+    case ElementAssertionKind.ComputedStyleEquals: return { kind: DomReadKind.ComputedStyle, property: assertion.property };
+    case ElementAssertionKind.AttributeEquals: case ElementAssertionKind.AttributeAbsent: return { kind: DomReadKind.Attribute, name: assertion.name };
     default: return null;
   }
 }
@@ -36,14 +36,14 @@ export function domReadFor(assertion: ResolvedElementAssertion): DomRead | null 
 function checkDom(assertion: DomCheckWith<SafeText>, probe: OneElementRead): Verdict {
   const read = probe.dom;
   switch (assertion.kind) {
-    case 'hasClass': case 'lacksClass': {
-      if (read?.kind !== 'classes') return FAILED;
-      return read.classes.includes(assertion.value) === (assertion.kind === 'hasClass') ? PASSED : FAILED;
+    case DomCheckKind.HasClass: case DomCheckKind.LacksClass: {
+      if (read?.kind !== DomReadKind.Classes) return FAILED;
+      return read.classes.includes(assertion.value) === (assertion.kind === DomCheckKind.HasClass) ? PASSED : FAILED;
     }
-    case 'computedStyleEquals':
-      return read?.kind === 'computedStyle' && normalise(read.value) === normalise(assertion.value) ? PASSED : FAILED;
-    case 'attributeEquals': return read?.kind === 'attribute' && read.value === assertion.value ? PASSED : FAILED;
-    case 'attributeAbsent': return read?.kind === 'attribute' && read.value === null ? PASSED : FAILED;
+    case DomCheckKind.ComputedStyleEquals:
+      return read?.kind === DomReadKind.ComputedStyle && normalise(read.value) === normalise(assertion.value) ? PASSED : FAILED;
+    case DomCheckKind.AttributeEquals: return read?.kind === DomReadKind.Attribute && read.value === assertion.value ? PASSED : FAILED;
+    case DomCheckKind.AttributeAbsent: return read?.kind === DomReadKind.Attribute && read.value === null ? PASSED : FAILED;
   }
 }
 
@@ -93,9 +93,9 @@ export function checkElement(assertion: ResolvedElementAssertion, probe: Element
     return { pass: false, code: probe.count };
   }
   // Checks on how many elements match come before the single-element rule below.
-  if (assertion.kind === 'absent') return probe.count === 0 ? PASSED : FAILED;
-  if (assertion.kind === 'countEquals') return probe.count === assertion.value ? PASSED : FAILED;
-  if (assertion.kind === 'hidden' && probe.count === 0) {
+  if (assertion.kind === ElementStateKind.Absent) return probe.count === 0 ? PASSED : FAILED;
+  if (assertion.kind === ElementAssertionKind.CountEquals) return probe.count === assertion.value ? PASSED : FAILED;
+  if (assertion.kind === ElementAssertionKind.Hidden && probe.count === 0) {
     return PASSED;
   }
   const found = oneElementOf(probe);
@@ -104,23 +104,23 @@ export function checkElement(assertion: ResolvedElementAssertion, probe: Element
   }
   const element = found.value;
   switch (assertion.kind) {
-    case 'hidden': return element.visible ? FAILED : PASSED;
-    case 'visible': return element.visible ? PASSED : FAILED;
-    case 'enabled': return element.enabled ? PASSED : FAILED;
-    case 'disabled': return !element.enabled ? PASSED : FAILED;
-    case 'textEquals': return normalise(element.text) === normalise(assertion.value) ? PASSED : FAILED;
-    case 'textContains': return normalise(element.text).includes(normalise(assertion.value)) ? PASSED : FAILED;
-    case 'valueEquals': return element.value === assertion.value ? PASSED : FAILED;
-    case 'valueContains': return element.value !== null && element.value.includes(assertion.value) ? PASSED : FAILED;
-    case 'selected': case 'unselected': case 'expanded': case 'collapsed': case 'pressed': case 'unpressed': case 'current':
+    case ElementAssertionKind.Hidden: return element.visible ? FAILED : PASSED;
+    case ElementAssertionKind.Visible: return element.visible ? PASSED : FAILED;
+    case ElementAssertionKind.Enabled: return element.enabled ? PASSED : FAILED;
+    case ElementAssertionKind.Disabled: return !element.enabled ? PASSED : FAILED;
+    case ElementAssertionKind.TextEquals: return normalise(element.text) === normalise(assertion.value) ? PASSED : FAILED;
+    case ElementAssertionKind.TextContains: return normalise(element.text).includes(normalise(assertion.value)) ? PASSED : FAILED;
+    case ElementAssertionKind.ValueEquals: return element.value === assertion.value ? PASSED : FAILED;
+    case ElementAssertionKind.ValueContains: return element.value !== null && element.value.includes(assertion.value) ? PASSED : FAILED;
+    case ElementAssertionKind.Selected: case ElementAssertionKind.Unselected: case ElementAssertionKind.Expanded: case ElementAssertionKind.Collapsed: case ElementAssertionKind.Pressed: case ElementAssertionKind.Unpressed: case ElementAssertionKind.Current:
       return checkState(assertion.kind, element);
     // The link's resolved href, never followed. An element in no link fails.
-    case 'hrefEquals': return sameUrl(assertion.value, element.href, baseUrl) ? PASSED : FAILED;
+    case ElementAssertionKind.HrefEquals: return sameUrl(assertion.value, element.href, baseUrl) ? PASSED : FAILED;
     // The probe does not report checked or focused state yet, so these checks can never pass by
     // accident. The run refuses them before probing; see isElementCheckNoDriverDecides in the contracts package.
-    case 'checked': case 'unchecked': case 'focused':
+    case ElementAssertionKind.Checked: case ElementAssertionKind.Unchecked: case ElementAssertionKind.Focused:
       return FAILED;
-    case 'hasClass': case 'lacksClass': case 'computedStyleEquals': case 'attributeEquals': case 'attributeAbsent':
+    case ElementAssertionKind.HasClass: case ElementAssertionKind.LacksClass: case ElementAssertionKind.ComputedStyleEquals: case ElementAssertionKind.AttributeEquals: case ElementAssertionKind.AttributeAbsent:
       return checkDom(assertion, element);
   }
 }
@@ -134,21 +134,21 @@ export function checkPage(assertion: PageAssertion, probe: PageProbe, baseUrl?: 
     return NAVIGATION_FAILED;
   }
   switch (assertion.kind) {
-    case 'urlPath': return new URL(probe.url).pathname === assertion.value ? PASSED : FAILED;
-    case 'title': return normalise(probe.title) === normalise(assertion.value) ? PASSED : FAILED;
+    case PageTextKind.UrlPath: return new URL(probe.url).pathname === assertion.value ? PASSED : FAILED;
+    case PageTextKind.Title: return normalise(probe.title) === normalise(assertion.value) ? PASSED : FAILED;
     // The expected URL may be a path; it is resolved against the page's URL before comparing.
-    case 'url': return new URL(assertion.value, probe.url).href === new URL(probe.url).href ? PASSED : FAILED;
+    case PageAssertionKind.Url: return new URL(assertion.value, probe.url).href === new URL(probe.url).href ? PASSED : FAILED;
     // A plain text prefix of the path: the query and fragment are not part of it.
-    case 'urlPathStartsWith': return new URL(probe.url).pathname.startsWith(assertion.value) ? PASSED : FAILED;
+    case PageAssertionKind.UrlPathStartsWith: return new URL(probe.url).pathname.startsWith(assertion.value) ? PASSED : FAILED;
     // Passes when a meta tag of that name or property has the content. A head with no such tag
     // fails. A value reference left in the check never matches.
-    case 'metaContent': {
+    case PageAssertionKind.MetaContent: {
       const expected = literalText(assertion.value);
       if (expected === undefined) return FAILED;
       const found = probe.meta.some((tag) => sameMetaName(tag.name, assertion.name) && normalise(tag.content) === normalise(expected));
       return found ? PASSED : FAILED;
     }
     // A head with no canonical link fails, even against the page's own URL.
-    case 'canonicalUrl': return sameUrl(assertion.value, probe.canonicalUrl, baseUrl) ? PASSED : FAILED;
+    case PageAssertionKind.CanonicalUrl: return sameUrl(assertion.value, probe.canonicalUrl, baseUrl) ? PASSED : FAILED;
   }
 }

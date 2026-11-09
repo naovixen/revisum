@@ -51,6 +51,7 @@ import type { DraftCommandPorts, PlannerCall } from "../commands/DraftCommand.ts
 import type { IsolatedRunner, LoginRunner } from "../explore/CrawlInBrowser.ts";
 import { plannerAdapter } from "../planners/PlannerAdapter.ts";
 import type { SuiteRunPorts } from "../commands/RunSuite.ts";
+import { PlannerEndpointKind } from "@revisum/contracts";
 
 // A host run's session goes through its own proxy. Only host runs allow declared private addresses,
 // so internal staging and localhost keep working, and every other address is refused.
@@ -144,7 +145,7 @@ const plannerCallThroughItsOwnProxy =
         const { origin } = endpoint;
         const rules = parseProxyRules({
             allowedOrigins: [origin],
-            privateOrigins: endpoint.kind === "local" ? [origin] : [],
+            privateOrigins: endpoint.kind === PlannerEndpointKind.Local ? [origin] : [],
             rewrites: [],
         });
         if (!rules.ok) {

@@ -1,6 +1,6 @@
 // A second tab in the session's own browser context, so it shares cookies and storage.
 import {
-    failure,
+    DriverErrorCode, failure,
     success,
     type DriverError,
     type Result,
@@ -35,7 +35,7 @@ export async function openTab(
     } catch (error) {
         attaching.cancel();
         return failure({
-            code: "navigation-failed",
+            code: DriverErrorCode.NavigationFailed,
             detail: `the new tab did not open: ${errorText(error)}`,
         });
     }
@@ -63,7 +63,7 @@ export async function openTab(
     } catch (error) {
         await close();
         return failure({
-            code: "navigation-failed",
+            code: DriverErrorCode.NavigationFailed,
             detail: `the new tab could not be prepared: ${errorText(error)}`,
         });
     }

@@ -10,7 +10,7 @@
 // the schema is never a reason to trust a plan.
 // `npm run lint` checks that docs/plan-language/plan.schema.json is exactly this schema.
 import {
-  AUDIT_MODES, BACKEND_ASSERTION_KINDS, CALL_EFFECTS, CLIPBOARD_ASSERTION_KINDS, CLIPBOARD_READS, CLOCK_ADVANCE_MODES, CLOCK_UNITS, DATE_ANCHORS,
+  ClipboardAssertionKind, StorageAssertionKind, BackendAssertionKind, AUDIT_MODES, BACKEND_ASSERTION_KINDS, CALL_EFFECTS, CLIPBOARD_ASSERTION_KINDS, CLIPBOARD_READS, CLOCK_ADVANCE_MODES, CLOCK_UNITS, DATE_ANCHORS,
   DATE_FORMATS, DIALOG_ACTIONS, DOWNLOAD_TEXT_KINDS, ELEMENT_STATE_KINDS, ELEMENT_TEXT_KINDS, KEYS,
   MODIFIERS, PAGE_TEXT_KINDS, POSITION_WORDS, REMEMBER_ATTRIBUTE_READ, REMEMBER_READS, RESPONSE_FIELD_PRESENCE_KINDS, RESPONSE_FIELD_TEXT_KINDS,
   RESPONSE_READS, ROLES, SCRIPT_MODES, STORAGE_ASSERTION_KINDS, STUB_ACTIONS,
@@ -284,9 +284,9 @@ export function planJsonSchema(): JsonSchema {
       // A check on one field of a declared read call's response.
       backendAssertion: {
         oneOf: [
-          closedObject({ kind: { enum: BACKEND_ASSERTION_KINDS.filter((kind) => kind === 'present' || kind === 'absent') } }, ['kind']),
+          closedObject({ kind: { enum: BACKEND_ASSERTION_KINDS.filter((kind) => kind === BackendAssertionKind.Present || kind === BackendAssertionKind.Absent) } }, ['kind']),
           closedObject({
-            kind: { enum: BACKEND_ASSERTION_KINDS.filter((kind) => kind === 'equals' || kind === 'contains') }, value: textOrValue(1),
+            kind: { enum: BACKEND_ASSERTION_KINDS.filter((kind) => kind === BackendAssertionKind.Equals || kind === BackendAssertionKind.Contains) }, value: textOrValue(1),
           }, ['kind', 'value']),
           closedObject({ kind: { const: 'numberEquals' }, value: { type: 'number' } }, ['kind', 'value']),
         ],
@@ -312,7 +312,7 @@ export function planJsonSchema(): JsonSchema {
       // A check on a declared storage entry.
       storageAssertion: {
         oneOf: [
-          closedObject({ kind: { enum: STORAGE_ASSERTION_KINDS.filter((kind) => kind !== 'equals') } }, ['kind']),
+          closedObject({ kind: { enum: STORAGE_ASSERTION_KINDS.filter((kind) => kind !== StorageAssertionKind.Equals) } }, ['kind']),
           closedObject({ kind: { const: 'equals' }, value: textOrValue(1) }, ['kind', 'value']),
         ],
       },
@@ -322,7 +322,7 @@ export function planJsonSchema(): JsonSchema {
           closedObject({
             kind: { const: 'textEquals' }, value: { oneOf: [text(1), reference('valueReference'), reference('multiLineText')] },
           }, ['kind', 'value']),
-          closedObject({ kind: { enum: CLIPBOARD_ASSERTION_KINDS.filter((kind) => kind !== 'textEquals') }, value: textOrValue(1) }, ['kind', 'value']),
+          closedObject({ kind: { enum: CLIPBOARD_ASSERTION_KINDS.filter((kind) => kind !== ClipboardAssertionKind.TextEquals) }, value: textOrValue(1) }, ['kind', 'value']),
         ],
       },
       // A URL a check compares and never visits: a path starting with "/", or an absolute http or

@@ -20,12 +20,13 @@
 // Both are deterministic and read nothing but their arguments and the project. Each denial appends
 // one plan.denied audit event whose code is the rule, so a denial leaves a record even when
 // nothing ran; a denial the audit sink failed to record is marked unrecorded.
-import { PolicyVerdictKind } from '@revisum/contracts';
+import { AuditEventKind, PolicyRuleId, PolicyVerdictKind } from '@revisum/contracts';
 import type {
-  Authorised, EventSink, GuardVerdict, Locale, Plan, PlanDenial, PolicyRuleId, ResolvedElement, SecretName, Step, Target, TargetId,
+  Authorised, EventSink, GuardVerdict, Locale, Plan, PlanDenial, ResolvedElement, SecretName, Step, Target, TargetId,
 } from '@revisum/contracts';
 import { deriveActor, sourceActorId } from '../approval/DeriveActor.ts';
 import { ownStanding, type PlanStanding } from '../approval/PlanStanding.ts';
+import { PlanStandingMode } from '../approval/PlanStandingMode.ts';
 import { planHash } from '../run/seal/BuildManifest.ts';
 import { unsafeFeaturesOf } from '../plan/UnsafeFeaturesOf.ts';
 import type { Limits, Project } from '../project/ParseProject.ts';
@@ -127,7 +128,7 @@ function undeclaredUseRule(plan: Plan, project: Project): PolicyRuleId | null {
 }
 
 function staticDenial(plan: Plan, targets: readonly Target[], standing: PlanStanding, project: Project): Denial | null {
-  if (isOverLimit(plan, project.limits)) return { rule: 'over-limit', stepIndex: null };
+  if (isOverLimit(plan, project.limits)) return { rule: PolicyRuleId.OverLimit, stepIndex: null };
   const undeclaredUse = undeclaredUseRule(plan, project);
   if (undeclaredUse !== null) {
     return { rule: undeclaredUse, stepIndex: null };
@@ -136,12 +137,12 @@ function staticDenial(plan: Plan, targets: readonly Target[], standing: PlanStan
   // With no targets no language is known, so every pattern applies: the engine's own never lapse.
   const patterns: string[] = targets.length === 0 ? [...everyIrreversiblePattern(project.policy.irreversiblePatterns)] : [];
   for (const set of patternSets) {
-    if (set === null) return { rule: 'no-locale-patterns', stepIndex: null };
+    if (set === null) return { rule: PolicyRuleId.NoLocalePatterns, stepIndex: null };
     patterns.push(...set);
   }
   // The standing is already the plan's own (ownStanding), never another plan's.
   const productionAllowed = isProductionAllowed(standing, project.policy);
-  const context: StaticContext = { project, patterns, productionAllowed, approved: standing.mode === 'approved' };
+  const context: StaticContext = { project, patterns, productionAllowed, approved: standing.mode === PlanStandingMode.Approved };
   for (const { step, index } of everyStep(plan.steps)) {
     const rule = ruleBeforeRun(step, context);
     if (rule !== null) return { rule, stepIndex: index };
@@ -166,7 +167,7 @@ export function policyGate(options: PolicyGateOptions): PolicyGate {
   const { project, events } = options;
   // True when the audit sink accepted the denial's event.
   const record = (rule: PolicyRuleId, plan?: Plan): boolean =>
-    events.append({ kind: 'plan.denied', code: rule, ...(plan === undefined ? {} : { subjectHash: planHash(plan) }) }, POLICY_GATE_ACTOR).ok;
+    events.append({ kind: AuditEventKind.PlanDenied, code: rule, ...(plan === undefined ? {} : { subjectHash: planHash(plan) }) }, POLICY_GATE_ACTOR).ok;
   // The plan as cleared with the standing it was judged as, or the gate's denial, recorded.
   const judge = (plan: Plan, targetIds: readonly TargetId[], standing: PlanStanding | undefined): Judged | PlanDenial => {
     // Only the targets the plan declares: one it does not gets no run, so its locale must not decide
@@ -202,9 +203,9 @@ export function policyGate(options: PolicyGateOptions): PolicyGate {
     guardAction(step, stepIndex, element, dialogText, locale) {
       const patterns = patternsForLocale(locale, project.policy.irreversiblePatterns);
       const rule = patterns === null ? 'no-locale-patterns' : ruleDuringRun(step, { element, dialogText, patterns, project });
-      if (rule === null) return { kind: 'allow' };
+      if (rule === null) return { kind: PolicyVerdictKind.Allow };
       const recorded = record(rule);
-      return { kind: 'deny', rule, stepIndex, ...(recorded ? {} : UNRECORDED) };
+      return { kind: PolicyVerdictKind.Deny, rule, stepIndex, ...(recorded ? {} : UNRECORDED) };
     },
   };
 }

@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import type { Token } from '../naming/LintRepository.ts';
 import { codeTokens, isIdentifier, isPunctuator, isString, listSourceFiles } from '../ListSourceFiles.ts';
 import { reportProblems } from '../ReadWorkspacePackages.ts';
+import { TokenKind } from '../naming/LintRepository.ts';
 
 const VERIFIED_PERSON = 'person-verified';
 const DECLARED_PERSON = 'person-declared';
@@ -39,10 +40,10 @@ function opensList(tokens: readonly Token[], index: number): boolean {
   if (previous === undefined) {
     return true;
   }
-  if (previous.kind === 'identifier') {
+  if (previous.kind === TokenKind.Identifier) {
     return KEYWORDS_BEFORE_EXPRESSION.has(previous.text);
   }
-  if (previous.kind !== 'punctuator') {
+  if (previous.kind !== TokenKind.Punctuator) {
     return false;
   }
   // The tokenizer splits "=>" into "=" and ">"; after an arrow an expression starts.

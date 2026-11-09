@@ -2,7 +2,7 @@
 // page: the run ends without it, and closing the session ends the page. One not yet called when the
 // time runs out, such as behind a page that holds the driver's own calls, is never called.
 import {
-    failure,
+    DriverErrorCode, failure,
     success,
     type DriverError,
     type PageScriptCall,
@@ -21,12 +21,12 @@ function resultOfTheScript(ended: ScriptCallOutcome): Result<string, DriverError
             return success(ended.text);
         case "threw":
             return failure({
-                code: "script-failed",
+                code: DriverErrorCode.ScriptFailed,
                 detail: "the script threw or its promise was rejected",
             });
         case "not-json":
             return failure({
-                code: "script-result-invalid",
+                code: DriverErrorCode.ScriptResultInvalid,
                 detail: "the script's result is not a value JSON can write",
             });
     }
@@ -56,7 +56,7 @@ export async function runPageScript<Handle>(
             return failure(DIALOG_OPEN);
         }
         return failure(
-            events.crashed() ? CRASHED : { code: "script-failed", detail: errorText(error) },
+            events.crashed() ? CRASHED : { code: DriverErrorCode.ScriptFailed, detail: errorText(error) },
         );
     }
     if (events.crashed()) {
@@ -64,14 +64,14 @@ export async function runPageScript<Handle>(
     }
     if (ended === TIMED_OUT) {
         return failure({
-            code: "script-timeout",
+            code: DriverErrorCode.ScriptTimeout,
             detail: `the script did not settle within ${call.timeoutMilliseconds} ms`,
         });
     }
     // A popup, second page or download the script started is closed or cancelled, as for an action.
     if (events.unsupportedOpenings() > openingsBefore) {
         return failure({
-            code: "unsupported-step",
+            code: DriverErrorCode.UnsupportedStep,
             detail: "the script opened a popup or a second page, or started a download",
         });
     }

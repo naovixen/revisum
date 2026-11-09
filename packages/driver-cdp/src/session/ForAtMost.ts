@@ -2,6 +2,7 @@
 // re-reading under one deadline.
 import type { DriverError } from "@revisum/contracts";
 import type { HasStepEnded } from "../page/PageOperations.ts";
+import { DriverErrorCode } from "@revisum/contracts";
 
 export const TIMED_OUT = Symbol("timed out");
 export const POLL_INTERVAL_MILLISECONDS = 50;
@@ -13,7 +14,7 @@ export const pause = (milliseconds: number): Promise<void> =>
     new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 export const notAnswering = (timeoutMilliseconds: number): DriverError => ({
-    code: "timeout",
+    code: DriverErrorCode.Timeout,
     detail: `the page did not answer within ${timeoutMilliseconds} ms`,
 });
 

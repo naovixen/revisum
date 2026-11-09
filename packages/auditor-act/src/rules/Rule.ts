@@ -3,7 +3,14 @@
 import type { Box } from '@revisum/contracts';
 
 // The four W3C ACT outcomes.
-export type Outcome = 'passed' | 'failed' | 'inapplicable' | 'cantTell';
+export const Outcome = {
+  Passed: 'passed',
+  Failed: 'failed',
+  Inapplicable: 'inapplicable',
+  CantTell: 'cantTell',
+} as const;
+
+export type Outcome = (typeof Outcome)[keyof typeof Outcome];
 export type Severity = 'P1' | 'P2' | 'P3' | 'P4';
 export const SEVERITIES: readonly Severity[] = ['P1', 'P2', 'P3', 'P4'];
 
@@ -157,8 +164,8 @@ export function isStaticRule(rule: Rule): rule is StaticRule {
 // A rule's outcome for the whole page, from the outcomes of its targets.
 export function pageOutcome(targets: readonly TargetResult[]): Outcome {
   if (targets.length === 0) return 'inapplicable';
-  if (targets.some((target) => target.outcome === 'failed')) return 'failed';
-  if (targets.some((target) => target.outcome === 'cantTell')) return 'cantTell';
+  if (targets.some((target) => target.outcome === Outcome.Failed)) return 'failed';
+  if (targets.some((target) => target.outcome === Outcome.CantTell)) return 'cantTell';
   return 'passed';
 }
 
