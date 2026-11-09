@@ -73,6 +73,29 @@ const PNGS_HOLDING_THE_VALUE: readonly {
     },
 ];
 
+const PADDING_PAST_THE_LIMIT = "x".repeat(17 * 1024 * 1024);
+
+const CHUNKS_INFLATING_PAST_THE_LIMIT: readonly {
+    readonly name: string;
+    readonly type: string;
+    readonly data: (compressed: readonly number[]) => readonly number[];
+}[] = [
+    { name: "a zTXt chunk", type: "zTXt", data: zTxtData },
+    {
+        name: "an iTXt chunk",
+        type: "iTXt",
+        data: (compressed) => iTxtData(COMPRESSED, compressed),
+    },
+];
+
+const SECRET_PLACES_AROUND_THE_PADDING: readonly {
+    readonly order: string;
+    readonly text: (value: string) => string;
+}[] = [
+    { order: "before", text: (value) => `token=${value}${PADDING_PAST_THE_LIMIT}` },
+    { order: "after", text: (value) => `${PADDING_PAST_THE_LIMIT}token=${value}` },
+];
+
 let folder: string;
 before(() => {
     folder = mkdtempSync(join(tmpdir(), "leak-scanner-png-"));
@@ -134,15 +157,31 @@ describe("Using the leak scanner", () => {
     ]) {
         describe(`given a PNG with bytes in ${name} that do not inflate`, () => {
             describe("when the file is scanned", () => {
-                test("then it should report nothing and not throw", () => {
+                test("then it should report a raw leak and not throw", () => {
                     const type = name.includes("zTXt") ? "zTXt" : "iTXt";
                     const bytes = pngWith(chunk(type, data));
-                    assert.deepEqual(
-                        formsFoundIn(`broken-${type}.png`, bytes, fakeSecretValue()),
-                        [],
-                    );
+                    assert.deepEqual(formsFoundIn(`broken-${type}.png`, bytes, fakeSecretValue()), [
+                        "raw",
+                    ]);
                 });
             });
         });
+    }
+
+    for (const { name, type, data } of CHUNKS_INFLATING_PAST_THE_LIMIT) {
+        for (const { order, text } of SECRET_PLACES_AROUND_THE_PADDING) {
+            describe(`given a PNG with ${name} that inflates past the limit, the secret ${order} the padding`, () => {
+                describe("when the file is scanned", () => {
+                    test("then it should report a raw leak", () => {
+                        const value = fakeSecretValue();
+                        const bytes = pngWith(chunk(type, data(deflated(text(value)))));
+                        assert.deepEqual(
+                            formsFoundIn(`too-long-${type}-${order}.png`, bytes, value),
+                            ["raw"],
+                        );
+                    });
+                });
+            });
+        }
     }
 });

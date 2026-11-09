@@ -8,7 +8,7 @@
 // Token-shaped values are fresh fakes generated here.
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
-import { test } from "node:test";
+import { describe, test } from "node:test";
 import { planParser } from "@revisum/engine";
 import { FAKE_TARGET, secretProject } from "../examples/SecretRun.ts";
 
@@ -171,6 +171,36 @@ test("token-shaped literals in a title, an expected text, an option and a locato
         "$.steps[1].locator.text",
         jwt,
     );
+});
+
+const CREDENTIALS_WITHOUT_A_TOKEN_SHAPE: readonly {
+    readonly name: string;
+    readonly literal: string;
+}[] = [
+    {
+        name: "a Basic authorisation header",
+        literal: "Authorization: Basic dXNlcjpwYXNzd29yZA==",
+    },
+    {
+        name: "a url holding a user name and password",
+        literal: "https://admin:hunter22hunter@example.com/",
+    },
+];
+
+describe("Using the plan parser", () => {
+    for (const { name, literal } of CREDENTIALS_WITHOUT_A_TOKEN_SHAPE) {
+        describe(`given a plan filling ${name} into an ordinary field`, () => {
+            describe("when the plan is parsed", () => {
+                test("then it should reject the text as a literal secret without echoing it", () => {
+                    assertLiteralSecret(
+                        planWith(fill("Full name", literal)),
+                        "$.steps[1].value",
+                        literal,
+                    );
+                });
+            });
+        });
+    }
 });
 
 // ---- Counter-examples ---------------------------------------------------------------------------

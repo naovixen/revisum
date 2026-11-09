@@ -4,7 +4,7 @@
 // field labelled "Access token", and the parser rejects it with literal_secret without echoing the
 // text. Counter-examples: fields whose code-style names hold no sensitive word still take literal text.
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { describe, test } from "node:test";
 import { planParser, type Plan, type PlanError, type Result } from "@revisum/engine";
 import { FAKE_TARGET, secretProject } from "../examples/SecretRun.ts";
 import { parserEnabling } from "../../plan/unsafe-features/examples/LostByFeature.ts";
@@ -114,3 +114,59 @@ for (const field of ORDINARY) {
         assert.ok(parsed.ok, `rejected: ${parsed.ok ? "" : JSON.stringify(parsed.error)}`);
     });
 }
+
+// Sites abbreviate these names or run their words together, so no word boundary sets them apart.
+const CONDENSED_SENSITIVE_SELECTORS: readonly string[] = [
+    "input[name=passwd]",
+    "#pwd",
+    "input[name=authtoken]",
+    "#clientsecret",
+    "#accesstoken",
+    "input[name=token2]",
+    "#motdepasse",
+];
+
+const ORDINARY_SELECTORS_STARTING_LIKE_SENSITIVE_WORDS: readonly string[] = [
+    "#tokenizer-demo",
+    "#passage",
+    "#secretary",
+    "#author",
+];
+
+describe("Using the plan parser", () => {
+    for (const selector of CONDENSED_SENSITIVE_SELECTORS) {
+        describe(`given a plan filling literal text into the field named by the css selector ${selector}`, () => {
+            describe("when the plan is parsed", () => {
+                test("then it should reject the text as a literal secret without echoing it", () => {
+                    const parsed = parseWithCss(cssFill(selector));
+
+                    assert.equal(parsed.ok, false, "the plan was accepted");
+                    assert.ok(
+                        parsed.error.some(
+                            (error) =>
+                                error.code === "literal_secret" &&
+                                error.path === "$.steps[1].value",
+                        ),
+                        JSON.stringify(parsed.error),
+                    );
+                    assert.equal(JSON.stringify(parsed.error).includes(LITERAL), false);
+                });
+            });
+        });
+    }
+
+    for (const selector of ORDINARY_SELECTORS_STARTING_LIKE_SENSITIVE_WORDS) {
+        describe(`given a plan filling literal text into the field named by the css selector ${selector}`, () => {
+            describe("when the plan is parsed", () => {
+                test("then it should accept the plan", () => {
+                    const parsed = parseWithCss(cssFill(selector));
+
+                    assert.ok(
+                        parsed.ok,
+                        `rejected: ${parsed.ok ? "" : JSON.stringify(parsed.error)}`,
+                    );
+                });
+            });
+        });
+    }
+});

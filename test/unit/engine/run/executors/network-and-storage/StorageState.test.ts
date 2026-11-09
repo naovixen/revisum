@@ -2,7 +2,8 @@
 // `storageState: { secretName }`; the secret's value is the storage-state JSON. Core resolves it
 // through the SecretStore like any secret, and no cookie or token value from it reaches any output.
 // Until a driver can load it into a session, every run of such a plan is refused (RunRefusals.test.ts),
-// so what the manifest will record is checked on the manifest builder.
+// so what the manifest will record is checked by resolving the plan's secrets and building its
+// manifest from their records, as a run does once its session has opened.
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -18,8 +19,13 @@ import {
     type Plan,
 } from "@revisum/engine";
 import {
+    resolvePlanSecrets,
+    secretRecords,
+} from "../../../../../../packages/engine/src/secrets/ResolvePlanSecrets.ts";
+import {
     FAKE_TARGET,
     echoesIn,
+    fakeEnvironmentStore,
     fakeSecretValue,
     fakeStorageState,
     parsedPlan,
@@ -27,7 +33,6 @@ import {
     resolvedSecret,
     runWithSecrets,
     secretFillPlan,
-    secretName,
     secretProject,
     spyDriver,
 } from "../../../secrets/examples/SecretRun.ts";
@@ -82,13 +87,15 @@ test("a plan holding literal storage-state JSON, as an object or as text, is rej
 
 // ---- Resolution and the manifest ----------------------------------------------------------------
 
-// The manifest of a plan naming storage state with this content, as the builder writes it.
+// The manifest of a plan naming storage state with this content, from the records of its secrets.
 const manifestRecording = (stateJson: string) => {
     const project = secretProject([SAVED]);
     const plan: Plan = parsedPlan(project, withStorageState(SAVED));
     const target =
         project.matrix.find((candidate) => candidate.id === FAKE_TARGET) ??
         assert.fail("no target");
+    const resolved = resolvePlanSecrets(plan, fakeEnvironmentStore({ [SAVED]: stateJson }), {});
+    assert.ok(resolved.ok, "the store resolved the storage state");
     return buildManifest({
         plan,
         target,
@@ -98,7 +105,7 @@ const manifestRecording = (stateJson: string) => {
         fixedTimeMilliseconds: 0,
         fixtures: [],
         host: { platform: "test", arch: "test" },
-        storageState: { name: secretName(SAVED), sha256: sha256(stateJson) },
+        ...secretRecords(resolved.value.secrets),
     });
 };
 
