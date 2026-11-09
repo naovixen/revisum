@@ -4,25 +4,40 @@
 // Two copies of the same fixture page are served on two declared origins; only the first is a
 // fixture origin with a rewrite. A real headless Chromium, through the own CDP driver, loads both
 // through the in-process proxy: the first shows the mutated heading, the second, the
-// counter-example, still shows the original.
+// counter-example, still shows the original. A plan run on the same proxy then shows the rewrite
+// reaching the run's manifest.
 import assert from "node:assert/strict";
+import { arch, platform } from "node:os";
 import { after, before, test } from "node:test";
 import type { DriverSession } from "@revisum/driver-cdp";
 import { createBrowserDriver } from "#test-support/browser/driver/CreateBrowserDriver.ts";
 import { egressThrough } from "#test-support/browser/driver/SessionEgressForTest.ts";
-import { buildManifest, defaultRedactor, type SessionEnvironment } from "@revisum/engine";
+import {
+    createRunService,
+    defaultRedactor,
+    parseProject,
+    planParser,
+    type SessionEnvironment,
+} from "@revisum/engine";
 import { type EgressProxy, type ResponseRewrite } from "@revisum/runner";
 import { startedEgressProxy } from "#test-support/StartedEgressProxy.ts";
 import { BROWSERS } from "#test-support/browser/Browsers.ts";
 import { createCleanUpScope } from "#test-support/CleanUpScope.ts";
-import { BrowserTarget } from "#test-support/browser/BrowserTarget.ts";
+import {
+    ADAPTER_OF_TARGET,
+    BrowserTarget,
+    englishMatrix,
+} from "#test-support/browser/BrowserTarget.ts";
 import {
     FIXED_TIME_MILLISECONDS,
     SEED,
     capabilityHarness,
+    capabilityPlan,
     type CapabilityHarness,
 } from "#test-support/browser/harnesses/CapabilityHarness.ts";
-import { defaultParser, signupPlan } from "../../unit/engine/plan/examples/GoldenPlan.ts";
+import { navigate, testId } from "#test-support/browser/RawPlan.ts";
+import { systemClock } from "#test-support/builders/MemoryEventSink.ts";
+import { realRunPorts } from "#test-support/RealRunPorts.ts";
 import {
     startEgressFixtureServer,
     type EgressFixtureServer,
@@ -34,7 +49,7 @@ import {
     origin,
 } from "../../unit/runner/examples/DeclaredService.ts";
 import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
-import { baseUrlOf } from "#test-support/builders/ClearRun.ts";
+import { baseUrlOf, clearRun, trustedProjectFrom } from "#test-support/builders/ClearRun.ts";
 
 const HEADING_CHANGED: ResponseRewrite = {
     name: "heading-changed",
@@ -113,25 +128,46 @@ test("the proxy reports the rewrite it applied, by origin and name, once", async
     ]);
 });
 
-test("the run manifest records the rewrites the proxy applied", () => {
-    const parsed = defaultParser()(signupPlan());
-    assert.ok(parsed.ok);
-    const manifest = buildManifest({
-        plan: parsed.value,
-        target: capability.target(BrowserTarget.Chrome),
-        adapter: {
-            id: "cdp",
-            version: "0.1.0",
-            protocol: "Chrome DevTools Protocol (raw WebSocket)",
-        },
-        browser: { name: "chromium", version: "156.0.8078.47" },
+test("the run manifest records the rewrites the proxy applied", async () => {
+    const projectFile = {
+        origins: [fixtureApp.origin, secondApp.origin],
+        limits: { stepTimeoutMilliseconds: 5000 },
+        matrix: englishMatrix([BrowserTarget.Chrome]),
+    };
+    const project = parseProject(projectFile);
+    assert.ok(project.ok, JSON.stringify(project));
+    const plan = planParser(project.value)(
+        capabilityPlan(BrowserTarget.Chrome, [
+            navigate("/mutant.html"),
+            {
+                type: "expect",
+                locator: testId("heading"),
+                assert: { kind: "textEquals", value: "Mutated heading" },
+                criterionId: "mutant.heading-changed",
+            },
+        ]),
+    );
+    assert.ok(plan.ok, JSON.stringify(plan));
+    const targetId = project.value.matrix[0]?.id ?? assert.fail("the project has no target");
+    const driver = createBrowserDriver({
+        executablePath: BROWSERS.chrome,
+        egress: egressThrough(proxy),
+    });
+    const result = await createRunService(
+        realRunPorts({
+            drivers: new Map([[ADAPTER_OF_TARGET[BrowserTarget.Chrome], driver]]),
+            clock: systemClock,
+            rewritesApplied: () => proxy.rewritesApplied(),
+        }),
+    ).run(clearRun(plan.value, await trustedProjectFrom(projectFile), targetId), {
+        baseUrl: baseUrlOf(fixtureApp.origin),
         seed: SEED,
         fixedTimeMilliseconds: FIXED_TIME_MILLISECONDS,
         fixtures: fixtureApp.fixtures,
-        host: { platform: "linux", arch: "x64" },
-        responseRewrites: proxy.rewritesApplied(),
+        host: { platform: platform(), arch: arch() },
     });
-    assert.deepEqual(manifest.responseRewrites, [
+    assert.equal(result.state, "Passed", JSON.stringify(result));
+    assert.deepEqual(result.manifest.responseRewrites, [
         { origin: fixtureApp.origin, name: "heading-changed" },
     ]);
 });

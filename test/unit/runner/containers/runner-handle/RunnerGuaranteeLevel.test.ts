@@ -20,10 +20,10 @@ const POLICY = egressPolicy({ allowOrigins: ["https://staging.example.test"] });
 type Started = {
     readonly level: GuaranteeLevel;
     readonly logged: readonly RunnerLogEntry[];
-    readonly startedCode: string | null;
 };
 
-// Runs on a fake engine with the given settings, noting the level inside `use` and the outcome.
+// Runs on a fake engine with the given settings, noting the level inside `use`. A run that never
+// reached `use` has no level to read, so that fails here rather than passing for a host-level run.
 async function startOn(settings: Omit<FakeEngineSettings, "localImageId">): Promise<Started> {
     const engine = fakeContainerEngine({ localImageId: PINNED_IMAGE_ID, ...settings });
     const logged: RunnerLogEntry[] = [];
@@ -39,11 +39,10 @@ async function startOn(settings: Omit<FakeEngineSettings, "localImageId">): Prom
         levels.push(run.guaranteeLevel());
         return Promise.resolve();
     });
-    return {
-        level: levels[0] ?? "host",
-        logged,
-        startedCode: started.ok ? null : started.error.code,
-    };
+    assert.ok(started.ok, `the run did not start: ${JSON.stringify(started)}`);
+    const [level] = levels;
+    assert.ok(level !== undefined, "the run never reached `use`");
+    return { level, logged };
 }
 
 const loggedCodes = (logged: readonly RunnerLogEntry[]): readonly string[] =>
@@ -59,29 +58,21 @@ const statementFor = (level: GuaranteeLevel) =>
     });
 
 test("when the probe from inside the container reaches outside, the level is host and egress-unenforceable is logged", async () => {
-    const { level, logged, startedCode } = await startOn({
+    const { level, logged } = await startOn({
         internalNetworks: true,
         probe: "reached",
     });
     assert.equal(level, "host");
     assert.ok(loggedCodes(logged).includes("egress-unenforceable"), JSON.stringify(logged));
-    assert.ok(
-        startedCode === null || startedCode === "egress-unenforceable",
-        `start failed with ${String(startedCode)}`,
-    );
 });
 
 test("when Docker cannot create a network with no route out, the level is host and egress-unenforceable is logged", async () => {
-    const { level, logged, startedCode } = await startOn({
+    const { level, logged } = await startOn({
         internalNetworks: false,
         probe: "blocked",
     });
     assert.equal(level, "host");
     assert.ok(loggedCodes(logged).includes("egress-unenforceable"), JSON.stringify(logged));
-    assert.ok(
-        startedCode === null || startedCode === "egress-unenforceable",
-        `start failed with ${String(startedCode)}`,
-    );
 });
 
 test("a run at the host level states egress and credentials as lost to egress-unenforceable, and claims no isolation", async () => {
@@ -100,11 +91,10 @@ test("a run at the host level states egress and credentials as lost to egress-un
 });
 
 test("counter-example: when every part started and the probe was blocked, the level is isolated and nothing is logged as unenforceable", async () => {
-    const { level, logged, startedCode } = await startOn({
+    const { level, logged } = await startOn({
         internalNetworks: true,
         probe: "blocked",
     });
-    assert.equal(startedCode, null);
     assert.equal(level, "isolated");
     assert.ok(!loggedCodes(logged).includes("egress-unenforceable"), JSON.stringify(logged));
     const statement = statementFor(level);

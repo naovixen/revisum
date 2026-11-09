@@ -7,12 +7,34 @@
 // command naming its path, the rewrites' path holds "rewrite" and the decisions' path "decision",
 // and each applied rewrite is one JSON line of { origin, name }, as each decision is of { origin, decision }.
 // The tests in test/containers/egress/ProxyEvidence.test.ts run the same behaviour on the real proxy.
+// A plan run given the handle as its record of rewrites carries what the handle read into its manifest.
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { describe, test } from "node:test";
 import { success, type ExecOutcome, type RunnerHandle } from "@revisum/contracts";
-import { buildManifest, manifestHash, type AdapterInfo } from "@revisum/engine";
+import {
+    buildManifest,
+    createRunService,
+    manifestHash,
+    planParser,
+    type AdapterInfo,
+    type RunResult,
+} from "@revisum/engine";
 import { dockerRunner, type ContainerEngine } from "@revisum/runner";
+import { baseUrlOf, clearRun, trustedProjectFrom } from "#test-support/builders/ClearRun.ts";
+import { driversOf, fakePorts } from "#test-support/fakes/FakePorts.ts";
+import { fakeDriverOpening } from "#test-support/fakes/session/FakeDriver.ts";
 import { REPOSITORY_ROOT } from "../../../../support/repository/RepositoryRoot.ts";
+import { fakeSessionOnOrders } from "../../../engine/run/examples/RunOnFakeSession.ts";
+import {
+    DEFAULT_CLOCK_START,
+    DEFAULT_SEED,
+    OPEN_ORDERS,
+    ORIGIN,
+    accepted,
+    planOf,
+    projectFileWith,
+    projectWith,
+} from "../../../engine/run/values/examples/RunPlan.ts";
 import {
     defaultParser,
     signupPlan,
@@ -279,5 +301,62 @@ test("counter-example: a file that does not exist yet reads as no lines, and lat
         assert.deepEqual(handle.proxyDecisions(), []);
         await handle.exec(["true"]);
         assert.deepEqual(handle.proxyDecisions(), [OUTSIDE_BLOCKED]);
+    });
+});
+
+// ---- A plan run reading the handle --------------------------------------------------------------------
+
+// Runs one plan, on a fake browser session, with this handle as the run's record of rewrites.
+async function planRunReading(handle: RunnerHandle): Promise<RunResult> {
+    const project = projectWith();
+    const plan = accepted(planParser(project), planOf([OPEN_ORDERS]));
+    const ports = fakePorts({
+        drivers: driversOf(fakeDriverOpening(fakeSessionOnOrders())),
+        rewritesApplied: () => handle.rewritesApplied(),
+    });
+    return createRunService(ports).run(
+        clearRun(
+            plan,
+            await trustedProjectFrom(projectFileWith()),
+            project.matrix[0]?.id ?? assert.fail("no target"),
+        ),
+        {
+            baseUrl: baseUrlOf(ORIGIN),
+            seed: DEFAULT_SEED,
+            fixedTimeMilliseconds: DEFAULT_CLOCK_START,
+            fixtures: [],
+            host: { platform: "test", arch: "test" },
+        },
+    );
+}
+
+// The plan's run while the handle is open, after the handle has read the proxy's files once.
+async function planRunOn(answers: FileAnswers): Promise<RunResult> {
+    const results: RunResult[] = [];
+    await ranWith(answers, async (handle) => {
+        await handle.exec(["true"]);
+        results.push(await planRunReading(handle));
+    });
+    return results[0] ?? assert.fail("the run never reached `use`");
+}
+
+describe("Using a run handle as a plan run's record of rewrites", () => {
+    describe("given a proxy container whose file holds an applied rewrite", () => {
+        describe("when a plan runs on the handle and ends", () => {
+            test("then it should record that rewrite in the run's manifest", async () => {
+                const result = await planRunOn({ rewrites: [lines(HEADING_CHANGED)] });
+                assert.deepEqual(result.manifest?.responseRewrites, [HEADING_CHANGED]);
+            });
+        });
+    });
+
+    describe("given a proxy container that applied no rewrite", () => {
+        describe("when a plan runs on the handle and ends", () => {
+            test("then it should record no rewrite in the run's manifest", async () => {
+                const result = await planRunOn({ rewrites: [notWrittenYet] });
+                const manifest = result.manifest ?? assert.fail("the run made no manifest");
+                assert.ok(!Object.hasOwn(manifest, "responseRewrites"));
+            });
+        });
     });
 });

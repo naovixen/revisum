@@ -4,6 +4,7 @@
 //   - A /tmp that fills up must not stop the proxy either, but the decisions it can no longer write
 //     are lost. It marks its record as lost, so a plan run drops to the host level of guarantee and a
 //     workload ends Errored with egress-unread, rather than show a record with gaps as complete.
+//   - A record too long to read back whole is just as incomplete, so it costs the run the same level.
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { after, before, describe, test } from "node:test";
@@ -19,7 +20,7 @@ import type { RunResult } from "@revisum/engine";
 import { createCleanUpScope } from "../../support/CleanUpScope.ts";
 import { REPOSITORY_ROOT } from "../../support/repository/RepositoryRoot.ts";
 import { declaredService, egressPolicy } from "../../unit/runner/examples/DeclaredService.ts";
-import { holdRunOpen, jsonInside, pinnedRunImage } from "../support/IsolatedRun.ts";
+import { execInside, holdRunOpen, jsonInside, pinnedRunImage } from "../support/IsolatedRun.ts";
 import { fixtureWorkloadImage, runFixtureSuite } from "../support/RunInWorkload.ts";
 
 const TIMEOUT = 300_000;
@@ -29,6 +30,11 @@ const LISTENING = "listening";
 const IPV4_ADDRESS = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
 const UNDECLARED_URL = "http://undeclared.invalid/";
 const RECORDS_STATE_FILE = "/tmp/egress-records-state";
+const DECISIONS_FILE = "/tmp/egress-decisions.jsonl";
+const DECISION_LINE = `${JSON.stringify({ origin: "http://overflow.invalid", decision: "blocked" })}\n`;
+const SHORT_RECORD_DECISIONS = 1_000;
+// Far past the most the runner will keep of one command's output, which is about 16 MiB.
+const OVERSIZED_RECORD_BYTES = 40 * 1024 * 1024;
 const SECRET_VALUE = "made-up-secret-value-for-the-proxy-0042";
 // A small append still fits in the last page of a full tmpfs, so one request is not enough to lose one.
 const FLOOD_REQUESTS = 400;
@@ -63,6 +69,13 @@ const floodScript = (url: string, count: number): string => `
     for (let index = 0; index < ${count}; index += 1) { const status = await ask(); statuses[status] = (statuses[status] ?? 0) + 1; }
     console.log(JSON.stringify(statuses));
   })();`;
+
+// Appends this many decision lines to the proxy's own record, as a page making that many requests would.
+const appendDecisions = (count: number): readonly string[] => [
+    "node",
+    "-e",
+    `require('node:fs').appendFileSync(${JSON.stringify(DECISIONS_FILE)}, ${JSON.stringify(DECISION_LINE)}.repeat(${count}))`,
+];
 
 // The engine, and a way to reach the proxy it started: its container is the runner's own.
 function engineWatchingTheProxy(inner: ContainerEngine) {
@@ -252,6 +265,77 @@ describe("Using the egress proxy on real Docker", () => {
                 assert.ok(
                     handle.proxyDecisions().length < decisionsBefore + FLOOD_REQUESTS + 2,
                     "every decision was recorded",
+                );
+            });
+        });
+    });
+
+    describe("given a plan run whose proxy has written a long record", () => {
+        const logged: RunnerLogEntry[] = [];
+        const { engine, execInProxy } = engineWatchingTheProxy(dockerCliEngine());
+        const cleanUps = createCleanUpScope();
+        let handle: RunnerHandle;
+
+        before(
+            async () => {
+                const started = await holdRunOpen(
+                    dockerRunner({
+                        engine,
+                        repositoryRoot: REPOSITORY_ROOT,
+                        inputs: [],
+                        log: (entry) => {
+                            logged.push(entry);
+                        },
+                    }),
+                    await pinnedRunImage(),
+                    egressPolicy({ allowOrigins: [] }),
+                );
+                assert.ok(started.ok, JSON.stringify(started));
+                handle = started.value;
+                const held = started.value;
+                cleanUps.add(() => held.stop());
+            },
+            { timeout: TIMEOUT },
+        );
+
+        after(() => cleanUps.runAll(), { timeout: TIMEOUT });
+
+        describe("when the record still fits in what the runner reads back", () => {
+            let decisionsBefore: number;
+            before(
+                async () => {
+                    decisionsBefore = handle.proxyDecisions().length;
+                    await execInProxy(appendDecisions(SHORT_RECORD_DECISIONS));
+                    await execInside(handle, ["true"]);
+                },
+                { timeout: TIMEOUT },
+            );
+
+            test("then it should read every decision and stay isolated", () => {
+                assert.equal(
+                    handle.proxyDecisions().length,
+                    decisionsBefore + SHORT_RECORD_DECISIONS,
+                );
+                assert.equal(handle.guaranteeLevel(), "isolated");
+            });
+        });
+
+        describe("when the record has grown past what the runner reads back", () => {
+            before(
+                async () => {
+                    await execInProxy(
+                        appendDecisions(Math.ceil(OVERSIZED_RECORD_BYTES / DECISION_LINE.length)),
+                    );
+                    await execInside(handle, ["true"]);
+                },
+                { timeout: TIMEOUT },
+            );
+
+            test("then it should drop the run to the host level of guarantee", () => {
+                assert.equal(handle.guaranteeLevel(), "host");
+                assert.ok(
+                    logged.some((entry) => entry.code === "egress-unenforceable"),
+                    JSON.stringify(logged),
                 );
             });
         });
