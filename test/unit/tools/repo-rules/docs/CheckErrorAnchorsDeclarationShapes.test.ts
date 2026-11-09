@@ -78,7 +78,9 @@ describe("Using the declared codes reader", () => {
         describe("when its value is a code", () => {
             test("then it should read the value and not the key", () => {
                 assert.deepEqual(
-                    declaredIn("const Codes = { 'quoted-key': 'first', Second: 'second' } as const;"),
+                    declaredIn(
+                        "const Codes = { 'quoted-key': 'first', Second: 'second' } as const;",
+                    ),
                     { codes: ["first", "second"], borrowedSets: [] },
                 );
             });
@@ -86,10 +88,13 @@ describe("Using the declared codes reader", () => {
 
         describe("when its value is a borrowed set", () => {
             test("then it should record the set and read no code from the key", () => {
-                assert.deepEqual(declaredIn("const Codes = { 'quoted-key': SharedCodes } as const;"), {
-                    codes: [],
-                    borrowedSets: ["SharedCodes"],
-                });
+                assert.deepEqual(
+                    declaredIn("const Codes = { 'quoted-key': SharedCodes } as const;"),
+                    {
+                        codes: [],
+                        borrowedSets: ["SharedCodes"],
+                    },
+                );
             });
         });
     });

@@ -8,7 +8,7 @@ import { describe, test } from "node:test";
 import { REPOSITORY_ROOT } from "../../support/repository/RepositoryRoot.ts";
 
 const PLAN_SOURCE_FOLDER = join(REPOSITORY_ROOT, "packages", "engine", "src", "plan");
-const PLAN_DECODERS_MODULE = "../../../packages/engine/src/plan/parse/ReadRecord.ts";
+const PLAN_DECODERS_MODULE = "../../../packages/engine/src/decoding/ReadRecord.ts";
 const FILE_THAT_REACHES_THE_DECODER = "ReadWrittenText.ts";
 const READERS_THAT_SEARCH_FOR_SECRETS: readonly string[] = [
     "readExpectedText",
