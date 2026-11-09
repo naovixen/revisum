@@ -4,13 +4,6 @@
 export * from "@revisum/contracts";
 export { schemaId } from "./foundation/EngineVersion.ts";
 export * from "./plan/parse/ReadRecord.ts";
-export {
-    optionalField,
-    readFields,
-    type FieldReader,
-    type FieldValues,
-    type OptionalField,
-} from "./plan/ReadFields.ts";
 export * from "./project/ParseProject.ts";
 export {
     loadTrustedProject,
