@@ -13,7 +13,7 @@ import {
 } from "@revisum/contracts";
 import { sha256 } from "../../foundation/Sha256.ts";
 import type { Logger } from "../logging/LoggingManifest.ts";
-import { runTimeText } from "../../plan/parse/ReadRecord.ts";
+import { runTimeText } from "../../decoding/ReadRecord.ts";
 import { EventKind } from "../logging/LoggingManifest.ts";
 
 export type RememberRefusal =

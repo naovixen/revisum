@@ -14,7 +14,7 @@ import {
 import { brand } from "../../../foundation/Brand.ts";
 import { readFieldPointers } from "../../../project/ReadCallDeclarations.ts";
 import { isInlineScript } from "../../IsInlineScript.ts";
-import { looksLikeCredential } from "../../LooksLikeCredential.ts";
+import { looksLikeCredential } from "../../../decoding/LooksLikeCredential.ts";
 import {
     allValid,
     INVALID,
@@ -22,8 +22,8 @@ import {
     readOneOf,
     type Issues,
     type Parsed,
-} from "../ReadRecord.ts";
-import { MAXIMUM_INLINE_SCRIPT_LENGTH } from "../../schema/PlanFields.ts";
+} from "../../../decoding/ReadRecord.ts";
+import { MAXIMUM_INLINE_SCRIPT_LENGTH } from "../../../decoding/PlanFields.ts";
 import { optionalField, readFields } from "../../ReadFields.ts";
 import type { ParseContext } from "../ParseContext.ts";
 import { refuse } from "../Refuse.ts";

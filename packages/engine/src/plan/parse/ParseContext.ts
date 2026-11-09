@@ -28,7 +28,7 @@ import {
     declaredScripts,
     enabledUnsafeFeatures,
 } from "../../project/ReadUnsafeFeatures.ts";
-import type { Issues } from "./ReadRecord.ts";
+import type { Issues } from "../../decoding/ReadRecord.ts";
 
 // What a plan may refer to, taken from the trusted project.
 export type PlanRules = {

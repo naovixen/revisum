@@ -39,8 +39,8 @@ import {
     readRecord,
     type Issues,
     type Parsed,
-} from "../plan/parse/ReadRecord.ts";
-import { readUnscannedText } from "../plan/ReadUnscannedText.ts";
+} from "../decoding/ReadRecord.ts";
+import { readUnscannedText } from "../decoding/ReadUnscannedText.ts";
 import {
     HEADER_NAME,
     readDeclarationSection,

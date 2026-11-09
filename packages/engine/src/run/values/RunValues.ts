@@ -40,7 +40,7 @@ import { brand } from "../../foundation/Brand.ts";
 import { formatCalendarDay, instantOf, relativeCalendarDay } from "./RelativeCalendarDay.ts";
 import { entriesInKeyOrder, sha256 } from "../../foundation/Sha256.ts";
 import { normalise } from "../outcome/Verdict.ts";
-import { runTimeText } from "../../plan/parse/ReadRecord.ts";
+import { runTimeText } from "../../decoding/ReadRecord.ts";
 import { generatedValueEntries } from "../../plan/parse/declarations/ReadPlanClock.ts";
 import type { Limits, Project } from "../../project/ParseProject.ts";
 

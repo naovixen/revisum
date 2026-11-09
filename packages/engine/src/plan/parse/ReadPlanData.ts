@@ -17,8 +17,15 @@ import {
 } from "@revisum/contracts";
 import { brand } from "../../foundation/Brand.ts";
 import { readId } from "../../project/ParseProject.ts";
-import { looksLikeCredential } from "../LooksLikeCredential.ts";
-import { allValid, INVALID, readList, readRecord, type Issues, type Parsed } from "./ReadRecord.ts";
+import { looksLikeCredential } from "../../decoding/LooksLikeCredential.ts";
+import {
+    allValid,
+    INVALID,
+    readList,
+    readRecord,
+    type Issues,
+    type Parsed,
+} from "../../decoding/ReadRecord.ts";
 import {
     CURRENT_PLAN_VERSION,
     FEATURE_ID,
@@ -27,7 +34,7 @@ import {
     META_FIELDS,
     OPTIONAL_PLAN_FIELDS,
     PLAN_FIELDS,
-} from "../schema/PlanFields.ts";
+} from "../../decoding/PlanFields.ts";
 import {
     readGeneratedValues,
     readPlanClock,

@@ -24,7 +24,7 @@ import {
 } from "@revisum/contracts";
 import { entriesInKeyOrder } from "../../foundation/Sha256.ts";
 import type { PlanLimits } from "../../project/ParseProject.ts";
-import { CRITERION_FIELD } from "../schema/PlanFields.ts";
+import { CRITERION_FIELD } from "../../decoding/PlanFields.ts";
 import { isAssertionStepType } from "../StepFacts.ts";
 import {
     CLEANUP_LINE,

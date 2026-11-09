@@ -6,12 +6,12 @@ import {
     type SafeText,
 } from "@revisum/contracts";
 import type { ReadableInput } from "../../../decoding/ReadableCopy.ts";
-import { INVALID, readOneOf, type Parsed } from "../ReadRecord.ts";
+import { INVALID, readOneOf, type Parsed } from "../../../decoding/ReadRecord.ts";
 import {
     MAXIMUM_META_NAME_LENGTH,
     MAXIMUM_URL_LENGTH,
     PAGE_KINDS,
-} from "../../schema/PlanFields.ts";
+} from "../../../decoding/PlanFields.ts";
 import { readFields } from "../../ReadFields.ts";
 import { knownField } from "../KnownField.ts";
 import type { ParseContext } from "../ParseContext.ts";

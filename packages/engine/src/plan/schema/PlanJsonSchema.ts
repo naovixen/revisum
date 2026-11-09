@@ -84,7 +84,7 @@ import {
     VALUE_NAME,
     WRITTEN_URL_PATTERN,
     type LocatorKind,
-} from "./PlanFields.ts";
+} from "../../decoding/PlanFields.ts";
 import { STEP_FACTS, STEP_TYPES } from "../StepFacts.ts";
 
 // A JSON Schema document or part of one. Plain JSON values only, so it serialises exactly.

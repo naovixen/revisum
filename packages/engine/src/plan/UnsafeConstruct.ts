@@ -12,14 +12,14 @@ import {
     type UnsafeFeature,
 } from "@revisum/contracts";
 import { isInlineChoice } from "./IsInlineChoice.ts";
-import { isOneOf } from "./parse/ReadRecord.ts";
+import { isOneOf } from "../decoding/ReadRecord.ts";
 import {
     DATABASE_COMMAND_FEATURE,
     DOM_CHECKS_FEATURE,
     INLINE_SCRIPT_FEATURE,
     LOCATOR_FEATURES,
     NAMED_SCRIPT_FEATURE,
-} from "./schema/PlanFields.ts";
+} from "../decoding/PlanFields.ts";
 
 // One use of an unsafe feature, at the JSON path of the field that names it.
 export type UnsafeConstruct = { readonly feature: UnsafeFeature; readonly path: string };

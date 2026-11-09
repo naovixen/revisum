@@ -29,7 +29,7 @@ import {
 import { deriveActor, sourceActorId } from "../../approval/DeriveActor.ts";
 import { planHash } from "../../run/seal/BuildManifest.ts";
 import { LIMIT_CEILINGS } from "../../project/ParseProject.ts";
-import { isUnsafeText } from "./ReadRecord.ts";
+import { isUnsafeText } from "../../decoding/ReadRecord.ts";
 import {
     placedPlanErrors,
     readPlanText,

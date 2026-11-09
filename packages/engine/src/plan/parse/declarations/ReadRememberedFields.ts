@@ -6,7 +6,7 @@ import {
     type ValueName,
 } from "@revisum/contracts";
 import { brand } from "../../../foundation/Brand.ts";
-import { allValid, INVALID, type Parsed } from "../ReadRecord.ts";
+import { allValid, INVALID, type Parsed } from "../../../decoding/ReadRecord.ts";
 import { readValueName } from "./ReadPlanClock.ts";
 import { isNameTaken, type ParseContext } from "../ParseContext.ts";
 import { refuse } from "../Refuse.ts";

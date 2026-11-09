@@ -6,7 +6,7 @@ import {
     type BackendAssertion,
 } from "@revisum/contracts";
 import type { ReadableInput } from "../../../decoding/ReadableCopy.ts";
-import { INVALID, readOneOf, type Issues, type Parsed } from "../ReadRecord.ts";
+import { INVALID, readOneOf, type Issues, type Parsed } from "../../../decoding/ReadRecord.ts";
 import type { ParseContext } from "../ParseContext.ts";
 import { refuse } from "../Refuse.ts";
 import { readExpectedText } from "../text/ReadTextOrValue.ts";

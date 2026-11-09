@@ -42,7 +42,7 @@ import {
     readRecord,
     type Issues,
     type Parsed,
-} from "../plan/parse/ReadRecord.ts";
+} from "../decoding/ReadRecord.ts";
 import { readSecretName } from "../project/ParseProject.ts";
 import {
     cutSecretEchoes,

@@ -21,7 +21,7 @@ import {
     type StubName,
 } from "@revisum/contracts";
 import { brand } from "../../../foundation/Brand.ts";
-import { INVALID, type Parsed } from "../ReadRecord.ts";
+import { INVALID, type Parsed } from "../../../decoding/ReadRecord.ts";
 import { readFields } from "../../ReadFields.ts";
 import type { ParseContext } from "../ParseContext.ts";
 import { refuse } from "../Refuse.ts";

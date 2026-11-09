@@ -2,7 +2,7 @@
 // fields it has.
 import { PlanErrorCode } from "@revisum/contracts";
 import type { ReadableInput } from "../../../decoding/ReadableCopy.ts";
-import { INVALID, peekRecord, type Parsed } from "../ReadRecord.ts";
+import { INVALID, peekRecord, type Parsed } from "../../../decoding/ReadRecord.ts";
 import { readFields, type FieldReader } from "../../ReadFields.ts";
 import { knownField } from "../KnownField.ts";
 import type { ParseContext } from "../ParseContext.ts";

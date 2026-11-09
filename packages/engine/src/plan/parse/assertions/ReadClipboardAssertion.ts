@@ -10,7 +10,7 @@ import {
     type TextOrValue,
 } from "@revisum/contracts";
 import type { ReadableInput } from "../../../decoding/ReadableCopy.ts";
-import { INVALID, readOneOf, type Parsed } from "../ReadRecord.ts";
+import { INVALID, readOneOf, type Parsed } from "../../../decoding/ReadRecord.ts";
 import type { ParseContext } from "../ParseContext.ts";
 import { refuse } from "../Refuse.ts";
 import { readMultiLineText } from "../text/ReadMultiLineText.ts";

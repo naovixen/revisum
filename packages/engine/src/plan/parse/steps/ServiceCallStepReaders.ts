@@ -1,6 +1,6 @@
 // Calls to a declared service, and checks on a read call's response.
 import { CallEffect, PlanErrorCode, StepType } from "@revisum/contracts";
-import { allValid, INVALID } from "../ReadRecord.ts";
+import { allValid, INVALID } from "../../../decoding/ReadRecord.ts";
 import type { StepSection, StepTypeIn } from "../../StepFacts.ts";
 import { readBackendAssertion } from "../assertions/ReadBackendAssertion.ts";
 import { readCallArguments } from "../declarations/ReadCallArguments.ts";

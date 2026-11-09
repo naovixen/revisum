@@ -9,7 +9,7 @@ import {
     readRecord,
     type Issues,
     type Parsed,
-} from "../plan/parse/ReadRecord.ts";
+} from "../decoding/ReadRecord.ts";
 import { PlanErrorCode } from "@revisum/contracts";
 
 type SigningKey = { readonly keyId: string; readonly publicKey: string };

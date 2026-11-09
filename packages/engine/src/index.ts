@@ -3,7 +3,7 @@
 // its own.
 export * from "@revisum/contracts";
 export { schemaId } from "./foundation/EngineVersion.ts";
-export * from "./plan/parse/ReadRecord.ts";
+export * from "./decoding/ReadRecord.ts";
 export * from "./project/ParseProject.ts";
 export {
     loadTrustedProject,

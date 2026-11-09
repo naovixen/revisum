@@ -1,7 +1,7 @@
 // Checks on an element or the page, and remember steps, which read a value for the steps after them.
 import { ElementAssertionKind, PlanErrorCode, StepType } from "@revisum/contracts";
-import { allValid, INVALID } from "../ReadRecord.ts";
-import { FROM_FIELD } from "../../schema/PlanFields.ts";
+import { allValid, INVALID } from "../../../decoding/ReadRecord.ts";
+import { FROM_FIELD } from "../../../decoding/PlanFields.ts";
 import { readValueName } from "../declarations/ReadPlanClock.ts";
 import type { StepSection, StepTypeIn } from "../../StepFacts.ts";
 import { readElementAssertion } from "../assertions/ReadElementAssertion.ts";

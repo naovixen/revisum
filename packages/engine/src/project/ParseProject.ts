@@ -58,8 +58,8 @@ import {
     readRecord,
     type Issues,
     type Parsed,
-} from "../plan/parse/ReadRecord.ts";
-import { readUnscannedText } from "../plan/ReadUnscannedText.ts";
+} from "../decoding/ReadRecord.ts";
+import { readUnscannedText } from "../decoding/ReadUnscannedText.ts";
 import { readCallDeclarations, readServices } from "./ReadCallDeclarations.ts";
 import {
     readObservedRequestDeclarations,
@@ -74,7 +74,7 @@ import {
     LOWERCASE_ID,
     MAXIMUM_TEST_ID_LENGTH,
     MAXIMUM_URL_LENGTH,
-} from "../plan/schema/PlanFields.ts";
+} from "../decoding/PlanFields.ts";
 import { readableCopy } from "../decoding/ReadableCopy.ts";
 
 const DEVICE_IDS: readonly DeviceProfileId[] = Object.values(DeviceProfileId);

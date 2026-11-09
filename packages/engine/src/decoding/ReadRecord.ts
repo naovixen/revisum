@@ -2,16 +2,12 @@
 // value or records a PlanError and returns INVALID. Errors carry a code and a JSON path, never
 // the offending value, so hostile or private text is never echoed back.
 import { PlanErrorCode, isPlainObject, type PlanError, type SafeText } from "@revisum/contracts";
-import type { NonEmptyList } from "../../decoding/NonEmptyList.ts";
-import {
-    readOneLevel,
-    type ReadableInput,
-    type ReadableRecord,
-} from "../../decoding/ReadableCopy.ts";
-import { brand } from "../../foundation/Brand.ts";
-import { sha256 } from "../../foundation/Sha256.ts";
-import { looksLikeCredential } from "../LooksLikeCredential.ts";
-import { UNSAFE_TEXT_CHARACTERS } from "../schema/PlanFields.ts";
+import type { NonEmptyList } from "./NonEmptyList.ts";
+import { readOneLevel, type ReadableInput, type ReadableRecord } from "./ReadableCopy.ts";
+import { brand } from "../foundation/Brand.ts";
+import { sha256 } from "../foundation/Sha256.ts";
+import { looksLikeCredential } from "./LooksLikeCredential.ts";
+import { UNSAFE_TEXT_CHARACTERS } from "./PlanFields.ts";
 
 export const INVALID: unique symbol = Symbol("invalid");
 export type Parsed<Value> = Value | typeof INVALID;

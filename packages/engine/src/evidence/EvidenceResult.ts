@@ -34,7 +34,7 @@ import { brand } from "../foundation/Brand.ts";
 import { guaranteeStatement } from "../run/seal/GuaranteeStatement.ts";
 import { canonicalJson, sha256 } from "../foundation/Sha256.ts";
 import { manifestHash } from "../run/seal/BuildManifest.ts";
-import { runTimeTextOrDigest } from "../plan/parse/ReadRecord.ts";
+import { runTimeTextOrDigest } from "../decoding/ReadRecord.ts";
 import { criterionIdFrom } from "../plan/parse/text/ReadCriterionId.ts";
 import {
     RECORD_UNREAD,

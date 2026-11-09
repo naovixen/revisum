@@ -32,7 +32,7 @@ import {
     readRecord,
     type Issues,
     type Parsed,
-} from "../plan/parse/ReadRecord.ts";
+} from "../decoding/ReadRecord.ts";
 import { readBuildVersion, readId } from "../project/ParseProject.ts";
 import type { TrustedProject } from "../project/TrustedProject.ts";
 import { isBrokenDriver, type BrokenDriver, type GuardedDriver } from "./GuardedDriver.ts";

@@ -29,9 +29,9 @@ import {
     readRecord,
     type Issues,
     type Parsed,
-} from "../plan/parse/ReadRecord.ts";
+} from "../decoding/ReadRecord.ts";
 import { readImageDigest, readSuiteName } from "../project/ReadEvidenceMode.ts";
-import { MAXIMUM_DAY_OFFSET } from "../plan/schema/PlanFields.ts";
+import { MAXIMUM_DAY_OFFSET } from "../decoding/PlanFields.ts";
 import { readableCopy } from "../decoding/ReadableCopy.ts";
 import { LIMIT_CEILINGS, readSecretName, readTarget } from "../project/ParseProject.ts";
 import { schemaId } from "../foundation/EngineVersion.ts";

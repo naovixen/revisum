@@ -219,8 +219,32 @@ export function findImportCycles(graph: ImportGraph): string[] {
 const describeGroup = (group: readonly string[]): string =>
     group.length > 2 ? ` (${group.length} files reach each other: ${group.join(", ")})` : "";
 
+// Folders that may depend one way only. Files can import each other across two folders without any
+// file cycle, which the search above cannot see, and the folders then cannot be understood apart.
+const ONE_WAY_FOLDERS = [
+    { folder: "packages/engine/src/project/", mustNotImport: "packages/engine/src/plan/" },
+] as const;
+
+export function findFolderDirectionProblems(graph: ImportGraph): string[] {
+    const problems: string[] = [];
+    for (const [file, edges] of graph) {
+        for (const { folder, mustNotImport } of ONE_WAY_FOLDERS) {
+            if (!file.startsWith(folder)) {
+                continue;
+            }
+            for (const edge of edges.filter(({ target }) => target.startsWith(mustNotImport))) {
+                problems.push(
+                    `folder direction: ${file} imports ${edge.target}; ${folder} must not depend on ${mustNotImport}, so move what both need below them`,
+                );
+            }
+        }
+    }
+    return problems;
+}
+
 export function checkImportCycles(root: string): string[] {
-    return findImportCycles(readImportGraph(root));
+    const graph = readImportGraph(root);
+    return [...findImportCycles(graph), ...findFolderDirectionProblems(graph)];
 }
 
 if (import.meta.main) {

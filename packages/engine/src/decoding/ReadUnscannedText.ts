@@ -4,7 +4,7 @@
 // import it.
 import type { SafeText } from "@revisum/contracts";
 import { brand } from "../foundation/Brand.ts";
-import { INVALID, isUnsafeText, type Issues, type Parsed } from "./parse/ReadRecord.ts";
+import { INVALID, isUnsafeText, type Issues, type Parsed } from "./ReadRecord.ts";
 import { PlanErrorCode } from "@revisum/contracts";
 
 export function readUnscannedText(

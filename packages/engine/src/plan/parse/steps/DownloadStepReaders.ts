@@ -1,8 +1,8 @@
 import { PlanErrorCode, StepType, type DownloadName } from "@revisum/contracts";
 import { brand } from "../../../foundation/Brand.ts";
-import { looksLikeCredential } from "../../LooksLikeCredential.ts";
-import { allValid, INVALID, type Parsed } from "../ReadRecord.ts";
-import { DOWNLOAD_NAME } from "../../schema/PlanFields.ts";
+import { looksLikeCredential } from "../../../decoding/LooksLikeCredential.ts";
+import { allValid, INVALID, type Parsed } from "../../../decoding/ReadRecord.ts";
+import { DOWNLOAD_NAME } from "../../../decoding/PlanFields.ts";
 import type { StepSection, StepTypeIn } from "../../StepFacts.ts";
 import { readDownloadAssertion } from "../assertions/ReadDownloadAssertion.ts";
 import { isNameTaken, type ParseContext } from "../ParseContext.ts";

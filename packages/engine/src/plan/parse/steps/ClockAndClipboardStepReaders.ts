@@ -8,7 +8,13 @@ import {
     type ClockAdvance,
 } from "@revisum/contracts";
 import { clockAdvanceMilliseconds } from "../../../run/executors/clock-and-clipboard/ClockAdvanceMilliseconds.ts";
-import { allValid, INVALID, readOneOf, readRecord, type Parsed } from "../ReadRecord.ts";
+import {
+    allValid,
+    INVALID,
+    readOneOf,
+    readRecord,
+    type Parsed,
+} from "../../../decoding/ReadRecord.ts";
 import type { StepSection, StepTypeIn } from "../../StepFacts.ts";
 import { readClipboardAssertion } from "../assertions/ReadClipboardAssertion.ts";
 import type { ParseContext } from "../ParseContext.ts";

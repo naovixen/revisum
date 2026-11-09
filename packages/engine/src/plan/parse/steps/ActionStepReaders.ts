@@ -8,9 +8,16 @@ import {
     StepType,
     type Modifier,
 } from "@revisum/contracts";
-import { namesSensitiveField } from "../../LooksLikeCredential.ts";
-import { allValid, INVALID, readList, readOneOf, type Issues, type Parsed } from "../ReadRecord.ts";
-import { MAXIMUM_MODIFIERS } from "../../schema/PlanFields.ts";
+import { namesSensitiveField } from "../../../decoding/LooksLikeCredential.ts";
+import {
+    allValid,
+    INVALID,
+    readList,
+    readOneOf,
+    type Issues,
+    type Parsed,
+} from "../../../decoding/ReadRecord.ts";
+import { MAXIMUM_MODIFIERS } from "../../../decoding/PlanFields.ts";
 import type { StepSection, StepTypeIn } from "../../StepFacts.ts";
 import { readDeclared } from "../declarations/ReadDeclared.ts";
 import type { ParseContext } from "../ParseContext.ts";

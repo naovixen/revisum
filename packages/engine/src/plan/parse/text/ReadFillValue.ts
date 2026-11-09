@@ -7,7 +7,7 @@ import {
     type SecretReference,
     type TextOrValue,
 } from "@revisum/contracts";
-import type { Parsed } from "../ReadRecord.ts";
+import type { Parsed } from "../../../decoding/ReadRecord.ts";
 import { readSecretReference } from "../declarations/ReadDeclared.ts";
 import type { ParseContext } from "../ParseContext.ts";
 import { readMultiLineText } from "./ReadMultiLineText.ts";

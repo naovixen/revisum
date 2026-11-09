@@ -25,7 +25,7 @@ import {
     readRecord,
     type Issues,
     type Parsed,
-} from "../ReadRecord.ts";
+} from "../../../decoding/ReadRecord.ts";
 import {
     CLOCK_TIME,
     EMAIL_LOCAL_PREFIX,
@@ -35,7 +35,7 @@ import {
     MAXIMUM_VALUES,
     UNIQUE_NUMBER_DIGITS,
     VALUE_NAME,
-} from "../../schema/PlanFields.ts";
+} from "../../../decoding/PlanFields.ts";
 
 // Reads plan text under the parser's rules (safe text, no credential shapes).
 type TextReader = (input: unknown, path: string, maximumLength: number) => Parsed<SafeText>;

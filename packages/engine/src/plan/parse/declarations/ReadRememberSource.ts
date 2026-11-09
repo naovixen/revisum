@@ -9,8 +9,8 @@ import {
     type RememberSource,
 } from "@revisum/contracts";
 import type { ReadableInput } from "../../../decoding/ReadableCopy.ts";
-import { INVALID, readOneOf, readRecord, type Parsed } from "../ReadRecord.ts";
-import { ATTRIBUTE_NAME, DOM_CHECKS_FEATURE } from "../../schema/PlanFields.ts";
+import { INVALID, readOneOf, readRecord, type Parsed } from "../../../decoding/ReadRecord.ts";
+import { ATTRIBUTE_NAME, DOM_CHECKS_FEATURE } from "../../../decoding/PlanFields.ts";
 import { readFields } from "../../ReadFields.ts";
 import { readDeclaredField, readRequestName } from "./ReadDeclared.ts";
 import { knownField } from "../KnownField.ts";

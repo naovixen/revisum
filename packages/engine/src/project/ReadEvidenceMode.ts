@@ -15,7 +15,7 @@ import type {
 } from "@revisum/contracts";
 import { PlanErrorCode, SuiteFramework } from "@revisum/contracts";
 import { brand } from "../foundation/Brand.ts";
-import { looksLikeCredential } from "../plan/LooksLikeCredential.ts";
+import { looksLikeCredential } from "../decoding/LooksLikeCredential.ts";
 import {
     INVALID,
     allValid,
@@ -25,8 +25,8 @@ import {
     readRecord,
     type Issues,
     type Parsed,
-} from "../plan/parse/ReadRecord.ts";
-import { readUnscannedText } from "../plan/ReadUnscannedText.ts";
+} from "../decoding/ReadRecord.ts";
+import { readUnscannedText } from "../decoding/ReadUnscannedText.ts";
 import { staysInside } from "../foundation/RepositoryPath.ts";
 import { readDeclarationSection } from "./ReadCallDeclarations.ts";
 

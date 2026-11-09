@@ -20,7 +20,7 @@ import {
     SuiteTestOutcome,
 } from "@revisum/contracts";
 import { brand } from "../foundation/Brand.ts";
-import { INVALID, allValid, type Parsed } from "../plan/parse/ReadRecord.ts";
+import { INVALID, allValid, type Parsed } from "../decoding/ReadRecord.ts";
 import { staysInside } from "../foundation/RepositoryPath.ts";
 import { readableCopy } from "../decoding/ReadableCopy.ts";
 

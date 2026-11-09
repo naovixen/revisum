@@ -15,7 +15,7 @@ import {
 } from "@revisum/contracts";
 import { argumentProblem } from "../../../run/executors/service-calls/ArgumentValue.ts";
 import { readableCopy, type ReadableInput } from "../../../decoding/ReadableCopy.ts";
-import { INVALID, type Parsed } from "../ReadRecord.ts";
+import { INVALID, type Parsed } from "../../../decoding/ReadRecord.ts";
 import { readFields, type FieldReader } from "../../ReadFields.ts";
 import type { ParseContext } from "../ParseContext.ts";
 import { refuse } from "../Refuse.ts";

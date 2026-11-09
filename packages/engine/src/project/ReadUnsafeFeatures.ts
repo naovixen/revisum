@@ -38,12 +38,9 @@ import {
     readRecord,
     type Issues,
     type Parsed,
-} from "../plan/parse/ReadRecord.ts";
-import { readUnscannedText } from "../plan/ReadUnscannedText.ts";
-import {
-    MAXIMUM_SELECTOR_LENGTH,
-    SELECTOR_FORBIDDEN_CHARACTERS,
-} from "../plan/schema/PlanFields.ts";
+} from "../decoding/ReadRecord.ts";
+import { readUnscannedText } from "../decoding/ReadUnscannedText.ts";
+import { MAXIMUM_SELECTOR_LENGTH, SELECTOR_FORBIDDEN_CHARACTERS } from "../decoding/PlanFields.ts";
 import {
     readDeclarationSection,
     readFieldPointers,

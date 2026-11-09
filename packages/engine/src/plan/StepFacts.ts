@@ -5,7 +5,7 @@
 // the parser, the JSON Schema, the readable forms and the run read is derived from it, so adding a
 // step type is one entry here, which the compiler demands.
 import type { CleanupStep, Step, StepByType, StepType } from "@revisum/contracts";
-import { CRITERION_FIELD, FROM_FIELD } from "./schema/PlanFields.ts";
+import { CRITERION_FIELD, FROM_FIELD } from "../decoding/PlanFields.ts";
 import {
     databaseStepConstructs,
     expectStepConstructs,

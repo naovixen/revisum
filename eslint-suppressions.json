@@ -323,6 +323,11 @@
       "count": 2
     }
   },
+  "packages/engine/src/decoding/ReadRecord.ts": {
+    "no-control-regex": {
+      "count": 2
+    }
+  },
   "packages/engine/src/decoding/ReadableCopy.ts": {
     "no-restricted-syntax": {
       "count": 1
@@ -421,11 +426,6 @@
     },
     "no-restricted-syntax": {
       "count": 1
-    }
-  },
-  "packages/engine/src/plan/parse/ReadRecord.ts": {
-    "no-control-regex": {
-      "count": 2
     }
   },
   "packages/engine/src/plan/parse/declarations/ReadPlanClock.ts": {

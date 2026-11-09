@@ -10,7 +10,7 @@ import {
     type PlanError,
 } from "@revisum/contracts";
 import { brand } from "../foundation/Brand.ts";
-import { isUnsafeProse } from "../plan/parse/ReadRecord.ts";
+import { isUnsafeProse } from "../decoding/ReadRecord.ts";
 
 export type AiText = Brand<string, "AiText">;
 

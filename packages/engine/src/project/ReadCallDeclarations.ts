@@ -39,9 +39,9 @@ import {
     readRecord,
     type Issues,
     type Parsed,
-} from "../plan/parse/ReadRecord.ts";
-import { readUnscannedText } from "../plan/ReadUnscannedText.ts";
-import { DECLARED_NAME, QUERY_KEY } from "../plan/schema/PlanFields.ts";
+} from "../decoding/ReadRecord.ts";
+import { readUnscannedText } from "../decoding/ReadUnscannedText.ts";
+import { DECLARED_NAME, QUERY_KEY } from "../decoding/PlanFields.ts";
 import { isInterpolationSafe } from "../run/executors/service-calls/ArgumentValue.ts";
 import { readOrigin } from "./ReadOrigin.ts";
 

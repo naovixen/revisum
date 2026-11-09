@@ -39,7 +39,7 @@ import {
     type StepType,
     type StorageAssertion,
 } from "@revisum/contracts";
-import { FROM_FIELD } from "../schema/PlanFields.ts";
+import { FROM_FIELD } from "../../decoding/PlanFields.ts";
 import { STEP_FACTS, STEP_TYPES, UNSAFE_STEP_TYPES } from "../StepFacts.ts";
 import {
     TextErrorCode,

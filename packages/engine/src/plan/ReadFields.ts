@@ -1,6 +1,6 @@
 import { PlanErrorCode, isNonArrayObject } from "@revisum/contracts";
 import type { ReadableInput } from "../decoding/ReadableCopy.ts";
-import { INVALID, readRecord, type Issues, type Parsed } from "./parse/ReadRecord.ts";
+import { INVALID, readRecord, type Issues, type Parsed } from "../decoding/ReadRecord.ts";
 
 // Reads one field's value. A bad value must give INVALID and record an issue at `path` in `issues`.
 // The type can't require that: a function can't be typed to record anything, and Parsed<unknown>

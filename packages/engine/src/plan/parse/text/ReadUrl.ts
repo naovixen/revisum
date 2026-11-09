@@ -2,8 +2,8 @@
 // one a check only compares.
 import { PlanErrorCode, type AllowedUrl, type SafeText } from "@revisum/contracts";
 import { brand } from "../../../foundation/Brand.ts";
-import { INVALID, type Parsed } from "../ReadRecord.ts";
-import { MAXIMUM_URL_LENGTH, WRITTEN_URL } from "../../schema/PlanFields.ts";
+import { INVALID, type Parsed } from "../../../decoding/ReadRecord.ts";
+import { MAXIMUM_URL_LENGTH, WRITTEN_URL } from "../../../decoding/PlanFields.ts";
 import type { ParseContext } from "../ParseContext.ts";
 import { refuse } from "../Refuse.ts";
 import { readWrittenText } from "./ReadWrittenText.ts";
