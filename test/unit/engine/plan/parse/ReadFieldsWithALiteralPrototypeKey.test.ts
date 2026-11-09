@@ -3,14 +3,12 @@
 // input's prototype is checked as well, so a class instance holding the right fields is no record.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
+import { INVALID, type Issues, type Parsed } from "@revisum/engine";
 import {
-    INVALID,
     optionalField,
     readFields,
     type FieldReader,
-    type Issues,
-    type Parsed,
-} from "@revisum/engine";
+} from "../../../../../packages/engine/src/plan/ReadFields.ts";
 import { classInstanceHolding } from "../../../../support/ClassInstanceHolding.ts";
 import { PlanErrorCode } from "@revisum/contracts";
 

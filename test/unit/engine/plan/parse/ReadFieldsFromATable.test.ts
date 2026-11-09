@@ -4,15 +4,12 @@
 // credential is never repeated, and INVALID always comes with something to show a person.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
+import { INVALID, readInteger, type Issues, type Parsed } from "@revisum/engine";
 import {
-    INVALID,
     optionalField,
     readFields,
-    readInteger,
     type FieldReader,
-    type Issues,
-    type Parsed,
-} from "@revisum/engine";
+} from "../../../../../packages/engine/src/plan/ReadFields.ts";
 import { tokenShapedText } from "../../evidence/examples/EvidenceRun.ts";
 import { PlanErrorCode } from "@revisum/contracts";
 

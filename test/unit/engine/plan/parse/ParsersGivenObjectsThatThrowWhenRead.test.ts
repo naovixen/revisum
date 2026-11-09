@@ -4,15 +4,11 @@
 // with the code the parser gives any value of the wrong form at that place, and never thrown.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
+import { INVALID, decodeManifest, parseProject, readInteger, type Issues } from "@revisum/engine";
 import {
-    INVALID,
-    decodeManifest,
-    parseProject,
     readFields,
-    readInteger,
     type FieldReader,
-    type Issues,
-} from "@revisum/engine";
+} from "../../../../../packages/engine/src/plan/ReadFields.ts";
 import {
     accountClosurePlan,
     defaultParser,
