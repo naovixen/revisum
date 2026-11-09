@@ -175,10 +175,18 @@ function wholeWord(pattern: string): RegExp {
     return new RegExp(`(?<![\\p{L}\\p{N}\\p{M}])${escaped}(?![\\p{L}\\p{N}\\p{M}])`, "iu");
 }
 
+// The Combining Diacritical Marks block alone: the vowel signs of other scripts are their letters.
+const COMBINING_DIACRITIC = /[\u0300-\u036F]/gu;
+
+// Only ever a reading to match against, so a recorded name keeps its accents. "Zählen" reads as
+// "zahlen"; that errs on the safe side.
+const withoutDiacritics = (text: string): string =>
+    text.normalize("NFKD").replace(COMBINING_DIACRITIC, "").normalize("NFC");
+
 // The text as written and with swapped characters read as the letters they stand for. Before the
 // words are split: a capital I for an l would otherwise read as the start of a camelCase word.
 const formsOf = (text: string): readonly string[] => {
-    const written = withoutInvisibleForms(text);
+    const written = withoutDiacritics(withoutInvisibleForms(text));
     return [written, withSwappedCharactersFolded(written)];
 };
 

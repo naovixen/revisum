@@ -4,10 +4,37 @@
 // imports and no closures over Node values. A form's named inputs hide what it inherits, so whatever
 // may be a form is read through the prototypes, never directly.
 
+// The control Enter in the element's form would submit it through, as a list of at most one so it
+// comes back as a handle the browser's accessibility engine can be asked about.
+export function formSubmitControl(element: Element): Element[] {
+    const field = element as HTMLInputElement;
+    const form =
+        field.form instanceof HTMLFormElement
+            ? field.form
+            : Element.prototype.closest.call(element, "form");
+    if (form === null) {
+        return [];
+    }
+    const controls: HTMLFormControlsCollection = Reflect.get(
+        HTMLFormElement.prototype,
+        "elements",
+        form,
+    );
+    return Array.from(controls)
+        .filter(
+            (control) =>
+                (control instanceof HTMLButtonElement && control.type === "submit") ||
+                (control instanceof HTMLInputElement &&
+                    (control.type === "submit" || control.type === "image")),
+        )
+        .slice(0, 1);
+}
+
 // What the policy gate's runtime guard needs to know about an element besides its role and name,
-// as JSON: its box, the accessible name of its form's submit control, the URL of the link it is
-// in, and its own test id. A field the page does not show is null.
-export function guardDetails(element: Element): string {
+// as JSON: its box, the name its form's submit control `submit` carries in the page, the URL of the
+// link it is in, and its own test id. A field the page does not show is null. The submit's name is
+// for a control hidden from the accessibility engine, which Enter still submits through.
+export function guardDetails(element: Element, submit?: Element): string {
     const normalise = (text: string): string => text.replace(/\s+/g, " ").trim();
     const nameOf = (control: Element): string => {
         const ariaLabel = Element.prototype.getAttribute.call(control, "aria-label");
@@ -42,22 +69,6 @@ export function guardDetails(element: Element): string {
         );
     };
     const rectangle = Element.prototype.getBoundingClientRect.call(element);
-    const field = element as HTMLInputElement;
-    const form =
-        field.form instanceof HTMLFormElement
-            ? field.form
-            : Element.prototype.closest.call(element, "form");
-    const controlsOf = (owner: Element): HTMLFormControlsCollection =>
-        Reflect.get(HTMLFormElement.prototype, "elements", owner);
-    const submit =
-        form === null
-            ? undefined
-            : Array.from(controlsOf(form)).find(
-                  (control) =>
-                      (control instanceof HTMLButtonElement && control.type === "submit") ||
-                      (control instanceof HTMLInputElement &&
-                          (control.type === "submit" || control.type === "image")),
-              );
     const submitName = submit === undefined ? "" : nameOf(submit);
     const parentOf = (node: Element): Element | null => {
         const slot = Reflect.get(Element.prototype, "assignedSlot", node);
@@ -71,14 +82,30 @@ export function guardDetails(element: Element): string {
         const root = Node.prototype.getRootNode.call(node);
         return root instanceof ShadowRoot ? root.host : null;
     };
+    // An SVG link may carry its target in the older xlink:href, and an SVG link's href property is no
+    // string, so the target is read from the attribute however the link is drawn.
+    const targetOf = (node: Element): string | null =>
+        Element.prototype.matches.call(node, "a, area")
+            ? (Element.prototype.getAttribute.call(node, "href") ??
+              Element.prototype.getAttributeNS.call(node, "http://www.w3.org/1999/xlink", "href"))
+            : null;
+    const resolvedUrl = (node: Element, target: string): string => {
+        const base: string = Reflect.get(Node.prototype, "baseURI", node);
+        try {
+            return new URL(target, base).href;
+        } catch {
+            return target;
+        }
+    };
     let link: Element | null = element;
-    while (link !== null && !Element.prototype.matches.call(link, "a[href]")) {
+    while (link !== null && targetOf(link) === null) {
         link = parentOf(link);
     }
+    const target = link === null ? null : targetOf(link);
     return JSON.stringify({
         box: { x: rectangle.x, y: rectangle.y, width: rectangle.width, height: rectangle.height },
         formSubmitName: submitName === "" ? null : submitName,
-        linkUrl: link instanceof HTMLAnchorElement ? link.href : null,
+        linkUrl: link === null || target === null ? null : resolvedUrl(link, target),
         testId: Element.prototype.getAttribute.call(element, "data-testid"),
     });
 }

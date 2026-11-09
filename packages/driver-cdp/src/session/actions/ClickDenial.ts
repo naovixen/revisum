@@ -1,7 +1,7 @@
 // What the policy gate's runtime guard is asked about an action's element, and its denial.
 import type { ActionGuard, DriverError, GuardVerdict, ResolvedElement } from "@revisum/contracts";
 import { whatAClickActivates } from "../../in-page/elements/Actionability.ts";
-import { guardDetails } from "../../in-page/elements/GuardDetails.ts";
+import { formSubmitControl, guardDetails } from "../../in-page/elements/GuardDetails.ts";
 import type { HasStepEnded, PageOperations, Point } from "../../page/PageOperations.ts";
 import { StepHasEnded } from "../../page/failures/StepHasEnded.ts";
 import {
@@ -40,11 +40,15 @@ async function resolvedElement<Handle>(
     element: Handle,
 ): Promise<ResolvedElement> {
     const { role, name } = await operations.roleAndName(element);
-    return {
-        role,
-        name,
-        ...decodeGuardDetails(await operations.callForString(guardDetails, [{ element }])),
-    };
+    const [submit] = await operations.callForElements(formSubmitControl, [{ element }]);
+    const details = decodeGuardDetails(
+        await operations.callForString(
+            guardDetails,
+            submit === undefined ? [{ element }] : [{ element }, { element: submit }],
+        ),
+    );
+    const submitName = submit === undefined ? null : (await operations.roleAndName(submit)).name;
+    return { role, name, ...details, formSubmitName: submitName ?? details.formSubmitName };
 }
 
 // The guard, for a read a step's deadline may outlive: once the step has ended, the read goes no

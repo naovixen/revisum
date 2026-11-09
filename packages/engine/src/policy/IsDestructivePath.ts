@@ -21,12 +21,18 @@ const withEscapesDecoded = (path: string): string =>
         ),
     );
 
+// Some servers read a backslash as a slash.
+const withBackslashesAsSlashes = (path: string): string => path.replace(/\\/gu, "/");
+
+const decodedOnce = (path: string): string => withBackslashesAsSlashes(withEscapesDecoded(path));
+
+// Some servers also drop white space at the end of a path, so it counts no more than a last slash.
 const comparableForm = (decoded: string): string =>
     decoded
         .toLowerCase()
         .replace(/;[^/]*/gu, "")
         .replace(/\/+/gu, "/")
-        .replace(/\/$/u, "");
+        .replace(/[\s/]+$/u, "");
 
 // The path with its "." and ".." segments resolved, a path parameter on one included, as Tomcat reads
 // "..;x=1". Servers differ on whether "//" holds an empty segment that ".." climbs out of.
@@ -44,8 +50,9 @@ function withoutDotSegments(path: string, isMergingSlashes: boolean): string {
 }
 
 // A path compared the way servers commonly read it: percent-decoded through every layer,
-// case-insensitive, with path parameters and repeated and trailing slashes removed, so
-// "/Account//%2564elete;x=1/" still reads as /account/delete. A server may decode a path more than
+// case-insensitive, with backslashes as slashes and path parameters, repeated slashes and whatever
+// trails in slashes and white space removed, so "/Account//%2564elete;x=1/" still reads as
+// /account/delete. A server may decode a path more than
 // once and only then resolve what is left, so `resolved` reads it with its dot segments resolved after
 // each round. `decoded` reads it without, as a server that decodes once does: resolving alone would
 // allow "/account/delete/%252e%252e/settings", which that server reads as under /account/delete.
@@ -53,11 +60,11 @@ type ComparablePath = { readonly decoded: string; readonly resolved: readonly st
 
 // Null when the path holds more layers than the gate will read.
 function comparablePath(path: string): ComparablePath | null {
-    let decoded = path;
-    let keepingSlashes = withoutDotSegments(path, false);
-    let mergingSlashes = withoutDotSegments(path, true);
+    let decoded = withBackslashesAsSlashes(path);
+    let keepingSlashes = withoutDotSegments(decoded, false);
+    let mergingSlashes = withoutDotSegments(decoded, true);
     for (let round = 0; round < MAXIMUM_DECODING_ROUNDS; round++) {
-        const next = withEscapesDecoded(decoded);
+        const next = decodedOnce(decoded);
         if (next === decoded) {
             return {
                 decoded: comparableForm(decoded),
@@ -65,8 +72,8 @@ function comparablePath(path: string): ComparablePath | null {
             };
         }
         decoded = next;
-        keepingSlashes = withoutDotSegments(withEscapesDecoded(keepingSlashes), false);
-        mergingSlashes = withoutDotSegments(withEscapesDecoded(mergingSlashes), true);
+        keepingSlashes = withoutDotSegments(decodedOnce(keepingSlashes), false);
+        mergingSlashes = withoutDotSegments(decodedOnce(mergingSlashes), true);
     }
     return null;
 }
