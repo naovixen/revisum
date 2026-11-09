@@ -37,7 +37,7 @@ jobs:
                 curl --fail --silent --show-error --location \
                   https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json --output .browsers/latest-versions.json
                 stable=$(node -e "console.log(JSON.parse(require(\"fs\").readFileSync(\".browsers/latest-versions.json\", \"utf8\")).channels.Stable.version)")
-                pinned=$(node --input-type=module -e "import(\"./tools/install-browsers.ts\").then((tool) => console.log(tool.CHROME_FOR_TESTING_BUILD))")
+                pinned=$(node --input-type=module -e "import(\"./tools/browsers/ChromeForTestingBuild.ts\").then((tool) => console.log(tool.CHROME_FOR_TESTING_BUILD))")
                 suites=0
                 if [ "${stable%%.*}" -gt "${pinned%%.*}" ]; then
                   echo "Chrome for Testing Stable ${stable} is a newer major than the pinned ${pinned}: re-running the contract and capability suites"

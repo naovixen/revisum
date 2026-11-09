@@ -57,7 +57,7 @@ When the last spec of a milestone is committed:
 
 - **The main session reads summaries, not files.** Use `git diff --stat`, `grep` and helper reports. Send long command output to a file in the scratchpad and read only the summary lines.
 - **One helper per step**, with its brief plus at most 20 lines of known facts. Don't repeat what `CLAUDE.md` says; helpers load it.
-- **Helpers iterate on one package** (`npm test -w <package>`) and run `npm run check` once at the end.
+- **Helpers iterate on one test folder** (`node tools/test-runner/RunTestFolder.ts --without-browser test/unit/<package>`) and run `npm run check` once at the end.
 - **Research is narrow.** The `Explore` helper reads excerpts, not whole research docs. Use the web only when the repo can't answer.
 - **Reviews only at milestone exits**, and only for trust-path specs.
 - **A fresh session per milestone.** It starts from `START.md`, not from a long conversation.

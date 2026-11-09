@@ -7,6 +7,9 @@ paths:
 
 ESLint enforces the title structure: `Using the X` > `given` > `and` > `when` > `and` > `then it should`. Merged, the titles must read as one sentence describing a behaviour.
 
+- Put a test in the folder that says what it needs: `test/unit/<package>/` for one package's behaviour, `test/browser/` for a real browser, `test/proofs/` for hostile plans and trust rules, `test/replay/` for golden runs, `test/containers/` for real containers. Import shared helpers from `test/support/` through `#test-support/*`; data goes in `test/fixtures/` and `test/golden/`.
+- A file that imports `test/support/browser/Browsers.ts`, directly or through other test files, is a browser test wherever it sits: it runs one at a time, and `npm test` leaves it out.
+- Tests carry no criterion tag or spec reference: traceability lives in `Criteria:` commit trailers.
 - Test behaviour through the public API: trigger an action, check the reaction (return value, thrown error, call to a port). Never reach into privates.
 - Cover positive and negative paths. Don't add scenarios the types already rule out.
 - Set state before the action, in the `given` and `when` levels.

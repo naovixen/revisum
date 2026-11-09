@@ -41,9 +41,9 @@ The product name is Revisum (`revisum` for the repo, packages and CLI). It appea
   - Never push, merge, rebase, tag, amend a commit, skip hooks or approve anything. The founder's push to `main` is the approval.
   - Deny rules in `.claude/settings.json` enforce this. Don't look for ways round them, such as a script that pushes.
 - **Tests and code are separate helpers and separate commits.**
-  - The test set is `test/`, `proofs/`, `fixtures/` and `golden/`. A tests commit changes only the test set.
+  - The test set is `test/`. A tests commit changes only the test set.
   - A code commit changes only `packages/`, `tools/` and `docs/`, and never the test set.
-  - Before each commit, run `git diff --cached --name-only | node tools/check-tests-apart.ts`. It must pass.
+  - Before each commit, run `git diff --cached --name-only | node tools/repo-rules/commits/CheckTestsApart.ts`. It must pass. Check the message too, because a commit can't be amended: `node tools/repo-rules/commits/CommitTrailers.ts --message <file>`.
 - **Correct by construction.** AI output, and any input from outside, is `unknown` until a hand-written decoder in `engine` parses it. Never let unparsed data reach execution. No `as` casts to branded types outside their owning parser.
 - **Dependency direction.** `engine` imports only `contracts` and Node built-ins. Only `cli` wires packages together; the one other cross-package import is `auditor-act` using `driver-cdp`'s browser connection. A wrong-way import must fail `tsc`; never work round it.
 - **No new runtime dependency** in `contracts` or `engine`. Any third-party package elsewhere needs a dependency review in `docs/decisions/` first.
@@ -70,13 +70,24 @@ The product name is Revisum (`revisum` for the repo, packages and CLI). It appea
 
 | Command | Does |
 |---|---|
-| `npm run check` | The fast checks: `tsc`, lint, naming lint, unit and contract tests that need no browser. It must be green before you finish |
-| `npm run check:push` | What CI runs on push: `npm run check`, browser tests, proofs, replay, gates. Real-container tests stay in `npm run check:containers`, because they need Docker |
+| `npm run check` | The fast checks, in order: `npm run typecheck`, `npm run lint`, `npm run lint:code`, `npm run lint:names`, `npm test`. It must be green before you finish |
+| `npm run check:push` | `npm run check`, then browser tests, proofs, replay and gates. CI runs the same on push, with the browser tests in shards |
+| `npm run check:containers` | Real-container tests (`test/containers/`). They need Docker, so they stay out of `npm run check:push`; CI runs them in their own job |
+| `npm run check:full` | `npm run check:push` on the full test tier: repeated runs and the headless-shell target |
+| `npm run typecheck` | `tsc --build` over every package, `tools/` and `test/` |
+| `npm run lint` | The repository rules, in one process (`tools/repo-rules/RunRepositoryRules.ts`) |
 | `npm run lint:code` | ESLint, part of `npm run check` |
-| `npm run format` | Prettier, across packages, tools and tests |
-| `npm test -w <package>` | Tests for one package |
-| `npm run proofs` | Hostile plans, secret leaks, egress, PII, audit chain |
-| `npm run replay` | Golden runs, compared by hash |
+| `npm run lint:names` | The naming lint's self-test, then the naming lint over the repository |
+| `npm run format` | Prettier, across packages, tools and tests. `npm run format:check` only reports |
+| `npm test` | The tests in `test/unit/` and `test/browser/` that drive no browser |
+| `npm run test:browser` | The tests in those folders that drive a browser, one file at a time |
+| `node --test "test/unit/<package>/**/*.test.ts"` | One package's unit tests. Records nothing for the gates |
+| `npm run proofs` | Hostile plans, secret leaks, egress, PII, audit chain (`test/proofs/`) |
+| `npm run replay` | Golden runs, compared by hash (`test/replay/`) |
+| `npm run gates` | After the tests: the project's metrics, the guarantee map, and a check that every test file has a result |
+| `npm run goldens:record` | Remakes the goldens in `test/golden/`; the replay golden on Windows x64 only. Not part of any check |
+| `npm run browsers` | Installs the pinned Chrome for Testing build |
+| `npm run benchmark` | The performance trend alarm, never a gate |
 | `npm run check:linux` | `npm run check:push` on CI's pinned Linux image, in Docker. Run it before reporting a step done when screenshots, fonts or replay hashes are involved |
 
 ## When you finish
