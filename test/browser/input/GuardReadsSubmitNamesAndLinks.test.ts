@@ -1,6 +1,7 @@
 // The runtime guard is told what the page really names and links to, in a real browser. A form's
-// submit control is named however the browser names it: by a title, a label or the alt text of an
-// image inside it, so Enter in a field cannot submit a form whose only submit control says Delete.
+// submit control is named however the browser names it: by a title, a label, the alt text of an
+// image inside it or its own alt text as an image input, so Enter in a field cannot submit a form
+// whose only submit control says Delete.
 // A link is a link however the page draws it: an SVG link and an image-map area lead somewhere just
 // as an HTML link does, so the project's destructive paths apply to them. Each denial is paired with
 // the same page under a harmless name or path, which does go through.
@@ -70,6 +71,8 @@ const SMALL_IMAGE = "/small-image.svg";
 
 const submitNamedByNestedImage = (name: string): string =>
     `<button><img alt="${name}" src="${SMALL_IMAGE}" width="16" height="16"></button>`;
+const submitDrawnAsImageInput = (name: string): string =>
+    `<input type="image" alt="${name}" src="${SMALL_IMAGE}" width="16" height="16">`;
 const submitNamedByTitle = (name: string): string =>
     `<button title="${name}"><svg width="16" height="16"></svg></button>`;
 const submitNamedByLabel = (name: string): string =>
@@ -88,6 +91,12 @@ const SUBMIT_WRITINGS: readonly SubmitWriting[] = [
         submit: submitNamedByNestedImage,
         destructivePage: "/submit-image-delete.html",
         harmlessPage: "/submit-image-update.html",
+    },
+    {
+        written: "its own alt text as an image input",
+        submit: submitDrawnAsImageInput,
+        destructivePage: "/submit-image-input-delete.html",
+        harmlessPage: "/submit-image-input-update.html",
     },
     {
         written: "its title",
