@@ -235,17 +235,6 @@
       "count": 6
     }
   },
-  "packages/driver-cdp/src/page/PageWatch.ts": {
-    "max-lines": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 1
-    },
-    "no-restricted-syntax": {
-      "count": 3
-    }
-  },
   "packages/driver-cdp/src/page/checks/ClickCheckWorld.ts": {
     "no-restricted-syntax": {
       "count": 4

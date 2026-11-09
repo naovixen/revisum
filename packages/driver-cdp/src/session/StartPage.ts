@@ -1,6 +1,7 @@
 // Starts watching a page of the session and prepares it, before it loads anything.
 import { ENABLE_PAGE } from "../connection/BrowserCommand.ts";
-import { PageWatch, type AttachedPage } from "../page/PageWatch.ts";
+import type { AttachedPage } from "../page/PageOpenings.ts";
+import { PageWatch } from "../page/PageWatch.ts";
 import { preparePage } from "./PreparePage.ts";
 import { recordPopupRequest, type SessionBrowser } from "./SessionBrowser.ts";
 
