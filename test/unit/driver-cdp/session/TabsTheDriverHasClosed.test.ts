@@ -10,7 +10,11 @@ import {
 } from "#test-support/fakes/session/FakeBrowserSocket.ts";
 import { inMockTime } from "#test-support/InMockTime.ts";
 import { baseUrlOf } from "#test-support/builders/ClearRun.ts";
-import { failureCode } from "#test-support/session-contract/SessionUnderTest.ts";
+import {
+    failureCode,
+    locatorOf,
+    NAME_FIELD,
+} from "#test-support/session-contract/SessionUnderTest.ts";
 import { SHARED_BROWSER_CLIPBOARD } from "../../../../packages/driver-cdp/src/capabilities/RunClipboard.ts";
 import {
     egressThroughExistingProxy,
@@ -112,6 +116,18 @@ describe("Using a second tab of a session", () => {
                 });
             });
         }
+
+        describe("when a screenshot hiding a field that exists is taken of it", () => {
+            test("then it should fail as a read of the page does, not as a field that cannot be found", async (context) => {
+                const { value } = await inMockTime(context, () =>
+                    tab.screenshotHidingFields([], [locatorOf(NAME_FIELD)], () => false),
+                );
+                assert.deepEqual(
+                    { code: failureCode(value), sent: socket.commandsSentToClosedPages() },
+                    { code: "page-unreadable", sent: [] },
+                );
+            });
+        });
 
         describe("when its state is read", () => {
             test("then it should not count as crashed", () => {
