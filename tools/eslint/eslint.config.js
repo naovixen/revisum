@@ -239,12 +239,14 @@ export default defineConfig([
         },
     },
     {
-        // Tests join when their sweep lands.
-        files: ["packages/**/*.ts", "tools/**/*.ts"],
-        rules: {
-            curly: ["error", "all"],
-            "@typescript-eslint/switch-exhaustiveness-check": "error",
-        },
+        files: ["packages/**/*.ts", "tools/**/*.ts", "test/**/*.ts"],
+        rules: { curly: ["error", "all"] },
+    },
+    {
+        files: ["packages/**/*.ts", "tools/**/*.ts", "test/**/*.ts"],
+        // These switches leave a case out on purpose: the type error at their default proves the union is closed.
+        ignores: ["test/proofs/repo-rules/composition-root/DescribePlanError.ts"],
+        rules: { "@typescript-eslint/switch-exhaustiveness-check": "error" },
     },
     {
         files: ["packages/**/*.ts", "tools/**/*.ts"],
@@ -254,6 +256,11 @@ export default defineConfig([
             "prefer-arrow-callback": "error",
             "no-restricted-syntax": ["error", ...everywhereSyntax, noExportStar, ...noMagicStrings],
         },
+    },
+    {
+        // Magic strings stay allowed here: a literal in a test often pins the published value.
+        files: ["test/**/*.ts"],
+        rules: { "prefer-arrow-callback": "error" },
     },
     {
         files: ["packages/**/*.ts"],

@@ -997,6 +997,9 @@
     "@typescript-eslint/naming-convention": {
       "count": 3
     },
+    "max-lines": {
+      "count": 1
+    },
     "revisum/test-title-format": {
       "count": 35
     }
@@ -1124,6 +1127,9 @@
     },
     "max-lines": {
       "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
     }
   },
   "test/browser/frames-and-tabs/CdpDownloadAndTabReplays.test.ts": {
@@ -1134,6 +1140,11 @@
   "test/browser/frames-and-tabs/CdpNewTabs.test.ts": {
     "revisum/test-title-format": {
       "count": 15
+    }
+  },
+  "test/browser/frames-and-tabs/OpeningsOutsideAnAction.test.ts": {
+    "max-lines": {
+      "count": 1
     }
   },
   "test/browser/frames-and-tabs/PopupHeldBack.test.ts": {
@@ -1192,6 +1203,9 @@
     "@typescript-eslint/naming-convention": {
       "count": 1
     },
+    "max-lines": {
+      "count": 1
+    },
     "revisum/test-title-format": {
       "count": 31
     }
@@ -1230,6 +1244,11 @@
     },
     "revisum/test-title-format": {
       "count": 27
+    }
+  },
+  "test/browser/page-reads/NegativeChecksOnUnreadablePages.test.ts": {
+    "max-lines": {
+      "count": 1
     }
   },
   "test/browser/page-reads/PageStatesDriverSupport.test.ts": {
@@ -1274,6 +1293,9 @@
     }
   },
   "test/containers/egress/BrowserChannelsAndDirectConnections.test.ts": {
+    "max-lines": {
+      "count": 1
+    },
     "revisum/test-title-format": {
       "count": 14
     }
@@ -1297,6 +1319,9 @@
     "@typescript-eslint/require-await": {
       "count": 2
     },
+    "max-lines": {
+      "count": 1
+    },
     "revisum/test-title-format": {
       "count": 14
     }
@@ -1314,6 +1339,11 @@
   "test/containers/isolation/StoppedDockerDaemon.test.ts": {
     "revisum/test-title-format": {
       "count": 4
+    }
+  },
+  "test/containers/support/PlanRunInside.ts": {
+    "max-lines-per-function": {
+      "count": 1
     }
   },
   "test/containers/support/RealCommandRun.ts": {
@@ -1463,6 +1493,11 @@
   },
   "test/proofs/repo-rules/composition-root/ClearedRunRuns.ts": {
     "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "test/proofs/repo-rules/composition-root/DescribePlanError.ts": {
+    "max-lines": {
       "count": 1
     }
   },
@@ -1665,6 +1700,9 @@
     "@typescript-eslint/require-await": {
       "count": 4
     },
+    "max-lines": {
+      "count": 1
+    },
     "revisum/test-title-format": {
       "count": 29
     }
@@ -1747,12 +1785,18 @@
     }
   },
   "test/support/builders/DecodePng.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    },
     "no-nested-ternary": {
       "count": 1
     }
   },
   "test/support/builders/HostilePlans.ts": {
     "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 1
+    },
+    "max-lines-per-function": {
       "count": 1
     }
   },
@@ -1783,6 +1827,9 @@
   },
   "test/unit/cli/commands/examples/DraftCommand.ts": {
     "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "max-lines": {
       "count": 1
     }
   },
@@ -1825,6 +1872,9 @@
   },
   "test/unit/engine/approval/AgentLockdownApproval.test.ts": {
     "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "max-lines": {
       "count": 1
     },
     "revisum/test-title-format": {
@@ -1894,7 +1944,7 @@
       "count": 7
     },
     "max-lines-per-function": {
-      "count": 1
+      "count": 2
     },
     "no-restricted-syntax": {
       "count": 1
@@ -1936,6 +1986,9 @@
   "test/unit/engine/drafting/examples/CrawlOutcome.ts": {
     "@typescript-eslint/require-await": {
       "count": 4
+    },
+    "max-lines": {
+      "count": 1
     }
   },
   "test/unit/engine/evidence/EvidencePlanRunsUnchanged.test.ts": {
@@ -1997,6 +2050,9 @@
     "@typescript-eslint/require-await": {
       "count": 1
     },
+    "max-lines": {
+      "count": 1
+    },
     "revisum/test-title-format": {
       "count": 24
     }
@@ -2016,6 +2072,9 @@
     }
   },
   "test/unit/engine/plan/PlanDrafts.test.ts": {
+    "max-lines": {
+      "count": 1
+    },
     "revisum/test-title-format": {
       "count": 14
     }
@@ -2040,6 +2099,9 @@
     "@typescript-eslint/no-unused-vars": {
       "count": 1
     },
+    "max-lines": {
+      "count": 1
+    },
     "revisum/test-title-format": {
       "count": 21
     }
@@ -2049,6 +2111,9 @@
       "count": 1
     },
     "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    },
+    "max-lines": {
       "count": 1
     },
     "revisum/test-title-format": {
@@ -2100,6 +2165,9 @@
     }
   },
   "test/unit/engine/plan/readable/ReadablePlanErrors.test.ts": {
+    "max-lines": {
+      "count": 1
+    },
     "revisum/test-title-format": {
       "count": 31
     }
@@ -2128,6 +2196,9 @@
     }
   },
   "test/unit/engine/plan/readable/UnsafeReadableErrors.test.ts": {
+    "max-lines": {
+      "count": 1
+    },
     "revisum/test-title-format": {
       "count": 25
     }
@@ -2138,6 +2209,9 @@
     }
   },
   "test/unit/engine/plan/readable/UnsafeReadableTextForms.test.ts": {
+    "max-lines": {
+      "count": 1
+    },
     "revisum/test-title-format": {
       "count": 30
     }
@@ -2150,7 +2224,7 @@
       "count": 1
     },
     "max-lines-per-function": {
-      "count": 1
+      "count": 5
     },
     "no-nested-ternary": {
       "count": 3
@@ -2162,6 +2236,12 @@
     },
     "@typescript-eslint/no-unsafe-return": {
       "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 3
     },
     "no-nested-ternary": {
       "count": 2
@@ -2312,11 +2392,17 @@
     }
   },
   "test/unit/engine/project/ServiceCallDeclarations.test.ts": {
+    "max-lines": {
+      "count": 1
+    },
     "revisum/test-title-format": {
       "count": 32
     }
   },
   "test/unit/engine/project/StubAndStorageDeclarations.test.ts": {
+    "max-lines": {
+      "count": 1
+    },
     "revisum/test-title-format": {
       "count": 35
     }
@@ -2347,6 +2433,9 @@
       "count": 1
     },
     "@typescript-eslint/require-await": {
+      "count": 1
+    },
+    "max-lines": {
       "count": 1
     },
     "revisum/test-title-format": {
@@ -2388,6 +2477,9 @@
     "@typescript-eslint/require-await": {
       "count": 1
     },
+    "max-lines": {
+      "count": 1
+    },
     "no-restricted-syntax": {
       "count": 1
     }
@@ -2419,6 +2511,9 @@
     "@typescript-eslint/require-await": {
       "count": 1
     },
+    "max-lines": {
+      "count": 1
+    },
     "no-restricted-syntax": {
       "count": 1
     }
@@ -2440,6 +2535,9 @@
     "@typescript-eslint/no-unused-vars": {
       "count": 1
     },
+    "max-lines": {
+      "count": 1
+    },
     "revisum/test-title-format": {
       "count": 42
     }
@@ -2451,6 +2549,9 @@
     "@typescript-eslint/strict-boolean-expressions": {
       "count": 2
     },
+    "max-lines": {
+      "count": 1
+    },
     "revisum/test-title-format": {
       "count": 36
     }
@@ -2459,11 +2560,17 @@
     "@typescript-eslint/no-base-to-string": {
       "count": 1
     },
+    "max-lines": {
+      "count": 1
+    },
     "revisum/test-title-format": {
       "count": 21
     }
   },
   "test/unit/engine/run/executors/service-calls/examples/ShopService.ts": {
+    "max-lines": {
+      "count": 1
+    },
     "no-restricted-syntax": {
       "count": 1
     }
@@ -2715,6 +2822,9 @@
     "@typescript-eslint/require-await": {
       "count": 1
     },
+    "max-lines": {
+      "count": 1
+    },
     "revisum/test-title-format": {
       "count": 23
     }
@@ -2723,8 +2833,16 @@
     "@typescript-eslint/require-await": {
       "count": 1
     },
+    "max-lines": {
+      "count": 1
+    },
     "revisum/test-title-format": {
       "count": 12
+    }
+  },
+  "test/unit/runner/support/FakeContainerEngine.ts": {
+    "max-lines-per-function": {
+      "count": 1
     }
   },
   "test/unit/runner/support/LocalService.ts": {
