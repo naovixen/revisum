@@ -15,19 +15,38 @@ export function formSubmitControl(element: Element): Element[] {
     if (form === null) {
         return [];
     }
-    const controls: HTMLFormControlsCollection = Reflect.get(
-        HTMLFormElement.prototype,
-        "elements",
-        form,
+    const isSubmitOfForm = (control: Element): boolean => {
+        if (control instanceof HTMLButtonElement) {
+            return (
+                Reflect.get(HTMLButtonElement.prototype, "form", control) === form &&
+                Reflect.get(HTMLButtonElement.prototype, "type", control) === "submit"
+            );
+        }
+        if (control instanceof HTMLInputElement) {
+            const type: string = Reflect.get(HTMLInputElement.prototype, "type", control);
+            return (
+                Reflect.get(HTMLInputElement.prototype, "form", control) === form &&
+                (type === "submit" || type === "image")
+            );
+        }
+        return false;
+    };
+    // A form's `elements` leaves out image inputs, so its controls are found as the browser finds
+    // them: anywhere in its root, since the `form` attribute can place a control outside the form.
+    const controlsIn = (root: Node): NodeListOf<Element> => {
+        const selector = "button, input";
+        if (root instanceof Document) {
+            return Document.prototype.querySelectorAll.call(root, selector);
+        }
+        if (root instanceof DocumentFragment) {
+            return DocumentFragment.prototype.querySelectorAll.call(root, selector);
+        }
+        return Element.prototype.querySelectorAll.call(root as Element, selector);
+    };
+    const submit = Array.from(controlsIn(Node.prototype.getRootNode.call(form))).find(
+        isSubmitOfForm,
     );
-    return Array.from(controls)
-        .filter(
-            (control) =>
-                (control instanceof HTMLButtonElement && control.type === "submit") ||
-                (control instanceof HTMLInputElement &&
-                    (control.type === "submit" || control.type === "image")),
-        )
-        .slice(0, 1);
+    return submit === undefined ? [] : [submit];
 }
 
 // What the policy gate's runtime guard needs to know about an element besides its role and name,
