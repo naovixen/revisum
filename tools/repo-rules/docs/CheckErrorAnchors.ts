@@ -65,27 +65,47 @@ function namesBorrowedSet(tokens: readonly Token[], index: number): boolean {
     || (isPunctuator(before, ':') && (isPunctuator(after, ',') || isPunctuator(after, '}')));
 }
 
-// The string literals from `type Name =` or `const Name =` up to the ";" that ends the declaration,
-// and the sets it names on the way.
+// True for the Moved in `{ Own: 'own', Moved }`, a member named with no value of its own.
+const isShorthandMember = (tokens: readonly Token[], index: number): boolean =>
+  (isPunctuator(tokens[index - 1], '{') || isPunctuator(tokens[index - 1], ','))
+  && (isPunctuator(tokens[index + 1], ',') || isPunctuator(tokens[index + 1], '}'));
+
+// True for the string in `{ 'key': value }`, which names a member and is no code.
+const isQuotedKey = (tokens: readonly Token[], index: number): boolean =>
+  isPunctuator(tokens[index + 1], ':')
+  && (isPunctuator(tokens[index - 1], '{') || isPunctuator(tokens[index - 1], ',') || isPunctuator(tokens[index - 1], ';'));
+
+const declaresNameWith = (tokens: readonly Token[], name: string, keyword: string): number =>
+  tokens.findIndex((token, index) =>
+    isIdentifier(token, name) && isIdentifier(tokens[index - 1], keyword) && isPunctuator(tokens[index + 1], '='));
+
+// The string literals from `const Name =` or `type Name =` up to the ";" that ends the declaration,
+// and the sets it names on the way. A name with both is read at its const: the type only restates
+// the object's values, whichever comes first in the file.
 export function readDeclaredCodes(tokens: readonly Token[], name: string): DeclaredCodes | undefined {
-  const start = tokens.findIndex((token, index) =>
-    isIdentifier(token, name) && (isIdentifier(tokens[index - 1], 'type') || isIdentifier(tokens[index - 1], 'const'))
-    && isPunctuator(tokens[index + 1], '='));
+  const constantStart = declaresNameWith(tokens, name, 'const');
+  const isConstant = constantStart !== -1;
+  const start = isConstant ? constantStart : declaresNameWith(tokens, name, 'type');
   if (start === -1) {return undefined;}
   const codes: string[] = [];
   const borrowedSets = new Set<string>();
-  let depth = 0;
+  const openBrackets: Token[] = [];
   for (let index = start + 2; index < tokens.length; index++) {
     const token = tokens[index];
     if (token === undefined) {
       break;
     }
-    if (isPunctuator(token, '{') || isPunctuator(token, '[') || isPunctuator(token, '(')) {depth += 1;}
-    else if (isPunctuator(token, '}') || isPunctuator(token, ']') || isPunctuator(token, ')')) {depth -= 1;}
-    else if (isPunctuator(token, ';') && depth === 0) {break;}
-    else if (token.kind === TokenKind.String) {codes.push(token.text);}
-    // `typeof Set.Member` names the set, not `typeof`.
-    else if (token.kind === TokenKind.Identifier && token.text !== 'typeof' && namesBorrowedSet(tokens, index)) {
+    const isDirectlyInBraces = isPunctuator(openBrackets.at(-1), '{');
+    if (isPunctuator(token, '{') || isPunctuator(token, '[') || isPunctuator(token, '(')) {openBrackets.push(token);}
+    else if (isPunctuator(token, '}') || isPunctuator(token, ']') || isPunctuator(token, ')')) {openBrackets.pop();}
+    else if (isPunctuator(token, ';') && openBrackets.length === 0) {break;}
+    else if (token.kind === TokenKind.String) {
+      if (!(isDirectlyInBraces && isQuotedKey(tokens, index))) {codes.push(token.text);}
+    }
+    // `typeof Set.Member` names the set, not `typeof`. A field's type inside a type literal says
+    // what the field holds, and adds no codes to the set.
+    else if (token.kind === TokenKind.Identifier && token.text !== 'typeof' && (isConstant || !openBrackets.some((bracket) => isPunctuator(bracket, '{')))
+      && (namesBorrowedSet(tokens, index) || (isConstant && isDirectlyInBraces && isShorthandMember(tokens, index)))) {
       borrowedSets.add(token.text);
     }
   }
