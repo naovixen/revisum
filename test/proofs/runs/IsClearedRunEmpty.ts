@@ -1,5 +1,5 @@
-// Compile-time guarantees around the policy gate. Type-checked by policy-type-guarantees.test.ts
-// and by type-check.test.ts, never run.
+// Compile-time guarantees around the policy gate. Type-checked by PolicyTypeGuarantees.test.ts
+// and by TypeCheck.test.ts, never run.
 //   - A run takes only a ClearedRun, and only the policy gate makes one: a parsed plan, the plan held
 //     by a cleared run, an object written by hand and a spread copy of a cleared run all fail to
 //     type-check as one. So no run can be written under a project, target or standing other than

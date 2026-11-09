@@ -4,8 +4,8 @@
 // beside this one asks the gate directly; this one proves run() lets the guard decide, for every
 // action kind, the dialog step included.
 //
-// The real CDP and Playwright drivers ignore the guard until the CDP driver wires it in, so they are not
-// run here.
+// The real CDP driver calls the guard too, but it needs a browser, so it is not run here:
+// test/browser/input/DriverActionGuard.test.ts shows it honouring the guard.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
