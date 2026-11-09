@@ -30,6 +30,7 @@ import {
     formWithSubmitPage,
 } from "../dialogs/support/DialogOnPressPages.ts";
 import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
+import { PolicyRuleId, PolicyVerdictKind } from "@revisum/contracts";
 
 shareBrowserInThisFile();
 
@@ -151,7 +152,7 @@ describe("Using the real browser driver", () => {
                     const asked: ResolvedElement[] = [];
                     const noting: ActionGuard = (element) => {
                         asked.push(element);
-                        return { kind: "deny", rule: "irreversible-action", stepIndex: 1 };
+                        return { kind: PolicyVerdictKind.Deny, rule: PolicyRuleId.IrreversibleAction, stepIndex: 1 };
                     };
                     const acted = await onPage(formWithSubmitPage(inputName), (session) =>
                         session.act(harness.actionStep(click(testId(FIELD))), noting),

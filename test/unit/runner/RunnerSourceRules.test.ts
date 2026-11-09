@@ -16,15 +16,16 @@ import type { Token } from '../../../tools/repo-rules/naming/LintRepository.ts';
 import { codeTokens, listSourceFiles } from '../../../tools/repo-rules/ListSourceFiles.ts';
 import { fakeContainerEngine } from './support/FakeContainerEngine.ts';
 import { egressPolicy, imageDigest, PINNED_IMAGE_ID } from './examples/DeclaredService.ts';
+import { TokenKind } from '../../../tools/repo-rules/naming/LintRepository.ts';
 
 const runnerSources = (): readonly { readonly path: string; readonly tokens: readonly Token[] }[] =>
   listSourceFiles(REPOSITORY_ROOT, ['packages/runner/src']).map((path) => ({ path, tokens: codeTokens(readFileSync(join(REPOSITORY_ROOT, path), 'utf8')) }));
 
 // A package's import name is the one place the product name may be written: the packages are named that.
-const isPackageName = (token: Token): boolean => token.kind === 'string' && token.text.startsWith(`@${PRODUCT.name}/`);
+const isPackageName = (token: Token): boolean => token.kind === TokenKind.String && token.text.startsWith(`@${PRODUCT.name}/`);
 
 const productNameUses = (tokens: readonly Token[]): readonly string[] =>
-  tokens.filter((token) => (token.kind === 'identifier' || token.kind === 'string') && !isPackageName(token) && token.text.toLowerCase().includes(PRODUCT.name.toLowerCase()))
+  tokens.filter((token) => (token.kind === TokenKind.Identifier || token.kind === TokenKind.String) && !isPackageName(token) && token.text.toLowerCase().includes(PRODUCT.name.toLowerCase()))
     .map((token) => token.text);
 
 test('the runner\'s code never spells the product name, beyond its packages\' import names', () => {

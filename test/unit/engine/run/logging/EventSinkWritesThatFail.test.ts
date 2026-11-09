@@ -11,11 +11,12 @@ import {
     type EventInput,
     type EventSink,
 } from "@revisum/engine";
+import { AuditEventKind, ActorType } from "@revisum/contracts";
 
 // No minting code exists for tests, so this one place builds the actor directly.
-const ACTOR = { actor: "actor-hash", actorType: "agent" } as DerivedActor;
-const SUBMITTED: EventInput = { kind: "plan.submitted", runId: "run-0001" };
-const FINISHED: EventInput = { kind: "run.finished", runId: "run-0001" };
+const ACTOR = { actor: "actor-hash", actorType: ActorType.Agent } as DerivedActor;
+const SUBMITTED: EventInput = { kind: AuditEventKind.PlanSubmitted, runId: "run-0001" };
+const FINISHED: EventInput = { kind: AuditEventKind.RunFinished, runId: "run-0001" };
 
 let folder: string;
 let path: string;

@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
 import { test } from 'node:test';
-import { UntrustedRunOutcomeKind, createRunService, type PlanErrorCode } from '@revisum/engine';
+import { UntrustedRunOutcomeKind, createRunService, PlanErrorCode } from '@revisum/engine';
 import { PRIVATE_MARKER } from './examples/GoldenPlan.ts';
 import { accepted, rejection } from '../run/values/examples/RunPlan.ts';
 import {
@@ -170,7 +170,7 @@ const REFUSED: readonly RefusedCase[] = [
 
 // The path of a misplaced step: the step itself, or its type field, as unknown_step reports it.
 const acceptsPath = (refused: RefusedCase, path: string): boolean =>
-  path === refused.path || (refused.code === 'misplaced_step' && path === `${refused.path}.type`);
+  path === refused.path || (refused.code === PlanErrorCode.MisplacedStep && path === `${refused.path}.type`);
 
 for (const refused of REFUSED) {
   test(`${refused.name} is refused with ${refused.code} at ${refused.path}`, () => {

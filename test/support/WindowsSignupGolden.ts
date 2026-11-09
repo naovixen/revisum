@@ -2,6 +2,7 @@
 // steps so the result holds no screenshot, and the manifest and hashes of a real browser run of it.
 // tools/test-runner/RecordGoldens.ts runs this file, on Windows x64 only, and writes what it prints.
 import { signupHarness, signupPlan } from "./browser/harnesses/SignupHarness.ts";
+import { TerminalState } from "@revisum/contracts";
 
 const TARGET_ID = "cdp-chromium";
 const FOLDER = "replay/windows-signup";
@@ -12,7 +13,7 @@ export async function windowsSignupGolden(): Promise<Readonly<Record<string, unk
     const recording = await signupHarness();
     try {
         const { result } = await recording.run(recording.plan(plan), TARGET_ID);
-        if (result.state !== "Passed") {
+        if (result.state !== TerminalState.Passed) {
             throw new Error(
                 `the sign-up run ended ${result.state}: ${JSON.stringify(result.steps)}`,
             );

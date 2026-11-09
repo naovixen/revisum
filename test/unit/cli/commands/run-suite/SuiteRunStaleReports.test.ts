@@ -12,6 +12,7 @@ import {
     suiteThatWrites,
     writeReportInto,
 } from "./support/SuiteThatWrites.ts";
+import { SuitePass } from "@revisum/contracts";
 
 const PASSING_REPORT = passingReportWithNothingToReview();
 
@@ -91,11 +92,11 @@ describe("Using a suite run", () => {
                     suiteThatWrites({
                         duringSuite: (folder) => writeReportInto(folder, PASSING_REPORT),
                     }),
-                    { outputDirectory, pass: "proposal" },
+                    { outputDirectory, pass: SuitePass.Proposal },
                 );
                 const result = await runSuiteOn(suiteThatWrites({}), {
                     outputDirectory,
-                    pass: "gating",
+                    pass: SuitePass.Gating,
                 });
                 assertReadNoReport(result);
             });

@@ -29,6 +29,7 @@ import {
 } from '@revisum/engine';
 import { scriptsEnabled } from '#test-support/browser/ScriptsEnabled.ts';
 import { fakeExploreDriver } from '#test-support/fakes/session/FakeExploreDriver.ts';
+import { DriverErrorCode } from '@revisum/contracts';
 
 // ---- The types the spec names, as these tests read them --------------------------------------------
 
@@ -202,7 +203,7 @@ export function spyExploreDriver(site: FakeSite): SpyExploreDriver {
     async navigate(url) {
       calls.push({ method: 'navigate', url });
       const page = pageAt(site, url);
-      if (page === undefined || page.fails === true) return failure({ code: 'navigation-failed', detail: `no page at ${url}` });
+      if (page === undefined || page.fails === true) return failure({ code: DriverErrorCode.NavigationFailed, detail: `no page at ${url}` });
       current = { url, page };
       return success(undefined);
     },

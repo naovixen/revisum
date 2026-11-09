@@ -27,6 +27,7 @@ import {
     type NetworkHarness,
 } from "../network/support/NetworkRun.ts";
 import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
+import { StepOutcome } from "@revisum/contracts";
 
 shareBrowserInThisFile();
 
@@ -227,7 +228,7 @@ describe("Using the real browser driver", () => {
                     assert.equal(relayed.relay.timesTampered(), 1, "its decision was refused");
                     assert.equal(result.state, "Errored", JSON.stringify(result.steps));
                     const codes = result.steps.flatMap((step) =>
-                        step.outcome === "failed" ? [step.code] : [],
+                        step.outcome === StepOutcome.Failed ? [step.code] : [],
                     );
                     assert.deepEqual(codes, [ADAPTER_ERROR], JSON.stringify(result.steps));
                 } finally {

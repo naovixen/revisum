@@ -6,13 +6,14 @@ import { describe, test } from "node:test";
 import type { EgressEvent } from "@revisum/contracts";
 import { recordedReport } from "../../../engine/evidence/examples/EvidenceRun.ts";
 import { runDeclaredSuite, type SuiteBehaviour } from "./examples/SuiteRun.ts";
+import { EgressDecision, EgressChannel } from "@revisum/contracts";
 
 const REFUSED_ORIGIN = "outside.test:443";
 
 const blockedByTheProxy: EgressEvent = {
     origin: REFUSED_ORIGIN,
-    channel: "unattributed",
-    decision: "blocked",
+    channel: EgressChannel.Unattributed,
+    decision: EgressDecision.Blocked,
 };
 
 const SETUP_ENDINGS: readonly {

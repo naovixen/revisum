@@ -19,6 +19,7 @@ import { UPLOAD_FIXTURE, capabilityCdpDriver, capabilityDrivers, capabilityHarne
 import { BROWSERS } from '#test-support/browser/Browsers.ts';
 import { shareBrowserInThisFile } from '#test-support/browser/ShareBrowserInThisFile.ts';
 import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
+import { PolicyRuleId, PolicyVerdictKind } from '@revisum/contracts';
 
 shareBrowserInThisFile();
 
@@ -26,8 +27,8 @@ let capability: CapabilityHarness;
 before(async () => { capability = await capabilityHarness(2000); });
 after(async () => { await capability.close(); });
 
-const ALLOW: GuardVerdict = { kind: 'allow' };
-const DENY: GuardVerdict = { kind: 'deny', rule: 'irreversible-action', stepIndex: 1 };
+const ALLOW: GuardVerdict = { kind: PolicyVerdictKind.Allow };
+const DENY: GuardVerdict = { kind: PolicyVerdictKind.Deny, rule: PolicyRuleId.IrreversibleAction, stepIndex: 1 };
 
 type GuardCall = { readonly element: ResolvedElement; readonly dialogText: string | null };
 // A guard that answers with the given verdict and keeps every question it was asked.
@@ -135,7 +136,7 @@ for (const { targetId, actions } of DRIVERS) {
 
 describe(`the runtime guard on dialogs: ${BrowserTarget.Chrome}`, () => {
   test('a denied dialog answer ends with policy-denied; the guard gets the dialog text and an empty element', async () => {
-    const { guard, calls } = spyGuard({ kind: 'deny', rule: 'irreversible-dialog', stepIndex: 2 });
+    const { guard, calls } = spyGuard({ kind: PolicyVerdictKind.Deny, rule: PolicyRuleId.IrreversibleDialog, stepIndex: 2 });
     await withGuardPage(BrowserTarget.Chrome, async (session) => {
       assert.ok((await session.act(capability.actionStep(click(role('button', 'Ask a question'))), allowEveryAction)).ok, 'the click opens the dialog');
       const answered = await session.act(capability.actionStep({ type: 'dialog', action: 'accept', expectText: 'Keep the draft?' }), guard);

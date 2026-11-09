@@ -20,6 +20,7 @@ import {
   type Plan, type Project, type StepType,
 } from '@revisum/engine';
 import { TARGET_ID, TEST_SERVICE_SECRET_NAMES, goldenPlan, goldenPlanNames, testProject, type JsonRecord } from '../../examples/GoldenPlan.ts';
+import { ElementStateKind } from '@revisum/contracts';
 
 export { ORIGIN, PRIVATE_MARKER, TARGET_ID, goldenPlan, goldenPlanNames, signupPlan, type JsonRecord } from '../../examples/GoldenPlan.ts';
 
@@ -85,7 +86,7 @@ function everyElementCheck(): JsonRecord {
   const states = ELEMENT_STATE_KINDS.map((kind, index) => {
     const roleName = ROLES[index % ROLES.length] ?? 'button';
     // A positioned locator may not be counted, so absent keeps its locator unpositioned.
-    const position = kind === 'absent' ? undefined : POSITIONS[index % POSITIONS.length];
+    const position = kind === ElementStateKind.Absent ? undefined : POSITIONS[index % POSITIONS.length];
     return expect(role(`Control ${index}`, roleName, position), { kind }, `checks.state-${kind}`);
   });
   const remainingRoles = ROLES.slice(ELEMENT_STATE_KINDS.length).map((roleName, index) => click(role(`Remaining ${index}`, roleName)));

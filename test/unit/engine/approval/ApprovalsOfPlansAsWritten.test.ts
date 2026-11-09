@@ -20,6 +20,7 @@ import {
     type TestRepository,
 } from "./examples/MemoryApprovalStore.ts";
 import { signupPlan, withValue, type JsonRecord } from "../plan/examples/GoldenPlan.ts";
+import { ApprovalSubjectKind } from "@revisum/contracts";
 
 const READABLE_PLAN_PATH = "plans/signup.plan";
 
@@ -33,7 +34,7 @@ const parsedInRepository = async (repository: TestRepository, raw: unknown): Pro
 };
 
 const planSubject = (plan: Plan, path: string): ApprovalSubject => ({
-    kind: "plan",
+    kind: ApprovalSubjectKind.Plan,
     hash: planHash(plan),
     path,
 });
@@ -63,7 +64,7 @@ describe("Using the approval verifier", () => {
                     "solo",
                     async (repository) => {
                         const subject: ApprovalSubject = {
-                            kind: "plan",
+                            kind: ApprovalSubjectKind.Plan,
                             hash,
                             path: READABLE_PLAN_PATH,
                         };

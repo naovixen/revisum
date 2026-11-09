@@ -17,6 +17,7 @@ import {
     withExploreRun,
     type ExploreRun,
 } from "./examples/ExploreCommandPorts.ts";
+import { GuaranteeLevel } from "@revisum/contracts";
 
 function assertStoppedBeforeTheBrowserAndPlanner(run: ExploreRun, code: string): void {
     assert.deepEqual(exploreErrorCodes(run), [code], run.outcome.stdout);
@@ -87,7 +88,7 @@ describe("Using the draft command's explore mode", () => {
                         argv: (site) => exploreArguments(home(site), ["--json"]),
                         runner: (site) =>
                             watchedFakeRunner({
-                                level: "isolated",
+                                level: GuaranteeLevel.Isolated,
                                 output: containerPageMap(site.origin).printed,
                             }),
                         versionControl: (project) => {

@@ -11,6 +11,7 @@ import {
   APPROVERS_PATH, CODE_OWNERS_PATH, PLAN_PATH, PROJECT_PATH, approversOf, assertRefused, eventsOfKind, loadForChange,
   memoryEventSink, withRepository, type FixtureRepository,
 } from '../approval/examples/MemoryApprovalStore.ts';
+import { AccountType } from '@revisum/contracts';
 
 const PRODUCTION_ORIGIN = 'https://shop.example.com';
 const SMUGGLED_SECRET = 'PRODUCTION_DATABASE_URL';
@@ -145,7 +146,7 @@ test('an approvers.json edited in the change does not make its new maintainer ab
     const edited = structuredClone(approversOf(fixture));
     if (edited.agentLockdown !== undefined) edited.agentLockdown.maintainer = 'agent-account';
     fixture.workingCopy[APPROVERS_PATH] = edited;
-    fixture.landings.push({ commit: 'commit-agent-merge', branch: 'main', login: 'agent-account', type: 'user', at: '2026-10-25T09:00:00Z' });
+    fixture.landings.push({ commit: 'commit-agent-merge', branch: 'main', login: 'agent-account', type: AccountType.User, at: '2026-10-25T09:00:00Z' });
   });
 });
 
@@ -157,7 +158,7 @@ test('the same maintainer, once named in approvers.json on the protected branch,
   }, (fixture) => {
     const lockdown = approversOf(fixture).agentLockdown;
     if (lockdown !== undefined) lockdown.maintainer = 'agent-account';
-    fixture.landings.push({ commit: 'commit-agent-merge', branch: 'main', login: 'agent-account', type: 'user', at: '2026-10-25T09:00:00Z' });
+    fixture.landings.push({ commit: 'commit-agent-merge', branch: 'main', login: 'agent-account', type: AccountType.User, at: '2026-10-25T09:00:00Z' });
     fixture.lastCommitsOnProtectedBranch = { [PLAN_PATH]: 'commit-agent-merge' };
   });
 });

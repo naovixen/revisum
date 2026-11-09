@@ -14,6 +14,7 @@ import {
   APPROVERS_PATH, CODE_OWNERS_PATH, PROJECT_PATH, approversOf, assertRefused, loadForChange, memoryEventSink, withRepository,
   type FixtureRepository, type TestRepository,
 } from '../approval/examples/MemoryApprovalStore.ts';
+import { AccountType } from '@revisum/contracts';
 
 const PRODUCTION_ORIGIN = 'https://shop.example.com';
 const APPLICATION_CODE = 'src/signup.ts';
@@ -129,7 +130,7 @@ test('with an edited approvers.json reachable in the working copy, its new maint
     const edited = structuredClone(approversOf(fixture));
     if (edited.agentLockdown !== undefined) edited.agentLockdown.maintainer = 'build-agent';
     fixture.workingCopy[APPROVERS_PATH] = edited;
-    fixture.landings.push({ commit: 'commit-agent-merge', branch: 'main', login: 'build-agent', type: 'user', at: '2026-10-25T09:00:00Z' });
+    fixture.landings.push({ commit: 'commit-agent-merge', branch: 'main', login: 'build-agent', type: AccountType.User, at: '2026-10-25T09:00:00Z' });
   });
 });
 

@@ -1,6 +1,7 @@
 import { success, type WorkloadRunner } from "@revisum/engine";
 import { leaveOut, type OptionalMember } from "../LeaveOut.ts";
 import { recordCalls, type Recorded } from "../RecordCalls.ts";
+import { WorkloadOutcomeKind } from "@revisum/contracts";
 
 // A workload that says nothing and exits 0.
 export function fakeWorkloadRunner(
@@ -11,7 +12,7 @@ export function fakeWorkloadRunner(
         run: () =>
             Promise.resolve(
                 success({
-                    kind: "exited",
+                    kind: WorkloadOutcomeKind.Exited,
                     exitCode: 0,
                     egressEvents: [],
                     stdout: { bytes: new Uint8Array(), truncated: false },

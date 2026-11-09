@@ -10,6 +10,7 @@ import { type EgressProxy } from '@revisum/runner';
 import { startedEgressProxy } from '#test-support/StartedEgressProxy.ts';
 import { connectThroughProxy, getThroughProxy, startUpstream, UPSTREAM_BODY, type Upstream } from '../support/GetThroughProxy.ts';
 import { declaredService, egressPolicy, fakeResolver, origin, type FakeResolver } from '../examples/DeclaredService.ts';
+import { EgressDecision } from '@revisum/contracts';
 
 const PUBLIC_ADDRESS = '93.184.215.14';
 
@@ -83,7 +84,7 @@ after(async () => {
 });
 
 const dialledHosts = (): readonly string[] => upstream.dialled.map((dialled) => dialled.address);
-const blockedOrigins = (): readonly string[] => proxy.decisions().filter((entry) => entry.decision === 'blocked').map((entry) => String(entry.origin));
+const blockedOrigins = (): readonly string[] => proxy.decisions().filter((entry) => entry.decision === EgressDecision.Blocked).map((entry) => String(entry.origin));
 
 describe('a declared origin whose name resolves to a refused address is refused at resolve time', () => {
   for (const name of REFUSED_NAMES) {

@@ -22,12 +22,13 @@
 // "Konto löschen" (delete account) is denied as irreversible there, and "Create account" is not.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createRunService, admitDraft, assertBranded, failure, planHash, planStanding, policyGate, readPlanText, success, unverified, writePlanText, type BrowserDriver, type DerivedActor, type DraftError, type Plan, type PlanDraft, type PlanError, type PlanFormat, type PlanParse, type PlanProvenance, type PlanSource, type ProvenanceBasis } from '@revisum/engine';
+import { createRunService, admitDraft, assertBranded, failure, planHash, planStanding, policyGate, readPlanText, success, unverified, writePlanText, type BrowserDriver, type DerivedActor, type DraftError, type Plan, type PlanDraft, type PlanError, PlanFormat, type PlanParse, type PlanProvenance, PlanSource, ProvenanceBasis } from '@revisum/engine';
 import { baseUrlOf, clearRun, trustedProjectFrom } from '../../../support/builders/ClearRun.ts';
 import { memoryApprovalStore, memoryEventSink, parsedSignupPlan, withRepository } from '../approval/examples/MemoryApprovalStore.ts';
 import { ORIGIN, accountClosurePlan, defaultParser, signupPlan, testProject, testProjectInput, withValue, type JsonRecord } from './examples/GoldenPlan.ts';
 import { fakeDriver } from '#test-support/fakes/session/FakeDriver.ts';
 import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
+import { PolicyVerdictKind, PlanErrorCode, UnavailableReason, ApprovalSubjectKind } from '@revisum/contracts';
 
 // ---- One draft fixture per route ------------------------------------------------------------------------
 
@@ -36,23 +37,23 @@ type Route = { readonly format: PlanFormat; readonly basis: ProvenanceBasis; rea
 // 'explore-draft' is the explore route; it is named beside
 // PlanSource so this file compiles before and after the source joins PLAN_SOURCES.
 const ROUTES: { readonly [Source in PlanSource | 'explore-draft']: Route } = {
-  'hand-written': { format: 'text', basis: 'declared' },
-  'customer-llm': { format: 'json', basis: 'declared' },
-  'draft-command': { format: 'text', basis: 'core-recorded', reference: 'specs/signup.md' },
-  'ticket': { format: 'text', basis: 'core-recorded', reference: '42' },
-  'builder': { format: 'text', basis: 'core-recorded', reference: 'builder-session-1' },
-  'recorder': { format: 'text', basis: 'core-recorded', reference: 'recorder-session-1' },
-  'chat': { format: 'json', basis: 'core-recorded', reference: 'conversation-7' },
-  'explore-draft': { format: 'text', basis: 'core-recorded', reference: `sha256:${'c'.repeat(64)}` },
+  'hand-written': { format: PlanFormat.Text, basis: ProvenanceBasis.Declared },
+  'customer-llm': { format: PlanFormat.Json, basis: ProvenanceBasis.Declared },
+  'draft-command': { format: PlanFormat.Text, basis: ProvenanceBasis.CoreRecorded, reference: 'specs/signup.md' },
+  'ticket': { format: PlanFormat.Text, basis: ProvenanceBasis.CoreRecorded, reference: '42' },
+  'builder': { format: PlanFormat.Text, basis: ProvenanceBasis.CoreRecorded, reference: 'builder-session-1' },
+  'recorder': { format: PlanFormat.Text, basis: ProvenanceBasis.CoreRecorded, reference: 'recorder-session-1' },
+  'chat': { format: PlanFormat.Json, basis: ProvenanceBasis.CoreRecorded, reference: 'conversation-7' },
+  'explore-draft': { format: PlanFormat.Text, basis: ProvenanceBasis.CoreRecorded, reference: `sha256:${'c'.repeat(64)}` },
 };
 const isSource = (key: string): key is PlanSource => Object.hasOwn(ROUTES, key);
 const SOURCES: readonly PlanSource[] = Object.keys(ROUTES).filter(isSource);
 // The sources a caller may declare, and the routes only core may record.
-const DECLARABLE: readonly PlanSource[] = SOURCES.filter((source) => ROUTES[source].basis === 'declared');
-const CORE_RECORDED: readonly PlanSource[] = SOURCES.filter((source) => ROUTES[source].basis === 'core-recorded');
+const DECLARABLE: readonly PlanSource[] = SOURCES.filter((source) => ROUTES[source].basis === ProvenanceBasis.Declared);
+const CORE_RECORDED: readonly PlanSource[] = SOURCES.filter((source) => ROUTES[source].basis === ProvenanceBasis.CoreRecorded);
 
 // The provenance a hand-written file gets when no source is declared.
-const DEFAULT_PROVENANCE: PlanProvenance = { source: 'hand-written', basis: 'declared' };
+const DEFAULT_PROVENANCE: PlanProvenance = { source: PlanSource.HandWritten, basis: ProvenanceBasis.Declared };
 
 function provenanceOf(source: PlanSource): PlanProvenance {
   const route = ROUTES[source];
@@ -68,7 +69,7 @@ function draftWith(format: PlanFormat, content: string, provenance: PlanProvenan
 function contentOf(plan: JsonRecord, format: PlanFormat): string {
   const parsed = defaultParser()(plan);
   if (!parsed.ok) throw new Error(`the fixture plan was refused: ${JSON.stringify(parsed.error)}`);
-  return format === 'text' ? writePlanText(parsed.value) : JSON.stringify(plan, null, 2);
+  return format === PlanFormat.Text ? writePlanText(parsed.value) : JSON.stringify(plan, null, 2);
 }
 
 // The draft the route for `source` would produce for `plan`.
@@ -77,13 +78,13 @@ const draftOf = (source: PlanSource, plan: JsonRecord, format: PlanFormat = ROUT
 
 // The JSON the parser should receive for a draft: what the text reads to, or the JSON itself.
 function expectedParserInput(draft: PlanDraft): unknown {
-  if (draft.format === 'json') return JSON.parse(draft.content);
+  if (draft.format === PlanFormat.Json) return JSON.parse(draft.content);
   const read = readPlanText(draft.content, testProject().limits);
   if (!read.ok) assert.fail(`the fixture text was refused: ${JSON.stringify(read.error)}`);
   return read.value.json;
 }
 
-const someActor = (): DerivedActor => unverified({ kind: 'plan', hash: planHash(parsedSignupPlan()) }, 'local');
+const someActor = (): DerivedActor => unverified({ kind: ApprovalSubjectKind.Plan, hash: planHash(parsedSignupPlan()) }, 'local');
 const shown = (errors: readonly DraftError[]): string => JSON.stringify(errors);
 
 // ---- Spies ------------------------------------------------------------------------------------------------
@@ -111,7 +112,7 @@ function loggingDriver(log: CallLog): BrowserDriver {
     supports: () => { log.push('driver'); return success(true); },
     open: () => {
       log.push('driver');
-      return Promise.resolve(failure({ reason: 'launch-failed', detail: 'the logging driver opens no browser' }));
+      return Promise.resolve(failure({ reason: UnavailableReason.LaunchFailed, detail: 'the logging driver opens no browser' }));
     },
   });
 }
@@ -163,7 +164,7 @@ for (const source of DECLARABLE) {
 
   test(`a ${source} draft the parser refuses is not admitted, even when the text reads cleanly`, () => {
     // A mutant parser that refuses everything: had admitDraft built the plan itself, it would pass.
-    const refusal: readonly PlanError[] = [{ code: 'unknown_step', path: '$.steps[0]' }];
+    const refusal: readonly PlanError[] = [{ code: PlanErrorCode.UnknownStep, path: '$.steps[0]' }];
     const refusing: PlanParse = () => failure(refusal);
     const admitted = admitDraft(draftOf(source, signupPlan()), refusing, memoryEventSink(), someActor());
     assert.equal(admitted.ok, false);
@@ -222,7 +223,7 @@ for (const format of ['text', 'json'] as const) {
 test('a draft declared as customer-llm keeps that source, basis declared', () => {
   // The counter-example to the default: a declared source is recorded as declared, not replaced.
   const events = memoryEventSink();
-  const declared: PlanProvenance = { source: 'customer-llm', basis: 'declared' };
+  const declared: PlanProvenance = { source: PlanSource.CustomerLlm, basis: ProvenanceBasis.Declared };
   admitDraft(draftWith('json', contentOf(signupPlan(), 'json'), declared), defaultParser(), events, someActor());
   assert.deepEqual(events.recorded[0]?.event.planProvenance, declared);
 });
@@ -230,7 +231,7 @@ test('a draft declared as customer-llm keeps that source, basis declared', () =>
 for (const source of SOURCES) {
   test(`a draft claiming a core-recorded basis for ${source} is refused with untrusted-source`, () => {
     const events = memoryEventSink();
-    const claim: PlanProvenance = { source, basis: 'core-recorded' };
+    const claim: PlanProvenance = { source, basis: ProvenanceBasis.CoreRecorded };
     const admitted = admitDraft(draftWith('text', contentOf(signupPlan(), 'text'), claim), defaultParser(), events, someActor());
     if (admitted.ok) assert.fail(`a claimed core-recorded basis for ${source} was admitted`);
     assert.ok(shown(admitted.error).includes('untrusted-source'), shown(admitted.error));
@@ -261,7 +262,7 @@ for (const source of DECLARABLE) {
   for (const format of ['text', 'json'] as const) {
     test(`refusing a ${source} draft in ${format} form appends one plan.rejected event with its source and basis`, () => {
       const events = memoryEventSink();
-      const content = format === 'text'
+      const content = format === PlanFormat.Text
         ? 'Teleport to "nowhere"\n'
         : JSON.stringify({ ...signupPlan(), steps: [{ type: 'teleport', to: 'nowhere' }] });
       const admitted = admitDraft(draftWith(format, content, provenanceOf(source)), defaultParser(), events, someActor());
@@ -287,7 +288,7 @@ async function treatmentOf(draft: PlanDraft): Promise<string> {
   });
   return JSON.stringify({
     hash: planHash(admitted.value),
-    decision: decision.kind === 'deny' ? `deny ${decision.rule} at ${String(decision.stepIndex)}` : 'allow',
+    decision: decision.kind === PolicyVerdictKind.Deny ? `deny ${decision.rule} at ${String(decision.stepIndex)}` : 'allow',
     withoutApproval: planStanding(admitted.value, memoryApprovalStore([])).mode,
     withTheSignUpApproval: approvedStanding,
   });

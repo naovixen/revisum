@@ -8,6 +8,7 @@ import { ORIGIN } from './SecretRun.ts';
 import { FAKE_ELEMENT } from '#test-support/fakes/session/FakePage.ts';
 import { fakeSession } from '#test-support/fakes/session/FakeSession.ts';
 import { fakeDriverOpening } from '#test-support/fakes/session/FakeDriver.ts';
+import { StepType, SemanticLocatorKind } from '@revisum/contracts';
 
 export type EchoPage = {
   // Texts shown by elements found by test id, keyed by the test id.
@@ -20,7 +21,7 @@ export type EchoPageCalls = { navigations: number; actions: number; probes: numb
 
 // Fields are found by their label, shown texts by their test id; anything else is a key of its own.
 function elementKey(locator: ResolvedLocator): string {
-  if (locator.by === 'label') return `label:${locator.label}`;
+  if (locator.by === SemanticLocatorKind.Label) return `label:${locator.label}`;
   if (locator.by === 'testId') return `testId:${locator.testId}`;
   return JSON.stringify(locator);
 }
@@ -45,7 +46,7 @@ export function echoPageDriver(page: EchoPage): BrowserDriver & { readonly calls
     page: () => Promise.resolve(success({ url: `${ORIGIN}/`, title: 'Echo page', meta: [], canonicalUrl: null })),
     act: (action) => {
       calls.actions++;
-      if (action.type === 'fill') {
+      if (action.type === StepType.Fill) {
         fieldValues.set(elementKey(action.locator), typedText(action.value, page));
       }
       return Promise.resolve(success(undefined));
@@ -55,7 +56,7 @@ export function echoPageDriver(page: EchoPage): BrowserDriver & { readonly calls
       const key = elementKey(locator);
       const typed = fieldValues.get(key);
       if (typed !== undefined) return Promise.resolve(shown('', typed));
-      const text = locator.by === 'testId' ? page.texts?.[locator.testId] : undefined;
+      const text = locator.by === SemanticLocatorKind.TestId ? page.texts?.[locator.testId] : undefined;
       return Promise.resolve(text === undefined ? { count: 0 } : shown(text, null));
     },
   });

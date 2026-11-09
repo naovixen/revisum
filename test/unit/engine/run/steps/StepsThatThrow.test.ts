@@ -8,11 +8,12 @@ import { failure, type RunEventSink, type Session, type SessionTab } from "@revi
 import { fakeSession } from "#test-support/fakes/session/FakeSession.ts";
 import { fakeSessionOnOrders, runOnFakeSession, stepSummaries } from "../examples/RunOnFakeSession.ts";
 import { CLOSING_CHECK, OPEN_CART, unsafePlan, type JsonRecord } from "../../plan/unsafe-features/examples/UnsafePlan.ts";
+import { DriverErrorCode } from "@revisum/contracts";
 
 const ADAPTER_BROKE = "the adapter broke";
 const breaks = (): Promise<never> => Promise.reject(new Error(ADAPTER_BROKE));
 const cannotRead = () =>
-    Promise.resolve(failure({ code: "page-unreadable", detail: ADAPTER_BROKE } as const));
+    Promise.resolve(failure({ code: DriverErrorCode.PageUnreadable, detail: ADAPTER_BROKE } as const));
 
 const STATUS: JsonRecord = { by: "testId", testId: "status" };
 const FAILING_CHECK: JsonRecord = {

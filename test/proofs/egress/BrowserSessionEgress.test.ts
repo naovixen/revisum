@@ -42,6 +42,7 @@ import { ATTEMPT_SETTLED, ATTEMPT_STATE, attemptPage } from "./support/EgressCha
 import { driverWithEgress, hostBrowserDrivers } from "./support/HostBrowserDrivers.ts";
 import { startRecordingProxy, type RecordingProxy } from "./support/StartRecordingProxy.ts";
 import { baseUrlOf } from "#test-support/builders/ClearRun.ts";
+import { Engine } from "@revisum/contracts";
 
 const TARGET = BrowserTarget.Chrome;
 const ADAPTER = ADAPTER_OF_TARGET[TARGET];
@@ -248,7 +249,7 @@ describe("Using the driver's session egress", () => {
         describe("when a session opens", () => {
             test("then it should refuse before starting any egress", async () => {
                 const watched = watchedSource(realEgressSource);
-                const target: Target = { ...harness.target(TARGET), engine: "firefox" };
+                const target: Target = { ...harness.target(TARGET), engine: Engine.Firefox };
                 const opened = await openOutcome(driverOn(watched.source), target);
                 assert.ok(!opened.ok, "the session opened on another engine");
                 assert.equal(opened.error.reason, "engine-not-supported");

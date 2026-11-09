@@ -24,6 +24,7 @@ import { declaredService, egressPolicy, fakeResolver, hostOf, type FakeResolver 
 import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
 import { click, navigate, role, testId, textEquals } from '#test-support/browser/RawPlan.ts';
 import { FIXTURE_FOLDER, SERVER_ASSETS, networkHarness, startStub, stopStub, timesRequested, type NetworkHarness, type NetworkRun } from '../network/support/NetworkRun.ts';
+import { EgressDecision } from '@revisum/contracts';
 
 const BLOCKED_ORIGIN = 'http://blocked.invalid';
 
@@ -115,7 +116,7 @@ test('counter-example: without the stub, the same three requests reach the serve
   const unstubbed = await runThroughProxy(egressSteps(false));
   assert.equal(unstubbed.result.state, 'Passed', JSON.stringify(unstubbed.result.steps));
   assert.equal(timesRequested(unstubbed.requestedPaths, '/api/stubbed-data'), 3);
-  const allowed = (ran: ProxiedRun) => fixtureEvents(ran).filter((event) => event.decision === 'allowed').length;
+  const allowed = (ran: ProxiedRun) => fixtureEvents(ran).filter((event) => event.decision === EgressDecision.Allowed).length;
   assert.equal(allowed(unstubbed), allowed(stubbed) + 3, `${JSON.stringify(fixtureEvents(stubbed))} against ${JSON.stringify(fixtureEvents(unstubbed))}`);
 });
 

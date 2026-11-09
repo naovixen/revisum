@@ -21,7 +21,7 @@ import { tmpdir } from 'node:os';
 import { join, posix } from 'node:path';
 import { buildAdapters, runSuite } from '@revisum/cli';
 import {
-  failure, isSecret, success,
+  SuitePass, WorkloadStop, WorkloadOutcomeKind, failure, isSecret, success,
   type EgressEvent, type WorkloadErrorCode, type WorkloadOutcome, type WorkloadRequest, type WorkloadRunner,
 } from '@revisum/contracts';
 import { environmentSecretStore, type Project, type RunResult } from '@revisum/engine';
@@ -76,7 +76,7 @@ export function fakeWorkloadRunner(behaviour: SuiteBehaviour = {}): FakeWorkload
       if (!isSuiteRequest(request)) {
         const { exitCode = 0, timedOut: isTimedOut = false, egressEvents = [], egressRecordUnread: isEgressRecordUnread } = behaviour.setup ?? {};
         const records = { egressEvents, ...(isEgressRecordUnread === undefined ? {} : { egressRecordUnread: isEgressRecordUnread }), stdout: captured(''), stderr: captured('') };
-        const setup: WorkloadOutcome = isTimedOut ? { kind: 'timed-out', stop: 'removed', ...records } : { kind: 'exited', exitCode, ...records };
+        const setup: WorkloadOutcome = isTimedOut ? { kind: WorkloadOutcomeKind.TimedOut, stop: WorkloadStop.Removed, ...records } : { kind: WorkloadOutcomeKind.Exited, exitCode, ...records };
         return success(setup);
       }
       const reportPath = variable(request, REPORT_VARIABLE) ?? '';
@@ -85,7 +85,7 @@ export function fakeWorkloadRunner(behaviour: SuiteBehaviour = {}): FakeWorkload
         writeFileSync(join(request.outputDirectory, posix.basename(reportPath)), JSON.stringify(behaviour.report));
       }
       const records = { egressEvents: behaviour.egressEvents ?? [], stdout: captured(behaviour.stdout ?? ''), stderr: captured(behaviour.stderr ?? '') };
-      const outcome: WorkloadOutcome = behaviour.timedOut === true ? { kind: 'timed-out', stop: 'removed', ...records } : { kind: 'exited', exitCode: behaviour.exitCode ?? 0, ...records };
+      const outcome: WorkloadOutcome = behaviour.timedOut === true ? { kind: WorkloadOutcomeKind.TimedOut, stop: WorkloadStop.Removed, ...records } : { kind: WorkloadOutcomeKind.Exited, exitCode: behaviour.exitCode ?? 0, ...records };
       return success(outcome);
     },
     removeFromOutput: () => Promise.resolve(),
@@ -147,7 +147,7 @@ export async function runDeclaredSuite(options: SuiteRunOptions = {}): Promise<S
     secrets: environmentSecretStore({ [DECLARED_SECRET]: options.secretValue ?? 'shop-api-token-for-suite-runs-0042' }),
     checkout: options.checkout ?? suiteCheckout(),
     outputDirectory,
-    pass: 'gating',
+    pass: SuitePass.Gating,
   }));
   return { result, runner, outputDirectory };
 }

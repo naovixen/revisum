@@ -14,6 +14,7 @@ import {
     unsafeProjectFile,
 } from "../../plan/unsafe-features/examples/UnsafePlan.ts";
 import { fakeClock } from "#test-support/fakes/session/FakeClock.ts";
+import { RefusalCode, UnavailableReason } from "@revisum/contracts";
 
 const SUITE_NAME = "checkout-suite";
 const TIME_TAKEN = 7;
@@ -58,14 +59,14 @@ const refusedPlanRun = async (): Promise<RunResult> => {
 const planRunOnAnUnavailableTarget = async (): Promise<RunResult> => {
     const { result } = await runOnFakeSession(unsafePlan([OPEN_CART]), {
         open: () =>
-            Promise.resolve(failure({ reason: "launch-failed", detail: "the browser is broken" })),
+            Promise.resolve(failure({ reason: UnavailableReason.LaunchFailed, detail: "the browser is broken" })),
         clock: clockThatTakes(TIME_TAKEN),
     });
     return result;
 };
 
 const refusedSuiteRun = (): RunResult =>
-    refusedSuiteResult(SUITE_NAME, { code: "egress-unenforceable" });
+    refusedSuiteResult(SUITE_NAME, { code: RefusalCode.EgressUnenforceable });
 
 describe("Using the result of a run where nothing ran", () => {
     describe("given a plan the run refuses", () => {

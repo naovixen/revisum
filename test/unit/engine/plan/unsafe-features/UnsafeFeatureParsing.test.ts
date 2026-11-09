@@ -17,6 +17,7 @@ import {
 import { ALL_FEATURES_PLAN, CSS_CHECK, FEATURES, FEATURE_EXAMPLES, INLINE_READ, OPEN_CART, ORIGIN, XPATH_CHECK, css, unsafePlan, unsafeProjectFile, xpath, type FeatureName, type JsonRecord , ALL_FEATURES_PATHS } from './examples/UnsafePlan.ts';
 import { fakePorts } from '#test-support/fakes/FakePorts.ts';
 import { baseUrlOf } from '#test-support/builders/ClearRun.ts';
+import { StructuralLocatorKind } from '@revisum/contracts';
 
 const NOTHING_ENABLED: readonly FeatureName[] = [];
 
@@ -157,8 +158,8 @@ test('a plan refused for a disabled feature opens no browser, makes no call and 
 
 type LocatorCase = { readonly kind: 'css' | 'xpath'; readonly field: 'selector' | 'expression'; readonly locator: (text: unknown, fields?: JsonRecord) => JsonRecord };
 const LOCATOR_KINDS: readonly LocatorCase[] = [
-  { kind: 'css', field: 'selector', locator: css },
-  { kind: 'xpath', field: 'expression', locator: xpath },
+  { kind: StructuralLocatorKind.Css, field: 'selector', locator: css },
+  { kind: StructuralLocatorKind.Xpath, field: 'expression', locator: xpath },
 ];
 
 // A plan that clicks the locator, with a value orderCode defined, so a reference to it is defined.

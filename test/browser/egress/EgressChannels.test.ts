@@ -30,6 +30,7 @@ import {
 } from '../../unit/runner/examples/DeclaredService.ts';
 import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 import { baseUrlOf } from "#test-support/builders/ClearRun.ts";
+import { EgressDecision, BrowserChannel } from '@revisum/contracts';
 
 const WAIT_MILLISECONDS = 10_000;
 const POLL_MILLISECONDS = 50;
@@ -84,7 +85,7 @@ async function sendThrough(channel: ChannelName): Promise<{ readonly events: rea
   const host = CHANNEL_HOSTS[channel];
   const navigated = await session.navigate(fixture.url(CHANNEL_PAGES[channel]), scriptsEnabled);
   assert.ok(navigated.ok, JSON.stringify(navigated));
-  if (channel === 'popup') await session.act(capability.actionStep(click(role('button', 'Open the partner site'))), allowEveryAction);
+  if (channel === BrowserChannel.Popup) await session.act(capability.actionStep(click(role('button', 'Open the partner site'))), allowEveryAction);
   await waitFor(() => eventsOf(session).some((event) => event.channel === channel && hostOf(String(event.origin)) === host));
   return { events: eventsOf(session), session };
 }
@@ -93,14 +94,14 @@ describe('every channel to an undeclared origin is stopped and recorded as an eg
   for (const channel of CHANNEL_NAMES) {
     const host = CHANNEL_HOSTS[channel];
     // The widened allow-list declares the popup's origin to the driver, and nothing refused it.
-    const decision = channel === 'popup' ? 'held' : 'blocked';
+    const decision = channel === BrowserChannel.Popup ? 'held' : 'blocked';
     test(`${channel} traffic to ${host} is recorded as a ${decision} ${channel} event`, async () => {
       const { events, session } = await sendThrough(channel);
       try {
         const forHost = events.filter((event) => hostOf(String(event.origin)) === host);
         assert.ok(forHost.some((event) => event.channel === channel && event.decision === decision), JSON.stringify(events));
         assert.deepEqual(forHost.filter((event) => event.decision === 'allowed'), [], 'nothing to the undeclared origin was let through');
-        const proxyAllowed = proxy.decisions().filter((entry) => entry.decision === 'allowed' && hostOf(String(entry.origin)) === host);
+        const proxyAllowed = proxy.decisions().filter((entry) => entry.decision === EgressDecision.Allowed && hostOf(String(entry.origin)) === host);
         assert.deepEqual(proxyAllowed, [], 'the proxy let nothing through to the undeclared origin');
         assert.ok(!resolver.asked.includes(host), 'the undeclared name was never looked up');
       } finally {
@@ -111,7 +112,7 @@ describe('every channel to an undeclared origin is stopped and recorded as an eg
 
   // A popup is held back by the driver before it loads, so
   // only the five other channels ever reach the proxy.
-  for (const channel of CHANNEL_NAMES.filter((name) => name !== 'popup')) {
+  for (const channel of CHANNEL_NAMES.filter((name) => name !== BrowserChannel.Popup)) {
     const host = CHANNEL_HOSTS[channel];
     test(`the proxy itself blocks the ${channel} request that the widened browser let through`, async () => {
       const { session } = await sendThrough(channel);
@@ -132,7 +133,7 @@ test('counter-example: the fixture origin\'s own requests go through the proxy a
   try {
     const navigated = await session.navigate(fixture.url('/index.html'), scriptsEnabled);
     assert.ok(navigated.ok, JSON.stringify(navigated));
-    const allowed = proxy.decisions().filter((entry) => String(entry.origin) === fixture.origin && entry.decision === 'allowed');
+    const allowed = proxy.decisions().filter((entry) => String(entry.origin) === fixture.origin && entry.decision === EgressDecision.Allowed);
     assert.ok(allowed.length >= 1, `the proxy recorded the fixture origin as allowed: ${JSON.stringify(proxy.decisions())}`);
     assert.ok(eventsOf(session).some((event) => String(event.origin) === fixture.origin && event.channel === 'page' && event.decision === 'allowed'));
   } finally {

@@ -12,12 +12,13 @@ import {
     type Parsed,
 } from "@revisum/engine";
 import { classInstanceHolding } from "../../../../support/ClassInstanceHolding.ts";
+import { PlanErrorCode } from "@revisum/contracts";
 
 const readName: FieldReader<string> = (input, path, issues) => {
     if (typeof input === "string") {
         return input;
     }
-    issues.push({ code: "wrong_type", path });
+    issues.push({ code: PlanErrorCode.WrongType, path });
     return INVALID;
 };
 const readAnything: FieldReader<unknown> = (input) => input;

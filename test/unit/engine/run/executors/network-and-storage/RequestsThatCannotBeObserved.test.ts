@@ -11,6 +11,7 @@ import {
     stepSummaries,
 } from "../../examples/RunOnFakeSession.ts";
 import { OPEN_CART, unsafePlan, type JsonRecord } from "../../../plan/unsafe-features/examples/UnsafePlan.ts";
+import { DriverErrorCode } from "@revisum/contracts";
 
 const LIKES_CHECK: JsonRecord = {
     type: "expectRequests",
@@ -26,7 +27,7 @@ const FAILED_OBSERVES: readonly {
     {
         name: "gives a failure",
         observe: () =>
-            Promise.resolve(failure({ code: "navigation-failed", detail: "the port is closed" })),
+            Promise.resolve(failure({ code: DriverErrorCode.NavigationFailed, detail: "the port is closed" })),
     },
     {
         name: "rejects",

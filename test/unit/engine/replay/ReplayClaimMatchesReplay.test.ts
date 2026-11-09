@@ -7,7 +7,7 @@
 // The loss reason is read as text, as replay.test.ts reads determinism-unpinned.
 import assert from 'node:assert/strict';
 import { after, test } from 'node:test';
-import type { GuaranteeLevel } from '@revisum/contracts';
+import { GuaranteeLevel, RunMode } from '@revisum/contracts';
 import { guaranteeStatement, replayManifest, type RunResult } from '@revisum/engine';
 import {
   DATABASE_PASSWORD, OPEN_CART, SEED_ORDERS, WIPE_ORDERS, commandPlan, commandProjectFile,
@@ -43,7 +43,7 @@ const callScenario = (plan: JsonRecord, fields: JsonRecord, level?: GuaranteeLev
 const lossLines = (result: RunResult): readonly string[] => result.guarantees.lost.map((loss) => `${loss.guarantee} ${String(loss.because)}`);
 
 // What a statement says when nothing but the run's isolation decides it.
-const statementWith = (egressEnforced: boolean) => guaranteeStatement({ mode: 'plan', egressEnforced, unmaskedScreenshotsKept: false, unsafeFeatures: [] });
+const statementWith = (egressEnforced: boolean) => guaranteeStatement({ mode: RunMode.Plan, egressEnforced, unmaskedScreenshotsKept: false, unsafeFeatures: [] });
 
 // ---- Isolated, calling services, with no recording ---------------------------------------------------
 
@@ -91,7 +91,7 @@ test('at the isolated level, a project that sets the recording to false loses re
 // ---- Isolated, with no calls -----------------------------------------------------------------------------
 
 test('counter-example: at the isolated level, a plan with no calls keeps replay-identical and replays identically', async () => {
-  const ran = await runScenario({ ...closedScenario(projectFileWith(), planOf([OPEN_ORDERS])), guaranteeLevel: 'isolated' });
+  const ran = await runScenario({ ...closedScenario(projectFileWith(), planOf([OPEN_ORDERS])), guaranteeLevel: GuaranteeLevel.Isolated });
   assert.deepEqual(ran.result.guarantees, statementWith(true));
   assert.equal(replayManifest(ran.manifest).ok, true);
   assert.equal(replayed((await replayRun(ran)).answer).verdict, 'identical');
@@ -108,16 +108,16 @@ test('counter-example: at the isolated level, a plan with no calls keeps it even
 const commandScenario = (fields: JsonRecord): Scenario => ({
   ...closedScenario(commandProjectFile(fields), commandPlan([OPEN_CART, SEED_ORDERS], [WIPE_ORDERS])),
   environment: { [DATABASE_SECRET]: DATABASE_PASSWORD },
-  guaranteeLevel: 'isolated',
+  guaranteeLevel: GuaranteeLevel.Isolated,
 });
 
 const AT_THE_ISOLATED_LEVEL: readonly { readonly title: string; readonly scenario: Scenario; readonly record: boolean; readonly claims: boolean }[] = [
-  { title: 'no calls', scenario: { ...closedScenario(projectFileWith(), planOf([OPEN_ORDERS])), guaranteeLevel: 'isolated' }, record: false, claims: true },
+  { title: 'no calls', scenario: { ...closedScenario(projectFileWith(), planOf([OPEN_ORDERS])), guaranteeLevel: GuaranteeLevel.Isolated }, record: false, claims: true },
   { title: 'calls, recorded', scenario: callScenario(CALLING_PLAN.plan, RECORD_REPLIES, 'isolated'), record: true, claims: true },
   { title: 'calls, not recorded', scenario: callScenario(CALLING_PLAN.plan, {}, 'isolated'), record: false, claims: false },
   { title: 'database commands, recorded', scenario: commandScenario(RECORD_REPLIES), record: true, claims: false },
   { title: 'database commands, not recorded', scenario: commandScenario({}), record: false, claims: false },
-  { title: 'a clock the adapter cannot pin', scenario: { ...closedScenario(projectFileWith(), planOf([OPEN_ORDERS])), cannotPin: ['clock'], guaranteeLevel: 'isolated' }, record: false, claims: false },
+  { title: 'a clock the adapter cannot pin', scenario: { ...closedScenario(projectFileWith(), planOf([OPEN_ORDERS])), cannotPin: ['clock'], guaranteeLevel: GuaranteeLevel.Isolated }, record: false, claims: false },
 ];
 
 for (const { title, scenario, record, claims } of AT_THE_ISOLATED_LEVEL) {

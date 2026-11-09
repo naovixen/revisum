@@ -7,6 +7,7 @@ import { signupPlan, withValue } from '../plan/examples/GoldenPlan.ts';
 import {
   builtAt, clearanceOn, fakeBrowserBuild, targetDriver, projectWith, runOnTarget, runUntrustedOn, targetInput, targetOf, trustedProjectWith,
 } from './examples/TargetOf.ts';
+import { Engine } from '@revisum/contracts';
 
 // ---- Not in the matrix -------------------------------------------------------------------------
 
@@ -58,7 +59,7 @@ describe('a target that is not in the matrix', () => {
 // ---- Engine not supported ----------------------------------------------------------------------
 
 const chromiumOnly = (target: Target) =>
-  (target.engine === 'chromium' ? null : { reason: 'engine-not-supported' as const, detail: 'this fake drives Chromium only' });
+  (target.engine === Engine.Chromium ? null : { reason: 'engine-not-supported' as const, detail: 'this fake drives Chromium only' });
 
 describe('a WebKit target that no registered adapter supports', () => {
   const matrix = [
@@ -123,7 +124,7 @@ describe('a WebKit target that no registered adapter supports', () => {
 // ---- A device the adapter refuses ---------------------------------------------------------------
 
 const noMobileFirefox = (target: Target) =>
-  (target.engine === 'firefox' && (target.device === 'phone-390' || target.device === 'tablet-820')
+  (target.engine === Engine.Firefox && (target.device === 'phone-390' || target.device === 'tablet-820')
     ? { reason: 'engine-not-supported' as const, detail: 'this fake cannot emulate a mobile device in Firefox' } : null);
 
 describe('a Firefox target with a phone profile', () => {

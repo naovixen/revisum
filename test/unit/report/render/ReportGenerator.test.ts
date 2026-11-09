@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import {
-  MAXIMUM_PR_COMMENT_CHARACTERS, SEVERITIES, SEVERITY_STYLE, STROKE_DASH,
+  Verdict, MAXIMUM_PR_COMMENT_CHARACTERS, SEVERITIES, SEVERITY_STYLE, STROKE_DASH,
   contrast, deriveView, generate, levelAt, markdownEscape, parseReportInput, pngSize, sha256, usableBox, wordCount,
 } from '@revisum/report';
 import {
@@ -111,9 +111,9 @@ test('the verdict banner is the first element in main and shows the counts and h
 test('the banner counts equal an independent count and sum to the number of criteria', () => {
   for (const kind of ALL_KINDS) {
     const report = byKind(kind);
-    const failed = report.acceptance.filter((criterion) => criterion.status === 'failed').length;
-    const review = report.acceptance.filter((criterion) => criterion.status === 'needs-review').length;
-    const passed = report.acceptance.filter((criterion) => criterion.status === 'passed').length;
+    const failed = report.acceptance.filter((criterion) => criterion.status === Verdict.Failed).length;
+    const review = report.acceptance.filter((criterion) => criterion.status === Verdict.NeedsReview).length;
+    const passed = report.acceptance.filter((criterion) => criterion.status === Verdict.Passed).length;
     const view = deriveView(report);
     assert.deepEqual([view.counts.failed, view.counts.needsReview, view.counts.passed], [failed, review, passed]);
     assert.equal(failed + review + passed, report.acceptance.length);
@@ -124,8 +124,8 @@ test('the banner counts equal an independent count and sum to the number of crit
   const accessibility = byKind('a11y');
   for (const criterion of accessibility.acceptance) {
     const mine = accessibility.findings.filter((finding) => finding.criterionIds.includes(criterion.id));
-    if (mine.some((finding) => finding.status === 'failed')) assert.equal(criterion.status, 'failed', criterion.id);
-    else if (criterion.status === 'passed') assert.equal(mine.length, 0, criterion.id);
+    if (mine.some((finding) => finding.status === Verdict.Failed)) assert.equal(criterion.status, 'failed', criterion.id);
+    else if (criterion.status === Verdict.Passed) assert.equal(mine.length, 0, criterion.id);
   }
 });
 
@@ -312,7 +312,7 @@ test('the review queue lists exactly the needs-review findings, with reason and 
     const start = html.indexOf('<section id="review"');
     const section = html.slice(start, html.indexOf('</section>', start));
     assert.match(section, new RegExp(`Review queue \\(${view.review.length}\\)`));
-    const expected = report.findings.filter((finding) => finding.status === 'needs-review').length;
+    const expected = report.findings.filter((finding) => finding.status === Verdict.NeedsReview).length;
     assert.equal(view.review.length, expected);
     if (expected === 0) assert.match(section, /Nothing to review/);
     else assert.equal((section.match(/<tr><th scope="row" class="n">/g) ?? []).length, expected);
@@ -486,9 +486,9 @@ test('the accessibility report covers all 102 mapping-pair pages with the right 
   for (const criterion of report.acceptance) {
     if (criterion.id.endsWith('.clean')) assert.equal(criterion.status, 'passed', criterion.id);
     else assert.ok(criterion.status !== 'passed', `${criterion.id}: a fixture page with a seeded failure is never "passed"`);
-    if (criterion.status === 'failed') assert.ok(criterion.evidence.some((evidence) => evidence.kind === 'image'), `${criterion.id} has a screenshot`);
+    if (criterion.status === Verdict.Failed) assert.ok(criterion.evidence.some((evidence) => evidence.kind === 'image'), `${criterion.id} has a screenshot`);
   }
-  const annotated = new Set(report.findings.filter((finding) => finding.status === 'failed' && (finding.image?.box ?? null) !== null).map((finding) => finding.image?.imageId));
+  const annotated = new Set(report.findings.filter((finding) => finding.status === Verdict.Failed && (finding.image?.box ?? null) !== null).map((finding) => finding.image?.imageId));
   assert.ok(annotated.size >= 20, `${annotated.size} pages carry a callout`);
   assert.equal(report.findings.filter((finding) => finding.status === 'needs-review' && finding.severity === null).length, 27);
 });

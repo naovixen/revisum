@@ -45,6 +45,7 @@ import { OPEN_CART, unsafePlan } from "../../plan/unsafe-features/examples/Unsaf
 import { fakeDriver } from "#test-support/fakes/session/FakeDriver.ts";
 import { driversOf, fakePorts } from "#test-support/fakes/FakePorts.ts";
 import { notingBlockedOrigins } from "#test-support/fakes/session/FakeSession.ts";
+import { RefusalCode, UnavailableReason } from "@revisum/contracts";
 
 const EARLY_ORIGIN = "https://early.example.test";
 const LATE_ORIGIN = "https://late.example.test";
@@ -136,7 +137,7 @@ const LIST_EDITS: readonly ListEdit[] = [
 ];
 
 const unavailableDriver = fakeDriver({
-    supports: () => failure({ reason: "engine-not-supported", detail: "not this engine" }),
+    supports: () => failure({ reason: UnavailableReason.EngineNotSupported, detail: "not this engine" }),
     open: () => assert.fail("a target that is unavailable is never opened"),
 });
 
@@ -168,7 +169,7 @@ const unreadSuiteRun = (): RunResult => {
 };
 
 const refusedSuiteRun = (): RunResult =>
-    refusedSuiteResult(SUITE_NAME, { code: "egress-unenforceable" });
+    refusedSuiteResult(SUITE_NAME, { code: RefusalCode.EgressUnenforceable });
 
 const OTHER_ENDINGS: readonly {
     readonly name: string;

@@ -9,6 +9,7 @@ import { test } from 'node:test';
 import { FillValueKind, planHash, type PerformableAction } from '@revisum/engine';
 import { DEFAULT_CLOCK_START, OPEN_ORDERS, runPlan, type JsonRecord } from '../../values/examples/RunPlan.ts';
 import { COPY_LINK, accepted, advanceClock, expectClipboard, parserFor, planOf } from './examples/AdvanceClock.ts';
+import { StepType } from '@revisum/contracts';
 
 const VALUES: JsonRecord = {
   meetingDay: { kind: 'date', day: { from: 'startOfNextMonth', addDays: 0 }, format: 'longDate' },
@@ -25,7 +26,7 @@ const withAdvances = (): JsonRecord =>
 
 // The text each fill typed; a fill of anything but text is kept whole, so it fails the check.
 const filledValues = (actions: readonly PerformableAction[]): unknown[] =>
-  actions.flatMap((action) => (action.type === 'fill' ? [action.value.kind === FillValueKind.Text ? action.value.text : action.value] : []));
+  actions.flatMap((action) => (action.type === StepType.Fill ? [action.value.kind === FillValueKind.Text ? action.value.text : action.value] : []));
 
 // ---- Date values and the clocks (metamorphic) -----------------------------------------------------------
 

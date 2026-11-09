@@ -18,6 +18,7 @@ import {
   FEATURES, OPEN_CART, parseAll, smallUnsafePlan, textErrorsOf, unsafeGoldenPlan, unsafeGoldenText, unsafeLimits,
   type FeatureName, type ParsePlan,
 } from './examples/UnsafeMark.ts';
+import { PlanErrorCode, UnsafeFeature, ApprovalSubjectKind, ProvenanceBasis, PlanSource, PlanFormat } from '@revisum/contracts';
 
 const shown = (errors: readonly DraftError[]): string => JSON.stringify(errors);
 
@@ -48,8 +49,8 @@ function replaced(feature: FeatureName, statement: string, replacement: string):
   return { text: withLineReplaced(original, line, replacement), line };
 }
 
-const draft = (content: string): PlanDraft => ({ format: 'text', content, provenance: { source: 'hand-written', basis: 'declared' } });
-const actor = () => unverified({ kind: 'plan', hash: 'unsafe-readable-errors' }, 'local');
+const draft = (content: string): PlanDraft => ({ format: PlanFormat.Text, content, provenance: { source: PlanSource.HandWritten, basis: ProvenanceBasis.Declared } });
+const actor = () => unverified({ kind: ApprovalSubjectKind.Plan, hash: 'unsafe-readable-errors' }, 'local');
 
 function admittedErrors(text: string, parsePlan: ParsePlan): readonly DraftError[] {
   const admitted = admitDraft(draft(text), parsePlan, memoryEventSink(), actor());
@@ -61,20 +62,20 @@ function admittedErrors(text: string, parsePlan: ParsePlan): readonly DraftError
 
 // Lines of the golden texts that hold an unsafe construct, with the mark the spec requires.
 const MARKED_LINES: readonly { readonly feature: FeatureName; readonly construct: string; readonly statement: string }[] = [
-  { feature: 'css-locator', construct: 'a css locator', statement: 'Unsafe: Expect first css "[data-test^=\\"transaction-item-\\"]" is visible' },
-  { feature: 'css-locator', construct: 'a css locator inside a css locator', statement: 'Unsafe: Click css "button" containing text "Add" inside 2nd css "li.product"' },
-  { feature: 'xpath-locator', construct: 'an XPath locator', statement: 'Unsafe: Expect xpath "//main//li[2]" has text containing "Total"' },
-  { feature: 'dom-checks', construct: 'a class check', statement: 'Unsafe: Expect test id "cart-badge" has class "is-active"' },
-  { feature: 'dom-checks', construct: 'a computed style check', statement: 'Unsafe: Expect test id "cart-badge" computed style background-color is "rgb(220, 38, 38)"' },
-  { feature: 'dom-checks', construct: 'an absent attribute check', statement: 'Unsafe: Expect button "Check out" attribute disabled is absent' },
-  { feature: 'dom-checks', construct: 'remembering an attribute', statement: 'Unsafe: Remember attribute data-order-id of test id "order-row" as orderId' },
-  { feature: 'page-script', construct: 'a named page script', statement: 'Unsafe: Run page script readCart with currency "eur" remembering field itemCount as cartCount' },
-  { feature: 'page-script', construct: 'a page-script check', statement: 'Unsafe: Expect page script readCart with currency "eur" field itemCount is "3"' },
+  { feature: UnsafeFeature.CssLocator, construct: 'a css locator', statement: 'Unsafe: Expect first css "[data-test^=\\"transaction-item-\\"]" is visible' },
+  { feature: UnsafeFeature.CssLocator, construct: 'a css locator inside a css locator', statement: 'Unsafe: Click css "button" containing text "Add" inside 2nd css "li.product"' },
+  { feature: UnsafeFeature.XpathLocator, construct: 'an XPath locator', statement: 'Unsafe: Expect xpath "//main//li[2]" has text containing "Total"' },
+  { feature: UnsafeFeature.DomChecks, construct: 'a class check', statement: 'Unsafe: Expect test id "cart-badge" has class "is-active"' },
+  { feature: UnsafeFeature.DomChecks, construct: 'a computed style check', statement: 'Unsafe: Expect test id "cart-badge" computed style background-color is "rgb(220, 38, 38)"' },
+  { feature: UnsafeFeature.DomChecks, construct: 'an absent attribute check', statement: 'Unsafe: Expect button "Check out" attribute disabled is absent' },
+  { feature: UnsafeFeature.DomChecks, construct: 'remembering an attribute', statement: 'Unsafe: Remember attribute data-order-id of test id "order-row" as orderId' },
+  { feature: UnsafeFeature.PageScript, construct: 'a named page script', statement: 'Unsafe: Run page script readCart with currency "eur" remembering field itemCount as cartCount' },
+  { feature: UnsafeFeature.PageScript, construct: 'a page-script check', statement: 'Unsafe: Expect page script readCart with currency "eur" field itemCount is "3"' },
   {
-    feature: 'inline-page-script', construct: 'an inline page script',
+    feature: UnsafeFeature.InlinePageScript, construct: 'an inline page script',
     statement: 'Unsafe: Run inline read page script returning blockCount at "/blocks" remembering field blockCount as blockCount:',
   },
-  { feature: 'database-command', construct: 'a database check', statement: 'Unsafe: Expect database command countOrders with email "ada@example.com" field count is "3"' },
+  { feature: UnsafeFeature.DatabaseCommand, construct: 'a database check', statement: 'Unsafe: Expect database command countOrders with email "ada@example.com" field count is "3"' },
 ];
 
 for (const { feature, construct, statement } of MARKED_LINES) {
@@ -111,8 +112,8 @@ test('every golden text, marked as the spec prints it, reads without error', () 
 });
 
 const CLOSED_LINES: readonly { readonly name: string; readonly feature: FeatureName; readonly statement: string; readonly indent: string }[] = [
-  { name: 'a navigation', feature: 'css-locator', statement: 'Go to /cart', indent: '' },
-  { name: 'a test-id check', feature: 'css-locator', statement: 'Expect test id "status" is visible', indent: '' },
+  { name: 'a navigation', feature: UnsafeFeature.CssLocator, statement: 'Go to /cart', indent: '' },
+  { name: 'a test-id check', feature: UnsafeFeature.CssLocator, statement: 'Expect test id "status" is visible', indent: '' },
 ];
 
 for (const { name, feature, statement, indent } of CLOSED_LINES) {
@@ -258,7 +259,7 @@ for (const feature of FEATURES) {
   test(`the ${feature} golden text with ${feature} off is refused with unsafe_feature_disabled, each on a marked line`, () => {
     const text = unsafeGoldenText(feature);
     const errors = admittedErrors(text, parserEnabling(allBut(feature)));
-    const disabled = errors.filter((error) => error.code === 'unsafe_feature_disabled');
+    const disabled = errors.filter((error) => error.code === PlanErrorCode.UnsafeFeatureDisabled);
     assert.ok(disabled.length >= 1, shown(errors));
     for (const error of disabled) {
       assert.ok(error.position !== null, shown([error]));

@@ -14,6 +14,7 @@ import {
 import { checkDraftLocators, type PageMap } from "./examples/CrawlOutcome.ts";
 import { acceptedBy, parserEnabling } from "../plan/unsafe-features/examples/LostByFeature.ts";
 import { FEATURES, unsafePlan, type JsonRecord } from "../plan/unsafe-features/examples/UnsafePlan.ts";
+import { GuaranteeLevel } from "@revisum/contracts";
 
 const parsePlan = parserEnabling(FEATURES, { fixtures: [DECLARED_FIXTURE] });
 
@@ -55,7 +56,7 @@ const PAGE_PATH = "/contact";
 const MAP: PageMap = {
     origin: "http://127.0.0.1:4173",
     truncated: false,
-    guaranteeLevel: "host",
+    guaranteeLevel: GuaranteeLevel.Host,
     pages: [{ path: PAGE_PATH, title: "Contact", depth: 1, tree: [] }],
 };
 

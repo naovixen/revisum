@@ -6,6 +6,7 @@ import { describe, test } from "node:test";
 import { FillValueKind } from "@revisum/engine";
 import { recordingDriver } from "../run/values/examples/RunPlan.ts";
 import { runWithSecrets, secretFillPlan } from "./examples/SecretRun.ts";
+import { StepType } from "@revisum/contracts";
 
 const SECRET_NAME = "ACCESS_CODE";
 const SECRET_VALUE = "test-only-access-code";
@@ -24,7 +25,7 @@ describe("Using the run", () => {
                     driver,
                 );
                 assert.equal(result.state, "Passed", JSON.stringify(result.steps));
-                const fills = recording.actions.filter((action) => action.type === "fill");
+                const fills = recording.actions.filter((action) => action.type === StepType.Fill);
                 assert.equal(fills.length, 1);
                 const [fill] = fills;
                 assert.ok(
@@ -67,7 +68,7 @@ describe("Using the run", () => {
                 );
                 assert.equal(result.state, "Passed", JSON.stringify(result.steps));
                 const filledSecrets = recording.actions.flatMap((action) =>
-                    action.type === "fill" && action.value.kind === FillValueKind.Secret
+                    action.type === StepType.Fill && action.value.kind === FillValueKind.Secret
                         ? [action.value.secret.name]
                         : [],
                 );

@@ -19,6 +19,7 @@ import {
     targetOf,
     trustedProjectWith,
 } from "../../engine/target/examples/TargetOf.ts";
+import { DriverErrorCode, GuaranteeLevel } from "@revisum/contracts";
 
 const DESKTOP = targetInput("chromium-desktop", "fake-any", "chromium", "desktop-1280");
 const TABLET = targetInput("chromium-tablet", "fake-any", "chromium", "tablet-820");
@@ -29,7 +30,7 @@ const OPTIONS: ExploreOptions = {
     maximumPages: 1,
     maximumDepth: 0,
     pageTimeoutMilliseconds: 1000,
-    placement: "host",
+    placement: GuaranteeLevel.Host,
 };
 
 // A login plan on the tablet target only: the matrix's second target, never the crawl's default.
@@ -145,7 +146,7 @@ describe("Using the crawl in a browser", () => {
                 const session = sessionWhoseCloseFails({
                     navigate: () =>
                         Promise.resolve(
-                            failure({ code: "navigation-failed", detail: "the site is down" }),
+                            failure({ code: DriverErrorCode.NavigationFailed, detail: "the site is down" }),
                         ),
                 });
                 const crawled = await crawlOn(session);

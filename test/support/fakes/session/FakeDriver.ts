@@ -2,6 +2,7 @@ import { failure, success, type BrowserDriver, type Session } from "@revisum/eng
 import { fakeSession } from "./FakeSession.ts";
 import { leaveOut, type OptionalMember } from "../LeaveOut.ts";
 import { recordCalls, type Recorded } from "../RecordCalls.ts";
+import { UnavailableReason } from "@revisum/contracts";
 
 export type FakeDriver = Recorded<BrowserDriver>;
 
@@ -41,7 +42,7 @@ export const fakeDriverNeverLaunching = (
             open: () =>
                 Promise.resolve(
                     failure({
-                        reason: "launch-failed",
+                        reason: UnavailableReason.LaunchFailed,
                         detail: "the fake never launches",
                     }),
                 ),

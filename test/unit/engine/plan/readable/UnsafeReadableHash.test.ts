@@ -7,6 +7,7 @@ import { test } from 'node:test';
 import { planHash, writePlanJson, writePlanText } from '@revisum/engine';
 import { joinLines, lineOf, linesOf, withLineReplaced } from './examples/ParsePlan.ts';
 import { everyUnsafeExample, parseAll, parsedWith, planFromText, unsafeGoldenPlan, unsafeGoldenText, type FeatureName } from './examples/UnsafeMark.ts';
+import { UnsafeFeature } from '@revisum/contracts';
 
 const MARKED = /^(\s*)Unsafe:( .*)$/;
 
@@ -34,16 +35,16 @@ for (const { name, plan } of everyUnsafeExample()) {
 
 // Changes to one line of a golden text, each of which makes it a different plan.
 const STEP_CHANGES: readonly { readonly feature: FeatureName; readonly name: string; readonly from: string; readonly to: string }[] = [
-  { feature: 'css-locator', name: 'a selector', from: 'Unsafe: Click css "button" containing text "Add" inside 2nd css "li.product"', to: 'Unsafe: Click css "button" containing text "Add" inside 2nd css "li.products"' },
-  { feature: 'css-locator', name: 'a locator\'s containing text', from: 'Unsafe: Click css "button" containing text "Add" inside 2nd css "li.product"', to: 'Unsafe: Click css "button" containing text "Add!" inside 2nd css "li.product"' },
-  { feature: 'css-locator', name: 'the position of an inner locator', from: 'Unsafe: Click css "button" containing text "Add" inside 2nd css "li.product"', to: 'Unsafe: Click css "button" containing text "Add" inside 3rd css "li.product"' },
-  { feature: 'xpath-locator', name: 'an expression', from: 'Unsafe: Expect xpath "//main//li[2]" has text containing "Total"', to: 'Unsafe: Expect xpath "//main//li[3]" has text containing "Total"' },
-  { feature: 'dom-checks', name: 'an attribute check\'s kind', from: 'Unsafe: Expect button "Check out" attribute disabled is absent', to: 'Unsafe: Expect button "Check out" attribute disabled is "absent"' },
-  { feature: 'page-script', name: 'a script argument', from: 'Unsafe: Run page script readCart with currency "eur" remembering field itemCount as cartCount', to: 'Unsafe: Run page script readCart with currency "usd" remembering field itemCount as cartCount' },
-  { feature: 'inline-page-script', name: 'a script line', from: '"() => ({ blocks: window.editorStore.blocks.length })"', to: '"() => ({ blocks: window.editorStore.blocks.length  })"' },
-  { feature: 'inline-page-script', name: 'a carriage return at the end of a source', from: '"() => ({ blocks: window.editorStore.blocks.length })"', to: '"() => ({ blocks: window.editorStore.blocks.length })\\r"' },
-  { feature: 'inline-page-script', name: 'a returned field\'s pointer', from: 'Unsafe: Run inline read page script returning blockCount at "/blocks" remembering field blockCount as blockCount:', to: 'Unsafe: Run inline read page script returning blockCount at "/count" remembering field blockCount as blockCount:' },
-  { feature: 'database-command', name: 'a database argument', from: 'Unsafe: Expect database command countOrders with email "ada@example.com" field count is "3"', to: 'Unsafe: Expect database command countOrders with email "grace@example.com" field count is "3"' },
+  { feature: UnsafeFeature.CssLocator, name: 'a selector', from: 'Unsafe: Click css "button" containing text "Add" inside 2nd css "li.product"', to: 'Unsafe: Click css "button" containing text "Add" inside 2nd css "li.products"' },
+  { feature: UnsafeFeature.CssLocator, name: 'a locator\'s containing text', from: 'Unsafe: Click css "button" containing text "Add" inside 2nd css "li.product"', to: 'Unsafe: Click css "button" containing text "Add!" inside 2nd css "li.product"' },
+  { feature: UnsafeFeature.CssLocator, name: 'the position of an inner locator', from: 'Unsafe: Click css "button" containing text "Add" inside 2nd css "li.product"', to: 'Unsafe: Click css "button" containing text "Add" inside 3rd css "li.product"' },
+  { feature: UnsafeFeature.XpathLocator, name: 'an expression', from: 'Unsafe: Expect xpath "//main//li[2]" has text containing "Total"', to: 'Unsafe: Expect xpath "//main//li[3]" has text containing "Total"' },
+  { feature: UnsafeFeature.DomChecks, name: 'an attribute check\'s kind', from: 'Unsafe: Expect button "Check out" attribute disabled is absent', to: 'Unsafe: Expect button "Check out" attribute disabled is "absent"' },
+  { feature: UnsafeFeature.PageScript, name: 'a script argument', from: 'Unsafe: Run page script readCart with currency "eur" remembering field itemCount as cartCount', to: 'Unsafe: Run page script readCart with currency "usd" remembering field itemCount as cartCount' },
+  { feature: UnsafeFeature.InlinePageScript, name: 'a script line', from: '"() => ({ blocks: window.editorStore.blocks.length })"', to: '"() => ({ blocks: window.editorStore.blocks.length  })"' },
+  { feature: UnsafeFeature.InlinePageScript, name: 'a carriage return at the end of a source', from: '"() => ({ blocks: window.editorStore.blocks.length })"', to: '"() => ({ blocks: window.editorStore.blocks.length })\\r"' },
+  { feature: UnsafeFeature.InlinePageScript, name: 'a returned field\'s pointer', from: 'Unsafe: Run inline read page script returning blockCount at "/blocks" remembering field blockCount as blockCount:', to: 'Unsafe: Run inline read page script returning blockCount at "/count" remembering field blockCount as blockCount:' },
+  { feature: UnsafeFeature.DatabaseCommand, name: 'a database argument', from: 'Unsafe: Expect database command countOrders with email "ada@example.com" field count is "3"', to: 'Unsafe: Expect database command countOrders with email "grace@example.com" field count is "3"' },
 ];
 
 for (const { feature, name, from, to } of STEP_CHANGES) {

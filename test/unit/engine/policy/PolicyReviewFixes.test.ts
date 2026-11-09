@@ -16,6 +16,7 @@ import {
 } from './examples/Policy.ts';
 import { fakeEventSink } from '#test-support/fakes/ports/FakeEventSink.ts';
 import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
+import { PolicyRuleId, TerminalState } from '@revisum/contracts';
 
 // ---- Absolute URLs on the gate's own placeholder origin ------------------------------------------
 
@@ -144,7 +145,7 @@ const failingSink = () => fakeEventSink({ append: () => failure({ code: 'write-f
 const DELETE_PLAN = planOf(DELETE_STEPS);
 // What a run that threw leaves to read: no result.
 const NOTHING_RAN: UntrustedRunOutcome = { kind: UntrustedRunOutcomeKind.Ran, results: [] };
-const RECORDED_STATIC_DENIAL: UntrustedRunOutcome = { kind: UntrustedRunOutcomeKind.Denied, state: 'Denied', rule: 'irreversible-action', stepIndex: 1 };
+const RECORDED_STATIC_DENIAL: UntrustedRunOutcome = { kind: UntrustedRunOutcomeKind.Denied, state: TerminalState.Denied, rule: PolicyRuleId.IrreversibleAction, stepIndex: 1 };
 // The red-team's runtime click: a test id that turns out to be the Delete account button.
 const RUNTIME_DELETE_STEPS = [OPEN_ACCOUNT_PAGE, click(testId('danger-zone-action'))];
 const RUNTIME_DELETE_PAGE = { 1: { element: { role: 'button', name: 'Delete account' } } };

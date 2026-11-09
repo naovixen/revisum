@@ -15,6 +15,7 @@ import {
 import { ORIGIN, TARGET_ID, signupPlan, testProject, testProjectInput, withValue, type JsonRecord } from '../plan/examples/GoldenPlan.ts';
 import { fakeDriverNeverLaunching } from '#test-support/fakes/session/FakeDriver.ts';
 import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
+import { ApprovalSubjectKind } from '@revisum/contracts';
 
 const PRODUCTION_ORIGIN = 'https://shop.example.com';
 const UNREVIEWED_HASH = 'f'.repeat(64);
@@ -41,7 +42,7 @@ const retitledSignupInput = (): JsonRecord => withValue(signupPlan(), ['meta', '
 
 test('a code-owner review does not approve a plan hash that no file on the protected branch has', async () => {
   await withRepository('team', async (repository) => {
-    const subject: ApprovalSubject = { kind: 'plan', hash: UNREVIEWED_HASH, path: PLAN_PATH };
+    const subject: ApprovalSubject = { kind: ApprovalSubjectKind.Plan, hash: UNREVIEWED_HASH, path: PLAN_PATH };
     assertSubjectRefused(repository, await repository.verify(subject, repository.codeOwnerProof('review-grace')));
   });
 });
@@ -50,7 +51,7 @@ test('a code-owner review of the sign-up plan does not approve the same plan cha
   await withRepository('team', async (repository) => {
     const changed = parsedSignupPlan(retitledSignupInput());
     assert.notEqual(planHash(changed), repository.subject('plan').hash);
-    const subject: ApprovalSubject = { kind: 'plan', hash: planHash(changed), path: PLAN_PATH };
+    const subject: ApprovalSubject = { kind: ApprovalSubjectKind.Plan, hash: planHash(changed), path: PLAN_PATH };
     assertSubjectRefused(repository, await repository.verify(subject, repository.codeOwnerProof('review-grace')));
   });
 });
@@ -82,7 +83,7 @@ function parsedForProduction(input: JsonRecord): Plan {
 async function declaredApprovalOf(plan: Plan): Promise<Approval> {
   let approval: Approval | undefined;
   await withRepository('solo', async (repository) => {
-    const verified = await repository.verify({ kind: 'plan', hash: planHash(plan), path: PLAN_PATH }, repository.lockdownProof());
+    const verified = await repository.verify({ kind: ApprovalSubjectKind.Plan, hash: planHash(plan), path: PLAN_PATH }, repository.lockdownProof());
     if (!verified.ok) throw new Error(`the plan was not approved: ${verified.error}`);
     approval = verified.value.approval;
   }, (fixture) => { fixture.protectedFiles[PLAN_PATH] = plan; });

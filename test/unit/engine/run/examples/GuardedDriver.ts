@@ -20,6 +20,7 @@ import { fakeRunEventSink } from '#test-support/fakes/ports/FakeRunEventSink.ts'
 import { fakeRunIsolation } from '#test-support/fakes/session/FakeRunIsolation.ts';
 import { fakeSession } from '#test-support/fakes/session/FakeSession.ts';
 import { baseUrlOf } from '#test-support/builders/ClearRun.ts';
+import { DriverErrorCode, PolicyVerdictKind } from '@revisum/contracts';
 
 // What the page shows for one step: the element its locator resolves to, or an open dialog's text.
 export type PageView = { readonly element?: Partial<ResolvedElement>; readonly dialogText?: string };
@@ -72,7 +73,7 @@ export function guardedDriver(steps: readonly JsonRecord[], page: PageViews = {}
       // A guard may read the open dialog's text as a second argument; one that does not ignores it.
       const ask: (resolved: ResolvedElement, dialogText: string | null) => GuardVerdict = guard;
       const verdict = ask(elementFor(raw, seen), kind === 'dialog' ? (seen?.dialogText ?? null) : null);
-      if (verdict.kind === 'deny') return Promise.resolve(failure({ code: 'policy-denied', detail: verdict.rule }));
+      if (verdict.kind === PolicyVerdictKind.Deny) return Promise.resolve(failure({ code: DriverErrorCode.PolicyDenied, detail: verdict.rule }));
       if (index >= 0) inputEvents[index] = (inputEvents[index] ?? 0) + 1;
       return Promise.resolve(success(undefined));
     },

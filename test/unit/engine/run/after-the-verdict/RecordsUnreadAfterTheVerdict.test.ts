@@ -5,7 +5,7 @@
 // not among them, because the result claims them.
 import assert from "node:assert/strict";
 import { describe, test, type TestContext } from "node:test";
-import { success, type RunEventSink, type Session } from "@revisum/engine";
+import { EventKind, success, type RunEventSink, type Session } from "@revisum/engine";
 import {
     fakeSessionOnOrders,
     runOnFakeSession,
@@ -46,8 +46,8 @@ const FINAL_STATES: readonly unknown[] = ["Passed", "Failed", "Errored", "Denied
 const logFailingAfterTheVerdict = (): RunEventSink =>
     fakeRunEventSinkFailingOn(
         (event) =>
-            event.kind === "network.blocked" ||
-            (event.kind === "run.state" && FINAL_STATES.includes(event.state)),
+            event.kind === EventKind.NetworkBlocked ||
+            (event.kind === EventKind.RunState && FINAL_STATES.includes(event.state)),
     );
 
 const BROKEN_READS: readonly {

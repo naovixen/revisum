@@ -24,6 +24,7 @@ import { FIXED_TIME_MILLISECONDS, SEED, capabilityHarness, type CapabilityHarnes
 import { declaredService, egressPolicy, fakeResolver } from '../../unit/runner/examples/DeclaredService.ts';
 import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
 import { baseUrlOf } from "#test-support/builders/ClearRun.ts";
+import { BrowserChannel } from '@revisum/contracts';
 
 const WAIT_MILLISECONDS = 10_000;
 const POLL_MILLISECONDS = 50;
@@ -91,7 +92,7 @@ async function openPopup(session: DriverSession): Promise<void> {
   assert.ok(navigated.ok, JSON.stringify(navigated));
   await session.act(capability.actionStep(click(role('button', OPEN_BUTTON))), allowEveryAction);
   const deadline = Date.now() + WAIT_MILLISECONDS;
-  const reported = (): boolean => session.egressRecords().some((entry) => entry.channel === 'popup' && entry.origin === reachable.origin);
+  const reported = (): boolean => session.egressRecords().some((entry) => entry.channel === BrowserChannel.Popup && entry.origin === reachable.origin);
   while (!reported() && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, POLL_MILLISECONDS));
   assert.ok(reported(), `the browser reported the popup: ${JSON.stringify(session.egressRecords())}`);
   await new Promise((resolve) => setTimeout(resolve, POPUP_SETTLE_MILLISECONDS));

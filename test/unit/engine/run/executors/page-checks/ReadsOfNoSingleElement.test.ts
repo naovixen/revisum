@@ -26,6 +26,7 @@ import {
 } from "../../examples/ShownElement.ts";
 import { OPEN_CART, REMEMBER_ATTRIBUTE, unsafePlan } from "../../../plan/unsafe-features/examples/UnsafePlan.ts";
 import { FAKE_ELEMENT } from "#test-support/fakes/session/FakePage.ts";
+import { SemanticLocatorKind, DomReadKind } from "@revisum/contracts";
 
 // The spread gets past the type, which refuses dom written on such a read: this is a faulty driver.
 const carryingDom = (read: ElementsRead, dom: DomValue): ElementsRead => {
@@ -35,8 +36,8 @@ const carryingDom = (read: ElementsRead, dom: DomValue): ElementsRead => {
 
 const REMEMBER_STEP_INDEX = 1;
 const ORDER_ID = "ORD-7";
-const ATTRIBUTE_READ: DomRead = { kind: "attribute", name: "data-order-id" };
-const ORDER_ID_ATTRIBUTE: DomValue = { kind: "attribute", value: ORDER_ID };
+const ATTRIBUTE_READ: DomRead = { kind: DomReadKind.Attribute, name: "data-order-id" };
+const ORDER_ID_ATTRIBUTE: DomValue = { kind: DomReadKind.Attribute, value: ORDER_ID };
 
 // Each check with a DOM read it would pass on, were that read of one element.
 const DOM_CHECKS: readonly {
@@ -45,11 +46,11 @@ const DOM_CHECKS: readonly {
 }[] = [
     {
         assertion: { kind: "hasClass", value: safe("is-active") },
-        passingRead: { kind: "classes", classes: ["is-active"] },
+        passingRead: { kind: DomReadKind.Classes, classes: ["is-active"] },
     },
     {
         assertion: { kind: "lacksClass", value: safe("is-empty") },
-        passingRead: { kind: "classes", classes: [] },
+        passingRead: { kind: DomReadKind.Classes, classes: [] },
     },
     {
         assertion: {
@@ -57,15 +58,15 @@ const DOM_CHECKS: readonly {
             property: safe("color"),
             value: safe("rgb(1, 2, 3)"),
         },
-        passingRead: { kind: "computedStyle", value: "rgb(1, 2, 3)" },
+        passingRead: { kind: DomReadKind.ComputedStyle, value: "rgb(1, 2, 3)" },
     },
     {
         assertion: { kind: "attributeEquals", name: safe("aria-sort"), value: safe("ascending") },
-        passingRead: { kind: "attribute", value: "ascending" },
+        passingRead: { kind: DomReadKind.Attribute, value: "ascending" },
     },
     {
         assertion: { kind: "attributeAbsent", name: safe("disabled") },
-        passingRead: { kind: "attribute", value: null },
+        passingRead: { kind: DomReadKind.Attribute, value: null },
     },
 ];
 
@@ -73,7 +74,7 @@ const DOM_CHECKS: readonly {
 async function rememberAttributeFrom(read: ElementProbe) {
     const asked: (DomRead | null)[] = [];
     const probe = (locator: Locator, domRead: DomRead | null): Promise<ElementProbe> => {
-        if (locator.by === "testId" && locator.testId === "order-row") {
+        if (locator.by === SemanticLocatorKind.TestId && locator.testId === "order-row") {
             asked.push(domRead);
         }
         return Promise.resolve(read);
@@ -182,11 +183,11 @@ describe("Using a run that remembers an attribute of an element", () => {
     }[] = [
         {
             name: "that lacks the attribute",
-            read: { ...FAKE_ELEMENT, dom: { kind: "attribute", value: null } },
+            read: { ...FAKE_ELEMENT, dom: { kind: DomReadKind.Attribute, value: null } },
         },
         {
             name: "whose read is of another kind",
-            read: { ...FAKE_ELEMENT, dom: { kind: "classes", classes: [ORDER_ID] } },
+            read: { ...FAKE_ELEMENT, dom: { kind: DomReadKind.Classes, classes: [ORDER_ID] } },
         },
         { name: "whose read holds no DOM value", read: FAKE_ELEMENT },
     ];

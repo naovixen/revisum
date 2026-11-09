@@ -32,6 +32,7 @@ import {
 import { fakeStoragePort } from "../ports/FakeStoragePort.ts";
 import { leaveOut } from "../LeaveOut.ts";
 import { recordCalls, type Recorded } from "../RecordCalls.ts";
+import { StepType } from "@revisum/contracts";
 
 export { FAKE_DOWNLOAD, FAKE_ELEMENT } from "./FakePage.ts";
 
@@ -176,7 +177,7 @@ function tabOnceClosed(open: DocumentSession): SessionTab {
         audit: () => refusing(TAB_UNREADABLE),
         accessibilitySnapshot: () => refusing(TAB_UNREADABLE),
         linkTargets: () => refusing(TAB_UNREADABLE),
-        act: (action) => refusing(action.type === "dialog" ? NO_DIALOG : TAB_GONE),
+        act: (action) => refusing(action.type === StepType.Dialog ? NO_DIALOG : TAB_GONE),
         frame: () => refusing(TAB_GONE),
         crashed: () => false,
         download: () => refusing(TAB_GONE),

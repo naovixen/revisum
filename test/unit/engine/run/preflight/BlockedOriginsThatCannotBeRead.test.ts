@@ -9,7 +9,7 @@ import {
     type RefusalReader,
     type SessionEgress,
 } from "@revisum/driver-cdp";
-import { failure, success, type RunEventSink, type Session } from "@revisum/engine";
+import { EventKind, failure, success, type RunEventSink, type Session } from "@revisum/engine";
 import {
     fakeSessionOnOrders,
     runOnFakeSession,
@@ -107,7 +107,7 @@ function codesIn(value: unknown): readonly string[] {
 const lastRunState = (events: RunEventSink): unknown =>
     events
         .read()
-        .filter((event) => event.kind === "run.state")
+        .filter((event) => event.kind === EventKind.RunState)
         .at(-1)?.state;
 
 const FINAL_STATES: readonly unknown[] = ["Passed", "Failed", "Errored", "Denied"];
@@ -115,7 +115,7 @@ const FINAL_STATES: readonly unknown[] = ["Passed", "Failed", "Errored", "Denied
 // A log that works until it is told how the run ended.
 const logFailingAtTheEnd = (): RunEventSink =>
     fakeRunEventSinkFailingOn(
-        (event) => event.kind === "run.state" && FINAL_STATES.includes(event.state),
+        (event) => event.kind === EventKind.RunState && FINAL_STATES.includes(event.state),
     );
 
 describe("Using the run", () => {

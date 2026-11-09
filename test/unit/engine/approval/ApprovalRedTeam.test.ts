@@ -11,6 +11,7 @@ import {
   APPROVERS_PATH, PLAN_PATH, approversOf, assertRefused, memoryApprovalStore, parsedSignupPlan, withRepository,
   type FixtureRepository, type TestRepository,
 } from './examples/MemoryApprovalStore.ts';
+import { AccountType } from '@revisum/contracts';
 
 type Attempt = {
   readonly title: string;
@@ -103,7 +104,7 @@ test('the same lock-down, with a person as maintainer who merged, does approve',
   }, (fixture) => {
     const lockdown = approversOf(fixture).agentLockdown;
     if (lockdown !== undefined) lockdown.maintainer = 'maintainer-mia';
-    fixture.landings.push({ commit: 'commit-person-merge', branch: 'main', login: 'maintainer-mia', type: 'user', at: '2026-10-25T09:00:00Z' });
+    fixture.landings.push({ commit: 'commit-person-merge', branch: 'main', login: 'maintainer-mia', type: AccountType.User, at: '2026-10-25T09:00:00Z' });
     fixture.lastCommitsOnProtectedBranch = { [PLAN_PATH]: 'commit-person-merge' };
     if (fixture.protectedFiles[APPROVERS_PATH] === undefined) throw new Error('the red-team repository has no approvers.json');
   });

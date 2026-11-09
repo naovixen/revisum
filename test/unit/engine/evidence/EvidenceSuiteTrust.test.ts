@@ -19,6 +19,7 @@ import {
   SUITE_FOLDER, SUITE_NAME, chooseSuite, declaredCheckoutSuite, evidenceRun, opensMergeGate, passesFor, recordedReport, testsOf,
   withoutSpec, type JsonRecord,
 } from './examples/EvidenceRun.ts';
+import { SuitePass } from '@revisum/contracts';
 
 type HostileChange = { readonly description: string; readonly changedFiles: readonly string[]; readonly workingCopy: Record<string, unknown> };
 
@@ -160,8 +161,8 @@ test('a change that edits no suite file gets only the gating pass, still on the 
 
 test('every test of a proposal pass is labelled proposal, and of a gating pass gating', () => {
   const report = recordedReport('passing-with-criteria');
-  const proposal = testsOf(evidenceRun(report, { pass: 'proposal' }));
-  const gating = testsOf(evidenceRun(report, { pass: 'gating' }));
+  const proposal = testsOf(evidenceRun(report, { pass: SuitePass.Proposal }));
+  const gating = testsOf(evidenceRun(report, { pass: SuitePass.Gating }));
   assert.ok(proposal.length > 0);
   assert.deepEqual(proposal.map((entry) => entry.pass), proposal.map(() => 'proposal'));
   assert.deepEqual(gating.map((entry) => entry.pass), gating.map(() => 'gating'));
@@ -173,7 +174,7 @@ const cleanPassingReport = (): JsonRecord => withoutSpec(recordedReport('passing
 
 test('a proposal pass never opens the merge gate, even when every test passed', () => {
   const report = cleanPassingReport();
-  const proposal = evidenceRun(report, { pass: 'proposal' });
+  const proposal = evidenceRun(report, { pass: SuitePass.Proposal });
   assert.equal(proposal.state, 'Passed', 'the counter-example below needs a passing run');
   assert.equal(opensMergeGate(proposal), false);
 });

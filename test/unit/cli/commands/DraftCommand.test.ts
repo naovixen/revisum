@@ -20,6 +20,7 @@ import {
   replyWithContent, replyWithoutText, requestBody, runDraft, seededSecrets, startFakePlanner, draftWorkspace, stringsIn, withPlannedRun,
   type JsonRecord, type WireFormat,
 } from './examples/DraftCommand.ts';
+import { AuditEventKind } from '@revisum/contracts';
 
 // A local planner on the fake's own loopback origin, answering with the recorded OpenAI-compatible reply.
 const localSetup = {
@@ -51,7 +52,7 @@ test('drafting from a spec writes the recorded planner text to --out, byte for b
 
 test('the draft is recorded with source draft-command, basis core-recorded and the spec as its reference', async () => {
   await withPlannedRun(localSetup, (run) => {
-    const submissions = run.events.recorded.filter((recorded) => recorded.event.kind === 'plan.submitted');
+    const submissions = run.events.recorded.filter((recorded) => recorded.event.kind === AuditEventKind.PlanSubmitted);
     assert.equal(submissions.length, 1, JSON.stringify(run.events.recorded));
     assert.deepEqual(submissions[0]?.event.planProvenance, { source: 'draft-command', basis: 'core-recorded', reference: SPEC_PATH });
     assert.deepEqual(outputData(run)['provenance'], { source: 'draft-command', basis: 'core-recorded', reference: SPEC_PATH });

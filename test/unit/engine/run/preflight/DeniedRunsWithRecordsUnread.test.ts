@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
-    type ActionGuard,
+    EventKind, type ActionGuard,
     failure,
     type RunEventSink,
     type RunPorts,
@@ -21,6 +21,7 @@ import {
     unsafeProjectFile,
     type JsonRecord,
 } from "../../plan/unsafe-features/examples/UnsafePlan.ts";
+import { DriverErrorCode, PolicyVerdictKind } from "@revisum/contracts";
 
 // In English, so the guard's built-in irreversible patterns apply.
 const PROJECT_FILE = unsafeProjectFile(undefined, {
@@ -53,8 +54,8 @@ const sessionAskingTheGuard = (changes: Partial<Session> = {}): Session =>
                 null,
             );
             return Promise.resolve(
-                verdict?.kind === "deny"
-                    ? failure({ code: "policy-denied", detail: "denied" })
+                verdict?.kind === PolicyVerdictKind.Deny
+                    ? failure({ code: DriverErrorCode.PolicyDenied, detail: "denied" })
                     : success(undefined),
             );
         },
@@ -80,7 +81,7 @@ async function denialWithSoundRecords() {
 const lastRunStateLogged = (events: RunEventSink): Readonly<Record<string, unknown>> => {
     const last = events
         .read()
-        .filter((event) => event.kind === "run.state")
+        .filter((event) => event.kind === EventKind.RunState)
         .at(-1);
     assert.ok(last !== undefined, "the log holds no run.state entry");
     return Object.fromEntries(

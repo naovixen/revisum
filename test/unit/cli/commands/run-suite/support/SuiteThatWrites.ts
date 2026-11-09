@@ -25,6 +25,7 @@ import {
     suiteCheckout,
 } from "../examples/SuiteRun.ts";
 import { fakeWorkloadRunner } from "#test-support/fakes/services/FakeWorkloadRunner.ts";
+import { WorkloadStop, WorkloadOutcomeKind } from "@revisum/contracts";
 
 // The recorded passing report with its two malformed criterion annotations left out: they would
 // raise a review item, which keeps the merge gate shut for a reason of its own.
@@ -59,8 +60,8 @@ export function suiteThatWrites(suite: WrittenSuite): WorkloadRunner {
                 };
                 const outcome: WorkloadOutcome =
                     isSuite && suite.timedOut === true
-                        ? { kind: "timed-out", stop: "removed", ...records }
-                        : { kind: "exited", exitCode: isSuite ? (suite.exitCode ?? 0) : 0, ...records };
+                        ? { kind: WorkloadOutcomeKind.TimedOut, stop: WorkloadStop.Removed, ...records }
+                        : { kind: WorkloadOutcomeKind.Exited, exitCode: isSuite ? (suite.exitCode ?? 0) : 0, ...records };
                 return Promise.resolve(success(outcome));
             },
         },

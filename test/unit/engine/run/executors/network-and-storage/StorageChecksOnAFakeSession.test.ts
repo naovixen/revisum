@@ -8,12 +8,13 @@ import { ORIGIN } from "../../values/examples/RunPlan.ts";
 import { expectStorage } from "./examples/Stubs.ts";
 import { OPEN_CART, unsafePlan, type JsonRecord } from "../../../plan/unsafe-features/examples/UnsafePlan.ts";
 import { fakeStoragePort } from "#test-support/fakes/ports/FakeStoragePort.ts";
+import { StepType } from "@revisum/contracts";
 
 const STORED_VALUE = "stored-value";
 const EQUALS_STORED_VALUE: JsonRecord = { kind: "equals", value: STORED_VALUE };
 
 const storageCheckOf = (result: RunResult) => {
-    const step = result.steps.find((candidate) => candidate.type === "expectStorage");
+    const step = result.steps.find((candidate) => candidate.type === StepType.ExpectStorage);
     assert.ok(step !== undefined, "the plan holds a storage check");
     return { outcome: step.outcome, code: step.code, observed: step.observed };
 };

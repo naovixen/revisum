@@ -39,6 +39,7 @@ import { memoryEventSink, type MemoryEventSink, type RecordedEvent } from '../..
 import { FIXTURES } from '../../../../support/repository/RepositoryRoot.ts';
 import { defaultParser, signupPlan, type JsonRecord } from '../../plan/examples/GoldenPlan.ts';
 import { fakeApprovalStore } from '#test-support/fakes/ports/FakeApprovalStore.ts';
+import { ApprovalSubjectKind } from '@revisum/contracts';
 
 export const PLAN_PATH = 'plans/signup.json';
 export const PROJECT_PATH = 'project.json';
@@ -228,8 +229,8 @@ export function openRepository(name: RepositoryName, edit: (fixture: FixtureRepo
     },
     subject(kind) {
       const path = SUBJECT_PATHS[kind];
-      if (kind === 'plan') return { kind, hash: planHash(parsedSignupPlan()), path };
-      if (kind === 'holdout-plan') return { kind, hash: HOLDOUT_PLAN_HASH, path };
+      if (kind === ApprovalSubjectKind.Plan) return { kind, hash: planHash(parsedSignupPlan()), path };
+      if (kind === ApprovalSubjectKind.HoldoutPlan) return { kind, hash: HOLDOUT_PLAN_HASH, path };
       const content = fixture.protectedFiles[path];
       if (content === undefined) throw new Error(`the ${name} repository has no ${path} on its protected branch`);
       return { kind, hash: sha256(fileBytes(content)), path };

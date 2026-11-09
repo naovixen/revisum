@@ -29,6 +29,7 @@ import {
     targetOf,
     trustedProjectWith,
 } from "../../engine/target/examples/TargetOf.ts";
+import { GuaranteeLevel } from "@revisum/contracts";
 
 const SAME_DEADLINE_MILLISECONDS = 60_000;
 const DESKTOP = targetInput("chromium-desktop", "fake-any", "chromium", "desktop-1280");
@@ -37,7 +38,7 @@ const OPTIONS: ExploreOptions = {
     maximumPages: 1,
     maximumDepth: 0,
     pageTimeoutMilliseconds: 1000,
-    placement: "host",
+    placement: GuaranteeLevel.Host,
 };
 const PENDING = "still waiting";
 

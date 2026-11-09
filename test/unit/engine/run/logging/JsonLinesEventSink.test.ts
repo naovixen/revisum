@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, test } from 'node:test';
 import { jsonLinesEventSink, type ActorType, type DerivedActor, type EventInput, type EventSink } from '@revisum/engine';
+import { AuditEventKind } from '@revisum/contracts';
 
 // Only the approval verifier and core's runtime mint a DerivedActor. The sink needs one, and no
 // minting code exists for tests, so this helper is the one place here that builds it directly.
@@ -14,9 +15,9 @@ const derivedActor = (actor: string, actorType: ActorType): DerivedActor => ({ a
 const FOUNDER = derivedActor('actor-hash-founder', 'person-declared');
 const AGENT = derivedActor('actor-hash-agent', 'agent');
 
-const SUBMITTED: EventInput = { kind: 'plan.submitted', runId: 'run-0001', subjectHash: 'plan-hash-1', criterionIds: ['signup.creates-account'] };
-const APPROVED: EventInput = { kind: 'plan.approved', runId: 'run-0001', subjectHash: 'plan-hash-1' };
-const FINISHED: EventInput = { kind: 'run.finished', runId: 'run-0001' };
+const SUBMITTED: EventInput = { kind: AuditEventKind.PlanSubmitted, runId: 'run-0001', subjectHash: 'plan-hash-1', criterionIds: ['signup.creates-account'] };
+const APPROVED: EventInput = { kind: AuditEventKind.PlanApproved, runId: 'run-0001', subjectHash: 'plan-hash-1' };
+const FINISHED: EventInput = { kind: AuditEventKind.RunFinished, runId: 'run-0001' };
 
 let folder: string;
 let path: string;

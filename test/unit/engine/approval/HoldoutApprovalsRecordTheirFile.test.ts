@@ -13,12 +13,13 @@ import {
     type FixtureRepository,
     type TestRepository,
 } from "./examples/MemoryApprovalStore.ts";
+import { ApprovalSubjectKind } from "@revisum/contracts";
 
 const PULL_REQUEST = "12";
 const HEAD_COMMIT = "commit-pull-head";
 
 const holdoutNaming = (path: string | undefined): ApprovalSubject => ({
-    kind: "holdout-plan",
+    kind: ApprovalSubjectKind.HoldoutPlan,
     hash: HOLDOUT_PLAN_HASH,
     ...(path === undefined ? {} : { path }),
 });

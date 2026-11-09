@@ -24,6 +24,7 @@ import {
     TWO_ELEMENTS,
     unreadable,
 } from "../examples/ShownElement.ts";
+import { ElementTextKind, ElementStateKind } from "@revisum/contracts";
 
 const STATE_CHECKS = [
     { kind: "selected", state: "selected", isPassingState: true },
@@ -37,15 +38,15 @@ const STATE_CHECKS = [
 // Every check of one element, so each is held to the single-element rule.
 const SINGLE_ELEMENT_CHECKS: readonly ResolvedElementAssertion[] = [
     VISIBLE,
-    { kind: "enabled" },
-    { kind: "disabled" },
-    { kind: "textEquals", value: safe("Order placed") },
-    { kind: "textContains", value: safe("Order") },
-    { kind: "valueEquals", value: safe("Ada Lovelace") },
-    { kind: "valueContains", value: safe("Ada") },
+    { kind: ElementStateKind.Enabled },
+    { kind: ElementStateKind.Disabled },
+    { kind: ElementTextKind.TextEquals, value: safe("Order placed") },
+    { kind: ElementTextKind.TextContains, value: safe("Order") },
+    { kind: ElementTextKind.ValueEquals, value: safe("Ada Lovelace") },
+    { kind: ElementTextKind.ValueContains, value: safe("Ada") },
     { kind: "hrefEquals", value: safe("/orders") },
-    { kind: "selected" },
-    { kind: "checked" },
+    { kind: ElementStateKind.Selected },
+    { kind: ElementStateKind.Checked },
     { kind: "hasClass", value: safe("is-active") },
     { kind: "attributeAbsent", name: safe("disabled") },
 ];

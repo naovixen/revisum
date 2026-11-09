@@ -12,6 +12,7 @@ import {
     type Verdict,
 } from "@revisum/engine";
 import { severalElements } from "#test-support/fakes/session/SeveralElements.ts";
+import { ElementStateKind } from "@revisum/contracts";
 
 export const BASE_URL = "https://shop.example.test";
 export const ORDERS_URL = `${BASE_URL}/orders`;
@@ -52,9 +53,9 @@ export const statesOf = (states: Partial<AccessibleStates>): ElementProbe => ({
     states: { selected: null, expanded: null, pressed: null, current: null, ...states },
 });
 
-export const ABSENT: ResolvedElementAssertion = { kind: "absent" };
-export const HIDDEN: ResolvedElementAssertion = { kind: "hidden" };
-export const VISIBLE: ResolvedElementAssertion = { kind: "visible" };
+export const ABSENT: ResolvedElementAssertion = { kind: ElementStateKind.Absent };
+export const HIDDEN: ResolvedElementAssertion = { kind: ElementStateKind.Hidden };
+export const VISIBLE: ResolvedElementAssertion = { kind: ElementStateKind.Visible };
 export const COUNT_OF_NONE: ResolvedElementAssertion = { kind: "countEquals", value: 0 };
 
 export const verdictName = (verdict: Verdict): string =>

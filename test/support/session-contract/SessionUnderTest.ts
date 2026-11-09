@@ -24,6 +24,7 @@ import {
     resolvedDownloadOf,
     resolvedLocatorOf,
 } from "../PerformableActionOf.ts";
+import { PolicyRuleId, PolicyVerdictKind } from "@revisum/contracts";
 
 export type SessionUnderTest = {
     readonly session: Session;
@@ -102,9 +103,9 @@ function guardAnswering(verdict: GuardVerdict): GuardAndQuestions {
         },
     };
 }
-export const allowing = (): GuardAndQuestions => guardAnswering({ kind: "allow" });
+export const allowing = (): GuardAndQuestions => guardAnswering({ kind: PolicyVerdictKind.Allow });
 export const denying = (): GuardAndQuestions =>
-    guardAnswering({ kind: "deny", rule: "irreversible-dialog", stepIndex: 1 });
+    guardAnswering({ kind: PolicyVerdictKind.Deny, rule: PolicyRuleId.IrreversibleDialog, stepIndex: 1 });
 
 export function failureCode(
     result: Result<unknown, { readonly code: string }> | undefined,

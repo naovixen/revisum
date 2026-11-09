@@ -19,6 +19,7 @@ import {
   MAXIMUM_NAME_LENGTH, SECOND_ORIGIN, START_ORIGIN, checkDraftLocators, crawlProjectFile,
   type LineWarning, type PageMap, type PageMapNode,
 } from './examples/CrawlOutcome.ts';
+import { GuaranteeLevel } from '@revisum/contracts';
 
 let project: TrustedProject;
 before(async () => { project = await trustedProjectFrom(crawlProjectFile()); });
@@ -33,7 +34,7 @@ const leaf = (role: string, name: string): PageMapNode => ({ role, name, childre
 const MAP: PageMap = {
   origin: START_ORIGIN,
   truncated: false,
-  guaranteeLevel: 'host',
+  guaranteeLevel: GuaranteeLevel.Host,
   pages: [
     {
       path: '/contact', title: 'Contact Lantern Books', depth: 1,

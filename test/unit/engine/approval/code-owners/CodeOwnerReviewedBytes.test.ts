@@ -14,6 +14,7 @@ import {
   PLAN_PATH, assertRefused, eventsOfKind, parsedSignupPlan, withRepository, type FixtureRepository,
 } from '../examples/MemoryApprovalStore.ts';
 import { signupPlan, withValue } from '../../plan/examples/GoldenPlan.ts';
+import { ApprovalSubjectKind } from '@revisum/contracts';
 
 // Pull request 12 in the team repository: owner-grace's review-grace is on commit-pull-head, the
 // last commit touching the plan, and review-grace-early is on the older commit-pull-first.
@@ -27,7 +28,7 @@ const REVIEWED_PLAN = retitledPlan('Sign-up with a newsletter opt-in');
 const LATER_PLAN = retitledPlan('Sign-up with a newsletter opt-out');
 const NEVER_COMMITTED_PLAN = retitledPlan('Sign-up nobody committed');
 
-const planSubject = (plan: ReturnType<typeof parsedSignupPlan>): ApprovalSubject => ({ kind: 'plan', hash: planHash(plan), path: PLAN_PATH });
+const planSubject = (plan: ReturnType<typeof parsedSignupPlan>): ApprovalSubject => ({ kind: ApprovalSubjectKind.Plan, hash: planHash(plan), path: PLAN_PATH });
 
 // Gives `commit` its own version of the plan; the protected branch keeps the old one.
 const planAtCommit = (commit: string, plan: ReturnType<typeof parsedSignupPlan>) => (fixture: FixtureRepository): void => {

@@ -18,6 +18,7 @@ import {
     tunnelRequestText,
 } from "../support/GetThroughProxy.ts";
 import { fakeResolver } from "../examples/DeclaredService.ts";
+import { EgressDecision } from "@revisum/contracts";
 
 const APP_BODY = "reached the app";
 const IDLE_LIMIT_MILLISECONDS = 130_000;
@@ -151,7 +152,7 @@ const attempts = (): readonly Attempt[] => [
 ];
 
 const blockedDecisions = (proxy: EgressProxy, seenAs: string): readonly unknown[] =>
-    proxy.decisions().filter((entry) => entry.origin === seenAs && entry.decision === "blocked");
+    proxy.decisions().filter((entry) => entry.origin === seenAs && entry.decision === EgressDecision.Blocked);
 
 before(async () => {
     app = createServer((incoming, response) => {

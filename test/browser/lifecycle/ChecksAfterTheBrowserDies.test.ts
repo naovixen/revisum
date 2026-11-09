@@ -27,6 +27,7 @@ import {
     requestMatcher,
     routedPagesHarness,
 } from "../../support/browser/harnesses/RoutedPagesHarness.ts";
+import { StepType } from "@revisum/contracts";
 
 const CRASH_NOTICE_MILLISECONDS = 5000;
 const CRASH_NOTICE_POLL_MILLISECONDS = 20;
@@ -91,7 +92,7 @@ function driverThatDiesAfterTheHover(death: Death | null) {
             const session = opened.value;
             const act = async (action: PerformableAction, guard: ActionGuard) => {
                 const acted = await session.act(action, guard);
-                if (action.type === "hover" && death !== null) {
+                if (action.type === StepType.Hover && death !== null) {
                     await dieIn(session, death);
                 }
                 return acted;

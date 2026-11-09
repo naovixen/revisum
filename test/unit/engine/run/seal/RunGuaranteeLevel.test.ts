@@ -11,6 +11,7 @@ import { ORIGIN } from '../../plan/examples/GoldenPlan.ts';
 import { DEFAULT_CLOCK_START, DEFAULT_SEED, OPEN_ORDERS, accepted, planOf, projectFileWith, recordingDriver } from '../values/examples/RunPlan.ts';
 import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
 import { fakeRunIsolation } from '#test-support/fakes/session/FakeRunIsolation.ts';
+import { RunMode } from '@revisum/contracts';
 
 // Runs one plan on the shared test project, isolated as the port given says.
 async function runWith(isolation: RunIsolation): Promise<RunResult> {
@@ -28,7 +29,7 @@ async function runWith(isolation: RunIsolation): Promise<RunResult> {
   });
 }
 
-const statementWith = (egressEnforced: boolean) => guaranteeStatement({ mode: 'plan', egressEnforced, unmaskedScreenshotsKept: false, unsafeFeatures: [] });
+const statementWith = (egressEnforced: boolean) => guaranteeStatement({ mode: RunMode.Plan, egressEnforced, unmaskedScreenshotsKept: false, unsafeFeatures: [] });
 
 test('a run started at the isolated level states that egress was enforced', async () => {
   const { guarantees, state } = await runWith(fakeRunIsolation('isolated'));

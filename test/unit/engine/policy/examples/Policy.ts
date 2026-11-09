@@ -14,6 +14,7 @@ import {
   PLAN_PATH, eventsOfKind, memoryEventSink, withRepository, type MemoryEventSink, type RecordedEvent,
 } from '../../approval/examples/MemoryApprovalStore.ts';
 import { fakeProtectedBranchHolding } from '#test-support/fakes/ports/FakeVersionControlPort.ts';
+import { ApprovalSubjectKind } from '@revisum/contracts';
 
 export const ORIGIN = 'http://127.0.0.1:4173';
 export const PRODUCTION_ORIGIN = 'https://shop.example.com';
@@ -166,7 +167,7 @@ export const PROPOSAL: PlanStanding = { mode: 'proposal' };
 export async function approvedStanding(plan: Plan): Promise<PlanStanding> {
   let standing: PlanStanding | undefined;
   await withRepository('solo', async (repository) => {
-    const verified = await repository.verify({ kind: 'plan', hash: planHash(plan), path: PLAN_PATH }, repository.lockdownProof());
+    const verified = await repository.verify({ kind: ApprovalSubjectKind.Plan, hash: planHash(plan), path: PLAN_PATH }, repository.lockdownProof());
     if (!verified.ok) throw new Error(`the test plan was not approved: ${verified.error}`);
     standing = { mode: 'approved', approval: verified.value.approval };
   }, (fixture) => { fixture.protectedFiles[PLAN_PATH] = plan; });

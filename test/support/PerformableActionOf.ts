@@ -19,6 +19,7 @@ import {
     type Secret,
     type StepErrorCode,
 } from "@revisum/engine";
+import { StepType } from "@revisum/contracts";
 
 function resolvedOrThrow<Value>(resolved: Result<Value, StepErrorCode>, what: unknown): Value {
     if (!resolved.ok) {
@@ -39,7 +40,7 @@ export function performableActionOf(
     step: Exclude<ActionStep, DownloadStep>,
     secret?: Secret,
 ): PerformableAction {
-    if (step.type === "dialog") {
+    if (step.type === StepType.Dialog) {
         if (step.expectText === undefined) {
             return { type: step.type, action: step.action };
         }
@@ -52,7 +53,7 @@ export function performableActionOf(
         return { type: step.type, action: step.action, expectText };
     }
     const resolved = resolvedOrThrow(resolveLiteralActionStep(step, DEFAULT_LIMITS), step);
-    if (resolved.type !== "fill") {
+    if (resolved.type !== StepType.Fill) {
         return resolved;
     }
     return {

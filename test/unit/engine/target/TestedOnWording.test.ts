@@ -6,6 +6,7 @@ import { describe, test } from 'node:test';
 import { testedOn, type Target } from '@revisum/engine';
 import { type JsonRecord } from '../plan/examples/GoldenPlan.ts';
 import { projectWith, targetInput, targetOf } from './examples/TargetOf.ts';
+import { Engine, Fidelity } from '@revisum/contracts';
 
 const BUILD = { version: '156.0.7258.5', executablePath: '/browsers/chromium/chrome' };
 
@@ -57,7 +58,7 @@ describe('the wording names engine, version, device and fidelity', () => {
     assert.ok(desktop.startsWith('Chromium 156, '), desktop);
     assert.ok(!desktop.includes('('), `no fidelity note on a desktop engine target: ${desktop}`);
     assert.ok(!testedOn(target('chromium-phone-engine'), BUILD).includes('('));
-    const notes = FIDELITIES.filter((fidelity) => fidelity !== 'engine')
+    const notes = FIDELITIES.filter((fidelity) => fidelity !== Fidelity.Engine)
       .map((fidelity) => testedOn(target(`chromium-phone-${fidelity}`), BUILD))
       .map((wording) => /\(([^()]+)\)$/.exec(wording)?.[1]);
     assert.ok(notes.every((note) => note !== undefined), `each non-engine fidelity ends in a bracketed note: ${JSON.stringify(notes)}`);
@@ -71,7 +72,7 @@ describe('the wording names engine, version, device and fidelity', () => {
 
 describe('the wording never claims a device or browser that was not there', () => {
   test('WebKit always reads "patched WebKit, not Safari"', () => {
-    for (const each of allTargets.filter((candidate) => candidate.engine === 'webkit')) {
+    for (const each of allTargets.filter((candidate) => candidate.engine === Engine.Webkit)) {
       for (const wording of [testedOn(each), testedOn(each, { version: '26.0', executablePath: '/browsers/webkit/run' })]) {
         assert.ok(wording.includes('patched WebKit'), `${each.id}: ${wording}`);
         assert.ok(wording.includes('not Safari'), `${each.id}: ${wording}`);

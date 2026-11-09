@@ -6,12 +6,13 @@ import assert from 'node:assert/strict';
 import { after, test } from 'node:test';
 import { closedScenario, removeFakeExecutables, replayRun, replayed, runScenario, type Scenario } from './examples/ManifestUnderTest.ts';
 import { OPEN_ORDERS, planOf, projectFileWith } from '../run/values/examples/RunPlan.ts';
+import { GuaranteeLevel } from '@revisum/contracts';
 
 after(removeFakeExecutables);
 
 const NO_LEVEL: Scenario = closedScenario(projectFileWith(), planOf([OPEN_ORDERS]));
-const ISOLATED: Scenario = { ...NO_LEVEL, guaranteeLevel: 'isolated' };
-const HOST: Scenario = { ...NO_LEVEL, guaranteeLevel: 'host' };
+const ISOLATED: Scenario = { ...NO_LEVEL, guaranteeLevel: GuaranteeLevel.Isolated };
+const HOST: Scenario = { ...NO_LEVEL, guaranteeLevel: GuaranteeLevel.Host };
 
 test('an isolated run replayed without its level gives the verdict mismatch, never a pass', async () => {
   const ran = await runScenario(ISOLATED);

@@ -22,7 +22,7 @@
 //   - a run without the port refuses a plan with a database command before any side effect.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { success, type EgressEvent, type WorkloadErrorCode, type WorkloadOutcome } from '@revisum/contracts';
+import { WorkloadOutcomeKind, success, type EgressEvent, type WorkloadErrorCode, type WorkloadOutcome } from '@revisum/contracts';
 import { createRunService, noDatabaseCommandRunner, type RunService, parseProject, planParser, type LoggedEvent, type PlanStanding, type Project, type Result, type RunPorts, type RunResult } from '@revisum/engine';
 import { baseUrlOf, clearRun, trustedProjectFrom } from '../../../../../../support/builders/ClearRun.ts';
 import { TEST_SERVICE, testProjectInput , TEST_SERVICE_SECRET_NAMES } from '../../../../plan/examples/GoldenPlan.ts';
@@ -203,7 +203,7 @@ const outputOf = (text: string, truncated = false) => ({ bytes: new TextEncoder(
 
 export function outcomeOf(answer: CommandAnswer): CommandReply {
   const records = { egressEvents: [...(answer.egressEvents ?? [])], stdout: outputOf(answer.stdout ?? '', answer.truncated ?? false), stderr: outputOf('') };
-  return success(answer.timedOut === true ? { kind: 'timed-out', stop: 'removed', ...records } : { kind: 'exited', exitCode: answer.exitCode ?? 0, ...records });
+  return success(answer.timedOut === true ? { kind: WorkloadOutcomeKind.TimedOut, stop: 'removed', ...records } : { kind: WorkloadOutcomeKind.Exited, exitCode: answer.exitCode ?? 0, ...records });
 }
 
 export type FakeCommandRunner = {

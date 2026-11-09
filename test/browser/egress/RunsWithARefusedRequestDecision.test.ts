@@ -22,6 +22,7 @@ import { startRelayedDriver } from "#test-support/browser/driver/RelayedDriver.t
 import { shareBrowserInThisFile } from "#test-support/browser/ShareBrowserInThisFile.ts";
 import { capabilityHarness, type CapabilityHarness } from "#test-support/browser/harnesses/CapabilityHarness.ts";
 import type { FixtureRoute } from "#test-support/builders/FixtureServer.ts";
+import { EventKind } from "@revisum/engine";
 
 shareBrowserInThisFile();
 
@@ -143,7 +144,7 @@ const refusalAfterTheLastStep = (
 const failuresLogged = (ran: BrowserRun, code: string): readonly string[] =>
     ran.events
         .read()
-        .filter((event) => event.kind === "step.end" && event.code === code)
+        .filter((event) => event.kind === EventKind.StepEnd && event.code === code)
         .map((event) => event.detail ?? "");
 
 describe("Using a run in a real browser", () => {

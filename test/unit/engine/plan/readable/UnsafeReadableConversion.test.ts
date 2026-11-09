@@ -16,6 +16,7 @@ import {
   FEATURES, GOLDEN_TEXT_FOLDER_PATH, UNSAFE_LANGUAGE_FEATURES, UNSAFE_MARK, everyUnsafeExample, generatedUnsafePlans, parseAll, parsedWith,
   planFromText, readingOf, unsafeFeaturesUsed, unsafeGoldenJsonFile, unsafeGoldenPlan, unsafeGoldenText, unsafeLimits, type JsonRecord,
 } from './examples/UnsafeMark.ts';
+import { UnsafeFeature } from '@revisum/contracts';
 
 const EXAMPLES = everyUnsafeExample();
 const GENERATED_COUNT = 240;
@@ -217,18 +218,18 @@ for (const { name, plan } of EXAMPLES) {
 
 // The new grammar words in another case, on the golden texts. Only words outside quoted text change.
 const WORD_CASE_CHANGES: readonly { readonly feature: (typeof FEATURES)[number]; readonly from: string; readonly to: string }[] = [
-  { feature: 'css-locator', from: 'Unsafe: Expect first css "', to: 'Unsafe: Expect FIRST css "' },
-  { feature: 'css-locator', from: '" containing text "Add" inside 2nd css "', to: '" Containing Text "Add" INSIDE 2nd Css "' },
-  { feature: 'xpath-locator', from: 'Unsafe: Expect xpath "', to: 'Unsafe: expect XPATH "' },
-  { feature: 'dom-checks', from: '" has class "', to: '" HAS CLASS "' },
-  { feature: 'dom-checks', from: '" lacks class "', to: '" Lacks Class "' },
-  { feature: 'dom-checks', from: '" computed style background-color is "', to: '" COMPUTED STYLE background-color IS "' },
-  { feature: 'dom-checks', from: '" attribute disabled is absent', to: '" ATTRIBUTE disabled IS ABSENT' },
-  { feature: 'dom-checks', from: 'Unsafe: Remember attribute data-order-id of test id', to: 'Unsafe: REMEMBER ATTRIBUTE data-order-id OF test id' },
-  { feature: 'page-script', from: 'Unsafe: Run page script readCart with', to: 'Unsafe: RUN Page Script readCart WITH' },
-  { feature: 'page-script', from: '" remembering field itemCount as cartCount', to: '" REMEMBERING FIELD itemCount AS cartCount' },
-  { feature: 'inline-page-script', from: 'Unsafe: Run inline read page script returning blockCount at "', to: 'Unsafe: Run INLINE READ PAGE SCRIPT RETURNING blockCount AT "' },
-  { feature: 'database-command', from: 'Unsafe: Expect database command countOrders', to: 'Unsafe: Expect DATABASE COMMAND countOrders' },
+  { feature: UnsafeFeature.CssLocator, from: 'Unsafe: Expect first css "', to: 'Unsafe: Expect FIRST css "' },
+  { feature: UnsafeFeature.CssLocator, from: '" containing text "Add" inside 2nd css "', to: '" Containing Text "Add" INSIDE 2nd Css "' },
+  { feature: UnsafeFeature.XpathLocator, from: 'Unsafe: Expect xpath "', to: 'Unsafe: expect XPATH "' },
+  { feature: UnsafeFeature.DomChecks, from: '" has class "', to: '" HAS CLASS "' },
+  { feature: UnsafeFeature.DomChecks, from: '" lacks class "', to: '" Lacks Class "' },
+  { feature: UnsafeFeature.DomChecks, from: '" computed style background-color is "', to: '" COMPUTED STYLE background-color IS "' },
+  { feature: UnsafeFeature.DomChecks, from: '" attribute disabled is absent', to: '" ATTRIBUTE disabled IS ABSENT' },
+  { feature: UnsafeFeature.DomChecks, from: 'Unsafe: Remember attribute data-order-id of test id', to: 'Unsafe: REMEMBER ATTRIBUTE data-order-id OF test id' },
+  { feature: UnsafeFeature.PageScript, from: 'Unsafe: Run page script readCart with', to: 'Unsafe: RUN Page Script readCart WITH' },
+  { feature: UnsafeFeature.PageScript, from: '" remembering field itemCount as cartCount', to: '" REMEMBERING FIELD itemCount AS cartCount' },
+  { feature: UnsafeFeature.InlinePageScript, from: 'Unsafe: Run inline read page script returning blockCount at "', to: 'Unsafe: Run INLINE READ PAGE SCRIPT RETURNING blockCount AT "' },
+  { feature: UnsafeFeature.DatabaseCommand, from: 'Unsafe: Expect database command countOrders', to: 'Unsafe: Expect DATABASE COMMAND countOrders' },
 ];
 
 for (const { feature, from, to } of WORD_CASE_CHANGES) {

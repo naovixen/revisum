@@ -18,6 +18,7 @@ import {
     suiteThatWrites,
     writeReportInto,
 } from "./support/SuiteThatWrites.ts";
+import { SuitePass } from "@revisum/contracts";
 
 const PASSING_REPORT = passingReportWithNothingToReview();
 
@@ -36,7 +37,7 @@ const portsWithoutPass = () =>
                 }),
                 checkout: suiteCheckout(),
                 outputDirectory: outputFolder(),
-                pass: "gating",
+                pass: SuitePass.Gating,
             }),
         ).filter(([name]) => name !== "pass"),
     );
@@ -68,7 +69,7 @@ describe("Using a suite run", () => {
     describe("given a caller that names the proposal pass", () => {
         describe("when the passing suite ends", () => {
             test("then it should end Passed and keep the merge gate shut", async () => {
-                const result = await runSuiteOn(passingSuite(), { pass: "proposal" });
+                const result = await runSuiteOn(passingSuite(), { pass: SuitePass.Proposal });
                 assert.equal(result.state, "Passed");
                 assert.equal(evidenceMergeGateOpen(result), false);
             });
@@ -78,7 +79,7 @@ describe("Using a suite run", () => {
     describe("given a caller that names the gating pass", () => {
         describe("when the passing suite ends", () => {
             test("then it should end Passed and open the merge gate", async () => {
-                const result = await runSuiteOn(passingSuite(), { pass: "gating" });
+                const result = await runSuiteOn(passingSuite(), { pass: SuitePass.Gating });
                 assert.equal(result.state, "Passed");
                 assert.equal(evidenceMergeGateOpen(result), true);
             });

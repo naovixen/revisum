@@ -21,6 +21,7 @@ import {
   call, callPlanOf, callProjectFile, cleanupRecords, emptyReply, expectBackend, failedReply, jsonReply, orderArguments, requestLine,
   reviewItemCodes, runWithCalls, shopWith, stepLines, textReply, withCleanup, type JsonRecord, type Reply,
 } from './examples/ShopService.ts';
+import { HttpMethod } from '@revisum/contracts';
 
 const ORDER_PAID = expectBackend('getOrder', { orderId: { valueName: 'orderId' } }, 'status', { kind: 'equals', value: 'paid' });
 const NAVIGATE: JsonRecord = { type: 'navigate', url: '/orders' };
@@ -88,7 +89,7 @@ test('a call that gets a declared success status passes, and the steps after it 
 });
 
 test('a status the declaration lists as success, such as 404 for deleteOrder, passes', async () => {
-  const gone = shopWith((request) => (request.method === 'DELETE' ? emptyReply(404) : undefined));
+  const gone = shopWith((request) => (request.method === HttpMethod.Delete ? emptyReply(404) : undefined));
   const ran = await runWithCalls(callPlanOf([CREATE_ORDER, DELETE_ORDER]), { route: gone });
   assert.equal(ran.result.state, 'Passed', JSON.stringify(ran.result.steps));
 });
@@ -124,14 +125,14 @@ test('when the run passes, its cleanup calls run in order after the steps', asyn
 });
 
 test('when the run fails, its cleanup calls still run in order', async () => {
-  const pending = shopWith((request) => (request.method === 'GET' ? jsonReply(200, { status: 'pending', total: 42 }) : undefined));
+  const pending = shopWith((request) => (request.method === HttpMethod.Get ? jsonReply(200, { status: 'pending', total: 42 }) : undefined));
   const ran = await runWithCalls(withCleanup(callPlanOf([CREATE_ORDER, ORDER_PAID]), CLEANUP), { route: pending });
   assert.equal(ran.result.state, 'Failed');
   assert.deepEqual(lines(ran.requests).slice(-2), CLEANUP_LINES);
 });
 
 test('when the run errors after the value is set, its cleanup calls still run in order', async () => {
-  const brokenRead = shopWith((request) => (request.method === 'GET' ? failedReply('service-unreachable') : undefined));
+  const brokenRead = shopWith((request) => (request.method === HttpMethod.Get ? failedReply('service-unreachable') : undefined));
   const ran = await runWithCalls(withCleanup(callPlanOf([CREATE_ORDER, call('getOrder', { orderId: { valueName: 'orderId' } })]), CLEANUP), { route: brokenRead });
   assert.equal(ran.result.state, 'Errored');
   assert.deepEqual(lines(ran.requests).slice(-2), CLEANUP_LINES);
@@ -159,7 +160,7 @@ test('a failing cleanup call is recorded cleanup-failed, and the passing verdict
 
 test('a failing cleanup call does not change a failing verdict either', async () => {
   const pendingAndFailingReset = shopWith((request, earlier) => {
-    if (request.method === 'GET') return jsonReply(200, { status: 'pending', total: 42 });
+    if (request.method === HttpMethod.Get) return jsonReply(200, { status: 'pending', total: 42 });
     return failingReset(request, earlier);
   });
   const ran = await runWithCalls(withCleanup(callPlanOf([CREATE_ORDER, ORDER_PAID]), [RESET_SHOP]), { route: pendingAndFailingReset });
@@ -185,8 +186,8 @@ const shortChecks = callProjectFile({}, { backendCheckTimeoutMilliseconds: BACKE
 
 test('an expectBackend whose field matches only on the third poll passes', async () => {
   const paidOnThirdRead = shopWith((request, earlier) => {
-    if (request.method !== 'GET') return undefined;
-    const readsBefore = earlier.filter((sent) => sent.method === 'GET').length;
+    if (request.method !== HttpMethod.Get) return undefined;
+    const readsBefore = earlier.filter((sent) => sent.method === HttpMethod.Get).length;
     return jsonReply(200, { status: readsBefore >= 2 ? 'paid' : 'pending', total: 42 });
   });
   const ran = await runWithCalls(callPlanOf([CREATE_ORDER, ORDER_PAID]), { route: paidOnThirdRead, projectFile: shortChecks });
@@ -197,7 +198,7 @@ test('an expectBackend whose field matches only on the third poll passes', async
 });
 
 test('an expectBackend whose field never matches fails with assertion-failed once the check timeout runs out', async () => {
-  const neverPaid = shopWith((request) => (request.method === 'GET' ? jsonReply(200, { status: 'pending', total: 42 }) : undefined));
+  const neverPaid = shopWith((request) => (request.method === HttpMethod.Get ? jsonReply(200, { status: 'pending', total: 42 }) : undefined));
   const ran = await runWithCalls(callPlanOf([CREATE_ORDER, ORDER_PAID]), { route: neverPaid, projectFile: shortChecks });
   assert.deepEqual(stepLines(ran.result).slice(0, 3), ['call passed', 'expectBackend failed assertion-failed', 'expect skipped']);
   assert.equal(ran.result.state, 'Failed');
@@ -289,7 +290,7 @@ const basicForm = (value: string): string => Buffer.from(value).toString('base64
 const echoingShop = shopWith((request) => {
   const echoes = Object.values(SECRET_VALUES).flatMap((value) => [value, basicForm(value), encodeURIComponent(value)]);
   const body = { id: ORDER_ID, status: 'pending', total: 42, echo: { token: SECRET_VALUES[TOKEN_SECRET], all: echoes }, note: RESPONSE_MARKER };
-  if (request.method === 'GET') return jsonReply(200, body);
+  if (request.method === HttpMethod.Get) return jsonReply(200, body);
   if (requestLine(request) === 'POST /api/orders') return jsonReply(201, body);
   return undefined;
 });
@@ -407,8 +408,8 @@ test('a plan that calls no service runs without a services port', async () => {
 
 test('an expectBackend polled three times counts once toward maximumCalls, so the run is not cut short', async () => {
   const paidOnThirdRead = shopWith((request, earlier) => {
-    if (request.method !== 'GET') return undefined;
-    return jsonReply(200, { status: earlier.filter((sent) => sent.method === 'GET').length >= 2 ? 'paid' : 'pending', total: 42 });
+    if (request.method !== HttpMethod.Get) return undefined;
+    return jsonReply(200, { status: earlier.filter((sent) => sent.method === HttpMethod.Get).length >= 2 ? 'paid' : 'pending', total: 42 });
   });
   const projectFile = callProjectFile({}, { maximumCalls: 2, backendCheckTimeoutMilliseconds: 2000 });
   const ran = await runWithCalls(callPlanOf([CREATE_ORDER, ORDER_PAID]), { route: paidOnThirdRead, projectFile });

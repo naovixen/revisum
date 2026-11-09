@@ -11,6 +11,7 @@ import { BrowserTarget } from '#test-support/browser/BrowserTarget.ts';
 import { click, navigate, role, testId, textEquals, type JsonRecord } from '#test-support/browser/RawPlan.ts';
 import { INVITE_CODE, advanceClock, clockHarness, expectClipboard, recordingSessionCalls, rememberClipboard, type ClockHarness } from './support/ClockPlan.ts';
 import { guardHostClipboard } from './support/HostClipboard.ts';
+import { ClockAdvanceMode } from '@revisum/contracts';
 
 const hostClipboard = await guardHostClipboard();
 const copying = { skip: hostClipboard.skipReason ?? false };
@@ -78,7 +79,7 @@ describe('during an advance', () => {
       const ran = await harness.runSteps(BrowserTarget.Chrome, [
         navigate('/timer-order.html'),
         advanceClock(120, 'milliseconds', mode),
-        textEquals(testId('timer-counts'), mode === 'runTimers'
+        textEquals(testId('timer-counts'), mode === ClockAdvanceMode.RunTimers
           ? 'interval-30:4, timeout-50:1, promise-after-timeout-50:1, nested-timeout-20:1, timeout-100-first:1, timeout-100-second:1'
           : 'interval-30:1, timeout-50:1, promise-after-timeout-50:1, nested-timeout-20:0, timeout-100-first:1, timeout-100-second:1', 'guard.timers-ran'),
         textEquals(testId('input-events'), '0', 'guard.no-input'),

@@ -26,6 +26,7 @@ import {
   printedJson, runCommandStep, runCommandSteps, startFixtureService, type Listeners,
 } from '../support/RealCommandRun.ts';
 import { imageEnvironmentNames } from '../support/RunInWorkload.ts';
+import { EgressDecision } from '@revisum/contracts';
 
 const TIMEOUT = 600_000;
 
@@ -138,7 +139,7 @@ for (const host of ['example.com', 'metadata.google.internal']) {
 
 test('no egress event allows anything but the declared database', { timeout: TIMEOUT }, async () => {
   const { events } = await reachAttempts();
-  const allowed = events.filter((event) => event.decision === 'allowed');
+  const allowed = events.filter((event) => event.decision === EgressDecision.Allowed);
   assert.ok(allowed.every((event) => event.origin.includes(listeners.database.address)), JSON.stringify(allowed));
 });
 

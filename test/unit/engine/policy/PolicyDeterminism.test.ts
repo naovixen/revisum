@@ -9,6 +9,7 @@ import {
   acceptDialog, click, comparable, decideOn, element, label, localeOf, navigate, parsedPlan, planOf, press, role, stepAt,
   testGate, testId,
 } from './examples/Policy.ts';
+import { PolicyVerdictKind } from '@revisum/contracts';
 
 // One plan per outcome the static check can reach, so every branch is decided twice.
 const PLANS: readonly (readonly [string, readonly unknown[], readonly string[]])[] = [
@@ -27,7 +28,7 @@ for (const [what, steps, targets] of PLANS) {
     const first = decideOn(tested, plan);
     const second = decideOn(tested, plan);
     assert.deepEqual(comparable(second), comparable(first));
-    if (first.kind === 'allow' && second.kind === 'allow') assert.deepEqual(second.runs.map((cleared) => canonicalJson(cleared.plan)), first.runs.map((cleared) => canonicalJson(cleared.plan)));
+    if (first.kind === PolicyVerdictKind.Allow && second.kind === PolicyVerdictKind.Allow) assert.deepEqual(second.runs.map((cleared) => canonicalJson(cleared.plan)), first.runs.map((cleared) => canonicalJson(cleared.plan)));
   });
 
   test(`two gates built from the same project file decide ${what} alike`, async () => {

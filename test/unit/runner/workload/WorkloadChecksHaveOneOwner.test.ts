@@ -9,6 +9,7 @@ import { describe, test } from "node:test";
 import { REPOSITORY_ROOT } from "../../../support/repository/RepositoryRoot.ts";
 import type { Token } from "../../../../tools/repo-rules/naming/LintRepository.ts";
 import { codeTokens, listSourceFiles } from "../../../../tools/repo-rules/ListSourceFiles.ts";
+import { TokenKind } from "../../../../tools/repo-rules/naming/LintRepository.ts";
 
 const RUNNER_SOURCE = "packages/runner/src";
 const THE_ONE_SELECTION = `${RUNNER_SOURCE}/egress-proxy/tunnels/TcpRelay.ts`;
@@ -24,7 +25,7 @@ const runnerSources = (): readonly Source[] =>
     }));
 
 const usesIdentifier = (tokens: readonly Token[], name: string): boolean =>
-    tokens.some((token) => token.kind === "identifier" && token.text === name);
+    tokens.some((token) => token.kind === TokenKind.Identifier && token.text === name);
 
 describe("Using the runner's sources", () => {
     describe("given the removal from an output folder", () => {

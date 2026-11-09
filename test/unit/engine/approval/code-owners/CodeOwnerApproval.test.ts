@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { PERSON_ACTOR_TYPES } from '@revisum/engine';
 import { CODE_OWNERS_PATH, assertRefused, eventsOfKind, withRepository, type FixtureRepository } from '../examples/MemoryApprovalStore.ts';
+import { AccountType, VersionControlReviewState } from '@revisum/contracts';
 
 const PLAN_OWNER = 'owner-grace';
 
@@ -93,8 +94,8 @@ test('a reviewer who wrote the subject and is also its only code owner still get
   }, (fixture) => {
     plansOwnedBy('dev-ada')(fixture);
     fixture.pullRequests['12']?.reviews.push({
-      id: 'review-ada', state: 'approved', commit: 'commit-pull-head', submittedAt: '2026-10-20T15:30:00Z',
-      reviewer: { login: 'dev-ada', type: 'user' },
+      id: 'review-ada', state: VersionControlReviewState.Approved, commit: 'commit-pull-head', submittedAt: '2026-10-20T15:30:00Z',
+      reviewer: { login: 'dev-ada', type: AccountType.User },
     });
   });
 });

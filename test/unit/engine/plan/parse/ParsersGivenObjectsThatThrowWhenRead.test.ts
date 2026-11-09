@@ -21,6 +21,7 @@ import {
     withValue,
     type JsonRecord,
 } from "../examples/GoldenPlan.ts";
+import { PlanErrorCode } from "@revisum/contracts";
 
 type CodeAndPath = { readonly code: string; readonly path: string };
 
@@ -77,7 +78,7 @@ const readName: FieldReader<string> = (input, path, issues) => {
     if (typeof input === "string") {
         return input;
     }
-    issues.push({ code: "wrong_type", path });
+    issues.push({ code: PlanErrorCode.WrongType, path });
     return INVALID;
 };
 const readAge: FieldReader<number> = (input, path, issues) =>

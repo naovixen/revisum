@@ -1,6 +1,6 @@
 // What browser tests give a driver for its sessions' egress. What they assume about a session's egress
 // is gathered here, so a change to it is a change to this file.
-import { failure, success, type Result } from "@revisum/contracts";
+import { EgressDecision, failure, success, type Result } from "@revisum/contracts";
 import type { ConnectionFailure } from "@revisum/driver-cdp";
 import { ProxyClient, type EgressProxy } from "@revisum/runner";
 import { startedProxyServer } from "#test-support/StartedEgressProxy.ts";
@@ -26,7 +26,7 @@ const refusedSince = (proxy: EgressProxy, firstDecision: number): readonly strin
     proxy
         .decisions()
         .slice(firstDecision)
-        .filter((entry) => entry.decision === "blocked")
+        .filter((entry) => entry.decision === EgressDecision.Blocked)
         .map((entry) => String(entry.origin));
 
 const leavingProxyUp = (

@@ -15,13 +15,14 @@
 //   - a run on the recording driver, which declares no page scripts, still builds its manifest, and
 //     reports those steps as unsupported-step. Its database commands go to a fake runner.
 import assert from 'node:assert/strict';
-import { createRunService, guaranteeStatement, parseProject, planParser, unsafeFeaturesOf, type GuaranteeId, type GuaranteeStatement, type Plan, type PlanError, type PlanStanding, type Project, type Result, type RunResult, type UnsafeFeature } from '@revisum/engine';
+import { createRunService, guaranteeStatement, parseProject, planParser, unsafeFeaturesOf, type GuaranteeId, type GuaranteeStatement, type Plan, type PlanError, type PlanStanding, type Project, type Result, type RunResult, UnsafeFeature } from '@revisum/engine';
 import { baseUrlOf, clearRun, trustedProjectFrom } from '../../../../../support/builders/ClearRun.ts';
 import { DATABASE_PASSWORD, fakeCommandRunner } from '../../../run/executors/database-commands/examples/Database.ts';
 import { DEFAULT_CLOCK_START, DEFAULT_SEED, recordingDriver, type Recording } from '../../../run/values/examples/RunPlan.ts';
 import { DATABASE_SECRET, FEATURES, ORIGIN, SCRIPT_SOURCES, unsafeProjectFile, type FeatureName, type JsonRecord } from './UnsafePlan.ts';
 import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
 import { fakeSecretStore } from '#test-support/fakes/ports/FakeSecretStore.ts';
+import { RunMode, PlanErrorCode } from '@revisum/contracts';
 
 export type ParsePlan = (input: unknown) => Result<Plan, readonly PlanError[]>;
 
@@ -38,7 +39,7 @@ export const parserEnabling = (enabled: readonly FeatureName[] = FEATURES, field
 // Every feature but `feature`. Without page scripts there is no pageScripts entry, so inline
 // scripts are off too.
 export const allBut = (feature: FeatureName): readonly FeatureName[] =>
-  FEATURES.filter((other) => other !== feature && !(feature === 'page-script' && other === 'inline-page-script'));
+  FEATURES.filter((other) => other !== feature && !(feature === UnsafeFeature.PageScript && other === UnsafeFeature.InlinePageScript));
 
 export function acceptedBy(parse: ParsePlan, raw: unknown): Plan {
   const parsed = parse(raw);
@@ -58,7 +59,7 @@ export const rejection = (parse: ParsePlan, raw: unknown): string[] => errorsOf(
 
 // The paths of the unsafe_feature_disabled errors, sorted, and each only once.
 export const disabledPaths = (errors: readonly PlanError[]): string[] =>
-  [...new Set(errors.filter((error) => error.code === 'unsafe_feature_disabled').map((error) => error.path))].sort();
+  [...new Set(errors.filter((error) => error.code === PlanErrorCode.UnsafeFeatureDisabled).map((error) => error.path))].sort();
 
 export const featuresOf = (plan: Plan): readonly UnsafeFeature[] => unsafeFeaturesOf(plan);
 
@@ -81,7 +82,7 @@ export const lostBy = (features: readonly FeatureName[]): GuaranteeId[] =>
 // The gate's statement for a plan run with these features. egressEnforced says whether the run was
 // inside the isolated runner; with it, a closed plan run keeps every guarantee.
 export const statementFor = (features: readonly UnsafeFeature[], egressEnforced: boolean): GuaranteeStatement =>
-  guaranteeStatement({ mode: 'plan', egressEnforced, unmaskedScreenshotsKept: false, unsafeFeatures: features });
+  guaranteeStatement({ mode: RunMode.Plan, egressEnforced, unmaskedScreenshotsKept: false, unsafeFeatures: features });
 
 export const lostIds = (statement: GuaranteeStatement): string[] => [...new Set(statement.lost.map((entry) => entry.guarantee))].sort();
 

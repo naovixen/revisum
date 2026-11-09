@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { guaranteeStatement } from '@revisum/engine';
 import { dockerRunner, type RunnerLogEntry } from '@revisum/runner';
-import type { GuaranteeLevel } from '@revisum/contracts';
+import { GuaranteeLevel, RunMode } from '@revisum/contracts';
 import { REPOSITORY_ROOT } from '../../../../support/repository/RepositoryRoot.ts';
 import { fakeContainerEngine, type FakeEngineSettings } from '../../support/FakeContainerEngine.ts';
 import { egressPolicy, imageDigest, PINNED_IMAGE_ID } from '../../examples/DeclaredService.ts';
@@ -36,7 +36,7 @@ const loggedCodes = (logged: readonly RunnerLogEntry[]): readonly string[] => lo
 
 // What a run with this guarantee level vouches for, as its result and report state it.
 const statementFor = (level: GuaranteeLevel) =>
-  guaranteeStatement({ mode: 'plan', egressEnforced: level === 'isolated', unmaskedScreenshotsKept: false, unsafeFeatures: [] });
+  guaranteeStatement({ mode: RunMode.Plan, egressEnforced: level === GuaranteeLevel.Isolated, unmaskedScreenshotsKept: false, unsafeFeatures: [] });
 
 test('when the probe from inside the container reaches outside, the level is host and egress-unenforceable is logged', async () => {
   const { level, logged, startedCode } = await startOn({ internalNetworks: true, probe: 'reached' });

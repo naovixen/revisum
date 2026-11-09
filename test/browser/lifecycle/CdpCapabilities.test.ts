@@ -15,6 +15,7 @@ import { click, label, navigate, role, testId, textEquals } from '#test-support/
 import { UPLOAD_CONTENT, UPLOAD_FIXTURE, capabilityCdpDriver, capabilityDrivers, capabilityHarness, capabilityPlan, watchedDriver, type CapabilityHarness } from '#test-support/browser/harnesses/CapabilityHarness.ts';
 import { CRASH_READY_PATH, crashWhenRequested } from '#test-support/browser/harnesses/CrashWhenRequested.ts';
 import { determinismRuns } from '#test-support/TestTier.ts';
+import { StepOutcome } from '@revisum/contracts';
 
 const REPETITIONS = determinismRuns();
 // Long enough for the test to find and end the renderer while the step waits, even where listing
@@ -29,7 +30,7 @@ const repeated = (block: readonly unknown[]): unknown[] => Array.from({ length: 
 
 // Every step passed; on a failure, which repetition and which step of it failed, and how.
 function assertEveryStepPassed(result: RunResult, blockLength: number): void {
-  const failed = result.steps.find((step) => step.outcome !== 'passed');
+  const failed = result.steps.find((step) => step.outcome !== StepOutcome.Passed);
   const where = failed === undefined ? '' : `repetition ${Math.floor(failed.index / blockLength) + 1}, step ${failed.index % blockLength} (${failed.type}): ${failed.outcome} ${failed.code ?? ''}`;
   assert.equal(result.state, 'Passed', where);
   assert.equal(result.steps.length, blockLength * REPETITIONS);

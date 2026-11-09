@@ -23,19 +23,20 @@ import {
   APPLICATION_FILE, DECLARED_SECRET, REPORT_VARIABLE, SUITE_FILES, carriesCode, evidenceProject, holdsSecretObject, outputFolder,
   reportWithFailure, reportWithUnfinishedTest, runDeclaredSuite, suiteCheckout, suiteRequestOf, variable,
 } from './examples/SuiteRun.ts';
+import { SuiteTestOutcome, WorkloadErrorCode } from '@revisum/contracts';
 
 const DECLARED_COMMAND = ['npx', 'playwright', 'test'];
 
 // ---- Egress that cannot be enforced ----------------------------------------------------------------
 
 test('a workload runner that cannot enforce egress makes the run Refused with egress-unenforceable', async () => {
-  const { result } = await runDeclaredSuite({ behaviour: { refusal: 'egress-unenforceable' } });
+  const { result } = await runDeclaredSuite({ behaviour: { refusal: WorkloadErrorCode.EgressUnenforceable } });
   assert.equal(result.state, 'Refused');
   assert.equal(result.refusal.code, 'egress-unenforceable');
 });
 
 test('after the refusal nothing else is run: no setup, no suite, and no test result', async () => {
-  const { result, runner } = await runDeclaredSuite({ behaviour: { refusal: 'egress-unenforceable' } });
+  const { result, runner } = await runDeclaredSuite({ behaviour: { refusal: WorkloadErrorCode.EgressUnenforceable } });
   assert.ok(runner.requests.length <= 1, `the runner was asked ${runner.requests.length} times`);
   assert.deepEqual(result.suite?.tests ?? [], []);
 });
@@ -115,7 +116,7 @@ test('a suite stopped at its timeout reports its unfinished test interrupted, ne
 test('a timed-out suite never reports a test passed that the report does not show finished', async () => {
   const { result } = await runDeclaredSuite({ behaviour: { report: reportWithUnfinishedTest(), timedOut: true, exitCode: 137 } });
   const finishedPassing = ['pays with a saved card|chromium', 'lists past orders|chromium'];
-  const passed = testsOf(result).filter((entry) => entry.outcome === 'passed').map((entry) => `${entry.titlePath.at(-1)}|${entry.project}`);
+  const passed = testsOf(result).filter((entry) => entry.outcome === SuiteTestOutcome.Passed).map((entry) => `${entry.titlePath.at(-1)}|${entry.project}`);
   assert.ok(passed.every((key) => finishedPassing.includes(key)), JSON.stringify(passed));
 });
 

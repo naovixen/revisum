@@ -13,6 +13,7 @@ import {
 } from './examples/EvidenceRun.ts';
 import { withValue } from '../plan/examples/GoldenPlan.ts';
 import { OPEN_ORDERS, planOf, runPlan } from '../run/values/examples/RunPlan.ts';
+import { SuitePass } from '@revisum/contracts';
 
 const SHA256_HEX = /^[0-9a-f]{64}$/;
 
@@ -146,7 +147,7 @@ test('the guarantee statement is the same whether the suite passed or failed, an
   const statements = [
     evidenceRun(recordedReport('passing-with-criteria')),
     evidenceRun(recordedReport('each-outcome')),
-    evidenceRun(recordedReport('passing-with-criteria'), { pass: 'proposal' }),
+    evidenceRun(recordedReport('passing-with-criteria'), { pass: SuitePass.Proposal }),
   ].map((result) => JSON.stringify({ level: result.guarantees.level, holds: sorted(result.guarantees.holds), lost: sorted(result.guarantees.lost.map((entry) => `${entry.guarantee}:${entry.because}`)) }));
   assert.equal(new Set(statements).size, 1, statements.join('\n'));
 });

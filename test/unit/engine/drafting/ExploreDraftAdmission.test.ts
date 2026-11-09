@@ -12,6 +12,7 @@ import {
 } from '@revisum/engine';
 import { memoryApprovalStore, memoryEventSink, parsedSignupPlan, withRepository } from '../approval/examples/MemoryApprovalStore.ts';
 import { defaultParser, signupPlan, testProject, withValue, type JsonRecord } from '../plan/examples/GoldenPlan.ts';
+import { PolicyVerdictKind, ApprovalSubjectKind, PlanSource, PlanFormat } from '@revisum/contracts';
 
 // The page map's reference, as the command records it.
 const PAGE_MAP_REFERENCE = `sha256:${'5e'.repeat(32)}`;
@@ -25,7 +26,7 @@ const textOf = (plan: JsonRecord): string => {
   if (!parsed.ok) assert.fail(`the fixture plan was refused: ${JSON.stringify(parsed.error)}`);
   return writePlanText(parsed.value);
 };
-const draftOf = (plan: JsonRecord): PlanDraft => ({ format: 'text', content: textOf(plan) });
+const draftOf = (plan: JsonRecord): PlanDraft => ({ format: PlanFormat.Text, content: textOf(plan) });
 
 test('an explore draft is admitted with source explore-draft, basis core-recorded and the page map\'s sha256 as its reference', () => {
   const events = memoryEventSink();
@@ -45,8 +46,8 @@ test('a draft that declares itself an explore draft is refused with untrusted-so
   let parses = 0;
   const counting: PlanParse = (input) => { parses += 1; return defaultParser()(input); };
   for (const basis of ['declared', 'core-recorded'] as const) {
-    const claimed: PlanDraft = { ...draftOf(signupPlan()), provenance: { source: 'explore-draft', basis, reference: PAGE_MAP_REFERENCE } };
-    const admitted = admitDraft(claimed, counting, memoryEventSink(), unverified({ kind: 'plan', hash: planHash(parsedSignupPlan()) }, 'local'));
+    const claimed: PlanDraft = { ...draftOf(signupPlan()), provenance: { source: PlanSource.ExploreDraft, basis, reference: PAGE_MAP_REFERENCE } };
+    const admitted = admitDraft(claimed, counting, memoryEventSink(), unverified({ kind: ApprovalSubjectKind.Plan, hash: planHash(parsedSignupPlan()) }, 'local'));
     if (admitted.ok) {
       assert.fail(`an author could declare explore-draft, basis ${basis}`);
     }
@@ -75,7 +76,7 @@ async function treatmentOf(plan: Plan): Promise<Treatment> {
   });
   return {
     hash: planHash(plan),
-    decision: decision.kind === 'deny' ? `deny ${decision.rule} at ${String(decision.stepIndex)}` : 'allow',
+    decision: decision.kind === PolicyVerdictKind.Deny ? `deny ${decision.rule} at ${String(decision.stepIndex)}` : 'allow',
     withoutApproval: planStanding(plan, memoryApprovalStore([])).mode,
     withTheSignUpApproval: approvedStanding,
   };
@@ -84,7 +85,7 @@ async function treatmentOf(plan: Plan): Promise<Treatment> {
 function admittedUnder(source: AdmittedSource, plan: JsonRecord): Plan {
   const draft = draftOf(plan);
   const admitted = source === 'hand-written'
-    ? admitDraft(draft, defaultParser(), memoryEventSink(), unverified({ kind: 'plan', hash: planHash(parsedSignupPlan()) }, 'local'))
+    ? admitDraft(draft, defaultParser(), memoryEventSink(), unverified({ kind: ApprovalSubjectKind.Plan, hash: planHash(parsedSignupPlan()) }, 'local'))
     : admitCoreDraft(draft, { source, reference: source === 'explore-draft' ? PAGE_MAP_REFERENCE : 'specs/signup.md' }, defaultParser(), memoryEventSink());
   if (!admitted.ok) assert.fail(`${source}: ${JSON.stringify(admitted.error)}`);
   return admitted.value;

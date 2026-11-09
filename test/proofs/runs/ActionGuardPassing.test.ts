@@ -12,6 +12,7 @@ import { fakeDriverOpening } from '#test-support/fakes/session/FakeDriver.ts';
 import { FAKE_ELEMENT } from '#test-support/fakes/session/FakePage.ts';
 import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
 import { fakeSession } from '#test-support/fakes/session/FakeSession.ts';
+import { StepType, PolicyVerdictKind } from '@revisum/contracts';
 
 const ORIGIN = 'http://127.0.0.1:4173';
 const TARGET_ID = 'cdp-chromium';
@@ -85,7 +86,7 @@ test('every act() call of a run carries the runtime guard, for every kind of act
 });
 
 test('mutant: the check finds an act() call made without a guard', () => {
-  const guard: ActionGuard = () => ({ kind: 'allow' });
-  const recorded: ActCall[] = [{ type: 'click', guard }, { type: 'hover', guard: undefined }, { type: 'dialog', guard }];
+  const guard: ActionGuard = () => ({ kind: PolicyVerdictKind.Allow });
+  const recorded: ActCall[] = [{ type: StepType.Click, guard }, { type: StepType.Hover, guard: undefined }, { type: StepType.Dialog, guard }];
   assert.deepEqual(callsWithoutGuard(recorded).map((call) => call.type), ['hover']);
 });

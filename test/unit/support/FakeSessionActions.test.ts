@@ -30,9 +30,10 @@ import {
     testId,
     type JsonRecord,
 } from "../engine/policy/examples/Policy.ts";
+import { PolicyRuleId, PolicyVerdictKind } from "@revisum/contracts";
 
-const ALLOW: GuardVerdict = { kind: "allow" };
-const DENY: GuardVerdict = { kind: "deny", rule: "irreversible-action", stepIndex: 1 };
+const ALLOW: GuardVerdict = { kind: PolicyVerdictKind.Allow };
+const DENY: GuardVerdict = { kind: PolicyVerdictKind.Deny, rule: PolicyRuleId.IrreversibleAction, stepIndex: 1 };
 const NAMED_BUTTON = role("button", "Export");
 const UNNAMED_ELEMENT: ResolvedElement = {
     role: null,

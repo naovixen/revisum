@@ -14,7 +14,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, test } from "node:test";
 import { buildAdapters, runSuite } from "@revisum/cli";
-import { WORKLOAD_OUTPUT_PATH, success } from "@revisum/contracts";
+import { SuitePass, WORKLOAD_OUTPUT_PATH, success } from "@revisum/contracts";
 import { environmentSecretStore, type RunResult } from "@revisum/engine";
 import { dockerCliEngine, workloadRunner, type ContainerEngine } from "@revisum/runner";
 import { REPOSITORY_ROOT } from "../../support/repository/RepositoryRoot.ts";
@@ -140,7 +140,7 @@ const runSuiteInto = (
             secrets: environmentSecretStore({}),
             checkout,
             outputDirectory,
-            pass: "gating",
+            pass: SuitePass.Gating,
         }),
     );
 };

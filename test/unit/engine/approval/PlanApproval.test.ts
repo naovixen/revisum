@@ -15,6 +15,7 @@ import { memoryApprovalStore, parsedSignupPlan, withRepository, type TestReposit
 import { ORIGIN, TARGET_ID, signupPlan, testProjectInput, withValue, type JsonRecord } from '../plan/examples/GoldenPlan.ts';
 import { fakeDriverNeverLaunching } from '#test-support/fakes/session/FakeDriver.ts';
 import { driversOf, fakePorts } from '#test-support/fakes/FakePorts.ts';
+import { ApprovalSubjectKind } from '@revisum/contracts';
 
 const PRODUCTION_ORIGIN = 'https://shop.example.com';
 
@@ -135,7 +136,7 @@ for (const [what, path] of [['title', ['meta', 'title']], ['criterion id of an a
 
 for (const source of ['mcp', 'token'] as const) {
   test(`a decision that arrives through ${source === 'mcp' ? 'an MCP session' : 'a CI token'} is recorded with actor type agent`, () => {
-    const actor = unverified({ kind: 'plan', hash: planHash(parsedSignupPlan()) }, source);
+    const actor = unverified({ kind: ApprovalSubjectKind.Plan, hash: planHash(parsedSignupPlan()) }, source);
     assert.equal(actor.actorType, 'agent');
     assert.equal(PERSON_ACTOR_TYPES.includes(actor.actorType), false);
   });
@@ -144,14 +145,14 @@ for (const source of ['mcp', 'token'] as const) {
 // ---- Local decisions with no proof --------------------------------------------------------------
 
 test('a local decision with no proof is recorded as unverified, which is not a person', () => {
-  const actor = unverified({ kind: 'review-decision', hash: planHash(parsedSignupPlan()) }, 'local');
+  const actor = unverified({ kind: ApprovalSubjectKind.ReviewDecision, hash: planHash(parsedSignupPlan()) }, 'local');
   assert.equal(actor.actorType, 'unverified');
   assert.equal(PERSON_ACTOR_TYPES.includes(actor.actorType), false);
 });
 
 test('a plan with only unverified decisions stands as a proposal and does not open the merge gate', () => {
   const plan = parsedSignupPlan();
-  for (const source of ['local', 'mcp', 'token'] as const) unverified({ kind: 'plan', hash: planHash(plan) }, source);
+  for (const source of ['local', 'mcp', 'token'] as const) unverified({ kind: ApprovalSubjectKind.Plan, hash: planHash(plan) }, source);
   const standing = planStanding(plan, memoryApprovalStore([]));
   assert.equal(mergeGateOpen(standing), false);
 });

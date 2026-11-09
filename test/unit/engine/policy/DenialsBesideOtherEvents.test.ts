@@ -18,6 +18,7 @@ import {
     unsafeProjectFile,
     type JsonRecord,
 } from "../plan/unsafe-features/examples/UnsafePlan.ts";
+import { DriverErrorCode, PolicyVerdictKind } from "@revisum/contracts";
 
 // In English, so the guard's built-in irreversible patterns apply.
 const PROJECT_FILE = unsafeProjectFile(undefined, {
@@ -47,8 +48,8 @@ const sessionReporting = (reported: DriverError | null, elementName: string): Se
                 return Promise.resolve(failure(reported));
             }
             return Promise.resolve(
-                verdict?.kind === "deny"
-                    ? failure({ code: "policy-denied", detail: "denied" })
+                verdict?.kind === PolicyVerdictKind.Deny
+                    ? failure({ code: DriverErrorCode.PolicyDenied, detail: "denied" })
                     : success(undefined),
             );
         },
@@ -69,8 +70,8 @@ function sessionHoldingARequestAfterTheClick(isHeldThen: boolean): Session {
     };
 }
 
-const CRASH: DriverError = { code: "target-crashed", detail: "the page's renderer died" };
-const POPUP: DriverError = { code: "unsupported-step", detail: "the step opened a popup" };
+const CRASH: DriverError = { code: DriverErrorCode.TargetCrashed, detail: "the page's renderer died" };
+const POPUP: DriverError = { code: DriverErrorCode.UnsupportedStep, detail: "the step opened a popup" };
 
 describe("Using the run", () => {
     for (const { name, isHeld } of [

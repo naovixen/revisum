@@ -20,6 +20,7 @@ import {
   PRIVATE_MARKER, goldenPlan, lineAt, lineOf, lineStartingWith, linesOf, parsedWith, readableLimits, readableParser, signupPlan,
   withLineInserted, withLineRemoved, withLineReplaced,
 } from './examples/ParsePlan.ts';
+import { ApprovalSubjectKind, ProvenanceBasis, PlanSource, PlanFormat } from '@revisum/contracts';
 
 const parsePlan = readableParser();
 const limits = readableLimits();
@@ -333,10 +334,10 @@ test('text over the plan size limit is refused with one too-large error, without
 // ---- Parser errors, placed back on their line --------------------------------------------------------
 
 function textDraft(content: string): PlanDraft {
-  return { format: 'text', content, provenance: { source: 'hand-written', basis: 'declared' } };
+  return { format: PlanFormat.Text, content, provenance: { source: PlanSource.HandWritten, basis: ProvenanceBasis.Declared } };
 }
 function actor() {
-  return unverified({ kind: 'plan', hash: 'readable-plan-errors' }, 'local');
+  return unverified({ kind: ApprovalSubjectKind.Plan, hash: 'readable-plan-errors' }, 'local');
 }
 
 function parserErrors(text: string): readonly DraftError[] {

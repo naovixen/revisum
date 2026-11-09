@@ -40,7 +40,7 @@ import { dirname, join } from 'node:path';
 import { createServer as createHttpServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { createServer as createHttpsServer } from 'node:https';
 import { connect as connectTcp, type Socket } from 'node:net';
-import { type EventSink, type Redactor, type SecretStore, type VersionControlPort } from '@revisum/contracts';
+import { PlannerWire, type EventSink, type Redactor, type SecretStore, type VersionControlPort } from '@revisum/contracts';
 import { buildAdapters, type LoginRunner, type PlannerCall } from '@revisum/cli';
 import { environmentSecretStore } from '@revisum/engine';
 import { FIXTURES, GOLDEN } from '../../../../support/repository/RepositoryRoot.ts';
@@ -176,14 +176,14 @@ export function recordedReply(wire: WireFormat): JsonRecord {
 // The recorded reply with its text, or the whole value where the text stands, replaced.
 export function replyWithContent(wire: WireFormat, content: unknown): JsonRecord {
   const reply = recordedReply(wire);
-  if (wire === 'anthropic-messages') return { ...reply, content: [{ type: 'text', text: content }] };
+  if (wire === PlannerWire.AnthropicMessages) return { ...reply, content: [{ type: 'text', text: content }] };
   return { ...reply, choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }] };
 }
 
 // A reply that carries no text at all: a tool call in place of the text.
 export function replyWithoutText(wire: WireFormat): JsonRecord {
   const reply = recordedReply(wire);
-  if (wire === 'anthropic-messages') {
+  if (wire === PlannerWire.AnthropicMessages) {
     return { ...reply, content: [{ type: 'tool_use', id: 'tool-use-1', name: 'write_plan', input: { steps: [] } }], stop_reason: 'tool_use' };
   }
   return {

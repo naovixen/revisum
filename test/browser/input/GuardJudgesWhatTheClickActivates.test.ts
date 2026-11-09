@@ -19,6 +19,7 @@ import { capabilityHarness, type CapabilityHarness } from "#test-support/browser
 import type { FixtureRoute } from "#test-support/builders/FixtureServer.ts";
 import type { GuardVerdict, PerformableAction, Session } from "@revisum/engine";
 import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
+import { PolicyVerdictKind } from "@revisum/contracts";
 
 shareBrowserInThisFile();
 
@@ -203,7 +204,7 @@ describe("Using the real browser driver", () => {
     describe("given a session asked to click with a guard that allows it", () => {
         describe("when it acts", () => {
             test("then it should click", async () => {
-                const allow: GuardVerdict = { kind: "allow" };
+                const allow: GuardVerdict = { kind: PolicyVerdictKind.Allow };
                 const outcome = await withPlainPage(async (session) => {
                     const acted = await session.act(
                         harness.actionStep(click(role("button", "Save"))),

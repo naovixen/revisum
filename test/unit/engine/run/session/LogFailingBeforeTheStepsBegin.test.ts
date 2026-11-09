@@ -7,7 +7,7 @@ import { describe, test, type TestContext } from "node:test";
 import type { RunEventSink } from "@revisum/engine";
 import { memoryRunEventSink } from "../../../../support/builders/MemoryEventSink.ts";
 import { fakeSessionOnOrders, runOnFakeSession } from "../examples/RunOnFakeSession.ts";
-import { environmentSecretStore } from "@revisum/engine";
+import { EventKind, environmentSecretStore } from "@revisum/engine";
 import {
     CLOSING_CHECK,
     DATABASE_SECRET,
@@ -35,7 +35,7 @@ const FILL_SECRET: JsonRecord = {
 
 const logFailingOnStates = (states: readonly string[]): RunEventSink =>
     fakeRunEventSinkFailingOn(
-        (event) => event.kind === "run.state" && states.some((state) => state === event.state),
+        (event) => event.kind === EventKind.RunState && states.some((state) => state === event.state),
     );
 
 const logFailingOnState = (state: string): RunEventSink => logFailingOnStates([state]);

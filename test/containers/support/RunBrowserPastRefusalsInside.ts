@@ -20,6 +20,7 @@ import { baseUrlOf, clearRun, trustedProjectFrom } from "../../support/builders/
 import { FIXTURES } from "../../support/repository/RepositoryRoot.ts";
 import { buildAdapters } from "../../../packages/cli/src/wiring/BuildAdapters.ts";
 import { realRunPorts } from "../../support/RealRunPorts.ts";
+import { StepOutcome } from "@revisum/contracts";
 
 const THIS_FILE_IN_THE_WORKSPACE = "test/containers/support/RunBrowserPastRefusalsInside.ts";
 const PAGE_PATH = "/refusals.html";
@@ -153,7 +154,7 @@ async function runInThisContainer(): Promise<RunPastRefusals> {
             state: result.state,
             blockedOrigins: result.blockedOrigins,
             observedOnFailure: result.steps
-                .filter((step) => step.outcome !== "passed")
+                .filter((step) => step.outcome !== StepOutcome.Passed)
                 .map((step) => step.observed),
         };
     } finally {

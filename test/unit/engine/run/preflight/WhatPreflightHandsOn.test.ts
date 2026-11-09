@@ -35,6 +35,7 @@ import {
     unsafePlan,
     unsafeProjectFile,
 } from "../../plan/unsafe-features/examples/UnsafePlan.ts";
+import { StepType } from "@revisum/contracts";
 
 const FRAME_SECRET = "FRAME_ACCESS_CODE";
 const TAB_SECRET = "TAB_ACCESS_CODE";
@@ -101,7 +102,7 @@ describe("Using the run", () => {
                 );
                 assert.equal(result.state, "Passed", JSON.stringify(result.steps));
                 const filledSecrets = recording.actions.flatMap((action) =>
-                    action.type === "fill" && action.value.kind === FillValueKind.Secret
+                    action.type === StepType.Fill && action.value.kind === FillValueKind.Secret
                         ? [action.value.secret.name]
                         : [],
                 );

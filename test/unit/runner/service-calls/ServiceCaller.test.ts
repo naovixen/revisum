@@ -9,7 +9,7 @@
 import assert from 'node:assert/strict';
 import { performance } from 'node:perf_hooks';
 import { describe, test } from 'node:test';
-import { failure } from '@revisum/contracts';
+import { HttpMethod, failure } from '@revisum/contracts';
 import { echoesIn, fakeSecretValue, resolvedSecret } from '../../engine/secrets/examples/SecretRun.ts';
 import {
   OK_BODY, ORDER_PATH, bodyAsText, closedPort, consoleWrittenDuring, droppedAnswer, emptyAnswer, endlessAnswer, jsonAnswer,
@@ -124,7 +124,7 @@ for (const status of [301, 302, 303, 307, 308]) {
         if (received.path === '/api/test/reset') response.writeHead(status, { location: `${service.origin}/api/test/landing` }).end();
         else response.writeHead(200, { 'content-type': 'application/json' }).end('{}');
       });
-      const answered = await caller.call(serviceRequest(service.origin, { method: 'POST', pathAndQuery: '/api/test/reset', body: ['{}'] }));
+      const answered = await caller.call(serviceRequest(service.origin, { method: HttpMethod.Post, pathAndQuery: '/api/test/reset', body: ['{}'] }));
       assert.ok(answered.ok, JSON.stringify(answered));
       assert.equal(answered.value.status, status);
       assert.deepEqual(paths(service.received), ['POST /api/test/reset'], 'the redirect was followed or the request repeated');
@@ -202,7 +202,7 @@ test('when the proxy is not listening, the call fails with service-unreachable a
 // ---- A write is sent once ----------------------------------------------------------------------------
 
 const createOrder = (target: string) => serviceRequest(target, {
-  method: 'POST', pathAndQuery: '/api/orders', body: ['{"customer":"Ada Lovelace","quantity":2}'], timeoutMilliseconds: TIMEOUT,
+  method: HttpMethod.Post, pathAndQuery: '/api/orders', body: ['{"customer":"Ada Lovelace","quantity":2}'], timeoutMilliseconds: TIMEOUT,
 });
 
 test('a write that times out was received by the service exactly once', async () => {
@@ -285,7 +285,7 @@ test('the caller reveals secret headers and body parts only on the wire: the con
   };
   await withCallerHarness({ answer: echoing }, async ({ caller, service, proxy }) => {
     const request = serviceRequest(service.origin, {
-      method: 'POST', pathAndQuery: '/api/test/sessions',
+      method: HttpMethod.Post, pathAndQuery: '/api/test/sessions',
       headers: [
         { name: 'authorization', value: resolvedSecret('SHOP_API_TOKEN', `Bearer ${token}`) },
         { name: 'x-admin-login', value: resolvedSecret('SHOP_ADMIN_LOGIN', `Basic ${loginForm}`) },

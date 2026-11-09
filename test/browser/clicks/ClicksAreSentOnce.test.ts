@@ -17,6 +17,7 @@ import {
 } from "#test-support/browser/harnesses/CapabilityHarness.ts";
 import type { FixtureRoute } from "#test-support/builders/FixtureServer.ts";
 import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
+import { PolicyVerdictKind } from "@revisum/contracts";
 
 shareBrowserInThisFile();
 
@@ -127,7 +128,7 @@ const clickTheButtonOn = async (
     const asked: AskedAbout[] = [];
     const allowAndNote: ActionGuard = ({ role, name }, dialogText) => {
         asked.push({ role, name, dialogText });
-        return { kind: "allow" };
+        return { kind: PolicyVerdictKind.Allow };
     };
     const session = await harness.openOwn(TARGET);
     try {

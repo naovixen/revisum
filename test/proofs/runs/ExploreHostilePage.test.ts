@@ -13,6 +13,7 @@ import {
   containerPageMap, exploreArguments, exploreData, exploreErrorCodes, watchedFakeRunner, plannerRequestTexts, withExploreRun, writtenMap,
   type ExploreRun, type ExploreSetup,
 } from '../../browser/explore/examples/ExploreCommandPorts.ts';
+import { GuaranteeLevel } from '@revisum/contracts';
 
 const EVIL_URL = `http://${EVIL_HOST}/collect`;
 
@@ -86,7 +87,7 @@ test('counter-example: the recorded draft without the obeyed lines is admitted w
 test('in the isolated runner, the obeying draft adds no runner call: one start and one exec, both the crawl\'s', async () => {
   await withExploreRun(hostile(GOES_ELSEWHERE.text, {
     argv: (site) => exploreArguments(`${site.origin}/`, ['--json']),
-    runner: (site) => watchedFakeRunner({ level: 'isolated', output: containerPageMap(site.origin).printed }),
+    runner: (site) => watchedFakeRunner({ level: GuaranteeLevel.Isolated, output: containerPageMap(site.origin).printed }),
   }), (run) => {
     assert.ok(errorLines(run).includes(GOES_ELSEWHERE.line), JSON.stringify(exploreData(run)['errors']));
     assert.equal(run.runner?.started.length, 1);

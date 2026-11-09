@@ -4,6 +4,7 @@ import type {
     ArmedDownload,
     DownloadCapture,
 } from "../../../../packages/driver-cdp/src/capabilities/DownloadCapture.ts";
+import { DriverErrorCode } from "@revisum/contracts";
 
 export const FAKE_DOWNLOADED_FILE: DownloadedFile = {
     fileName: "report.txt",
@@ -13,7 +14,7 @@ export const FAKE_DOWNLOADED_FILE: DownloadedFile = {
 };
 
 const NO_FILE: Result<DownloadedFile, DriverError> = failure({
-    code: "no-download",
+    code: DriverErrorCode.NoDownload,
     detail: "the fake page starts no download",
 });
 

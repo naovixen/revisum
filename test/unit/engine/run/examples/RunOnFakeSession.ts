@@ -39,6 +39,7 @@ import { driversOf, fakePorts } from "#test-support/fakes/FakePorts.ts";
 import { fakeRunEventSink } from "#test-support/fakes/ports/FakeRunEventSink.ts";
 import { fakeSecretStore } from "#test-support/fakes/ports/FakeSecretStore.ts";
 import { fakeSession } from "#test-support/fakes/session/FakeSession.ts";
+import { HttpMethod } from "@revisum/contracts";
 
 export const SHOWN_ELEMENT: ElementProbe = { ...FAKE_ELEMENT, value: "Ready" };
 export const NO_ELEMENT: ElementProbe = { count: 0 };
@@ -66,7 +67,7 @@ export const fakeNetwork = (exchanges: readonly ObservedExchange[] = []): Networ
 
 // One finished exchange of the shared project's "likes" request.
 export const likesExchange = (status: number, firstName: string): ObservedExchange => ({
-    method: "GET",
+    method: HttpMethod.Get,
     url: `${ORIGIN}/api/transactions/likes`,
     status,
     mediaType: "application/json",

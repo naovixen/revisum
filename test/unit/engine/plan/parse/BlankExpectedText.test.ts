@@ -17,6 +17,7 @@ import {
 import { jsonReply, requestLine, shopWith, type Route } from "../../run/executors/service-calls/examples/ShopService.ts";
 import { parserEnabling, rejection } from "../unsafe-features/examples/LostByFeature.ts";
 import { OPEN_CART, unsafePlan, type JsonRecord } from "../unsafe-features/examples/UnsafePlan.ts";
+import { StepOutcome, SemanticLocatorKind } from "@revisum/contracts";
 
 const STATUS: JsonRecord = { by: "testId", testId: "status" };
 const EXPORT_BUTTON: JsonRecord = { by: "role", role: "button", name: "Export" };
@@ -118,7 +119,7 @@ const shopAnsweringOrderId = (orderId: string): Route =>
     });
 
 const probeOf = (locator: Locator): Promise<ElementProbe> =>
-    Promise.resolve(locator.by === "text" ? NO_ELEMENT : SHOWN_ELEMENT);
+    Promise.resolve(locator.by === SemanticLocatorKind.Text ? NO_ELEMENT : SHOWN_ELEMENT);
 
 const readyWorld = (scriptField: string) =>
     fakeSessionOnOrders({
@@ -141,7 +142,7 @@ const databaseAnswering = (count: string) => () => ({ stdout: JSON.stringify({ c
 
 function assertFailedWithValueEmpty(result: RunResult): void {
     assert.notEqual(result.state, "Passed", JSON.stringify(result.steps));
-    const firstFailed = result.steps.find((step) => step.outcome === "failed");
+    const firstFailed = result.steps.find((step) => step.outcome === StepOutcome.Failed);
     assert.equal(firstFailed?.code, "value-empty", JSON.stringify(result.steps));
 }
 

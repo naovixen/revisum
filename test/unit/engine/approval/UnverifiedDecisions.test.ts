@@ -15,9 +15,10 @@ import {
   type ApprovalSubject,
 } from '@revisum/engine';
 import { eventsOfKind, memoryApprovalStore, memoryEventSink, parsedSignupPlan, withRepository } from './examples/MemoryApprovalStore.ts';
+import { AuditEventKind, ApprovalSubjectKind } from '@revisum/contracts';
 
 const SOURCES = ['local', 'mcp', 'token'] as const;
-const planSubject = (): ApprovalSubject => ({ kind: 'plan', hash: planHash(parsedSignupPlan()) });
+const planSubject = (): ApprovalSubject => ({ kind: ApprovalSubjectKind.Plan, hash: planHash(parsedSignupPlan()) });
 
 // ---- No Approval is minted ------------------------------------------------------------------------
 
@@ -30,7 +31,7 @@ test('a decision with no proof gives only an actor and its type, never an approv
 
 test('decisions with no proof from every source leave the plan with no approval and the merge gate shut', () => {
   const plan = parsedSignupPlan();
-  const actorTypes = SOURCES.map((source) => unverified({ kind: 'plan', hash: planHash(plan), path: 'plans/signup.json' }, source).actorType);
+  const actorTypes = SOURCES.map((source) => unverified({ kind: ApprovalSubjectKind.Plan, hash: planHash(plan), path: 'plans/signup.json' }, source).actorType);
   assert.deepEqual(actorTypes, ['unverified', 'agent', 'agent']);
   assert.equal(actorTypes.some((actorType) => PERSON_ACTOR_TYPES.includes(actorType)), false);
   const store = memoryApprovalStore([]);
@@ -53,7 +54,7 @@ for (const source of ['mcp', 'token'] as const) {
   test(`a decision recorded from ${source === 'mcp' ? 'an MCP session' : 'a CI token'} is appended with actor type agent and approves nothing`, () => {
     const events = memoryEventSink();
     const subject = planSubject();
-    events.append({ kind: 'review.decided', subjectHash: subject.hash }, unverified(subject, source));
+    events.append({ kind: AuditEventKind.ReviewDecided, subjectHash: subject.hash }, unverified(subject, source));
     const decided = eventsOfKind(events, 'review.decided');
     assert.equal(decided.length, 1);
     assert.equal(decided[0]?.actor.actorType, 'agent');
@@ -63,7 +64,7 @@ for (const source of ['mcp', 'token'] as const) {
 
 test('a local decision with no proof is appended with actor type unverified', () => {
   const events = memoryEventSink();
-  events.append({ kind: 'review.decided', subjectHash: planSubject().hash }, unverified(planSubject(), 'local'));
+  events.append({ kind: AuditEventKind.ReviewDecided, subjectHash: planSubject().hash }, unverified(planSubject(), 'local'));
   assert.equal(eventsOfKind(events, 'review.decided')[0]?.actor.actorType, 'unverified');
 });
 

@@ -22,8 +22,9 @@ import { echoPageDriver } from "../../secrets/examples/EchoPageDriver.ts";
 import { guardedDriver } from "../examples/GuardedDriver.ts";
 import { testProject } from "../../plan/examples/GoldenPlan.ts";
 import { baseUrlOf } from "#test-support/builders/ClearRun.ts";
+import { PolicyVerdictKind } from "@revisum/contracts";
 
-const ALLOW: GuardVerdict = { kind: "allow" };
+const ALLOW: GuardVerdict = { kind: PolicyVerdictKind.Allow };
 const SECRET_VALUE = "test-only-value";
 const FILL_ADA = { type: "fill", locator: NAME_FIELD, value: "Ada" };
 

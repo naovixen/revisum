@@ -32,6 +32,7 @@ import { driverWith, sessionWith } from "#test-support/browser/driver/WrappingSe
 import { endAtOnce, rendererProcesses } from "#test-support/browser/harnesses/ProcessTree.ts";
 import { download, expectDownload } from "../page-reads/support/PageStatesHarness.ts";
 import { TARGET, htmlPage, routedPagesHarness } from "../../support/browser/harnesses/RoutedPagesHarness.ts";
+import { StepType } from "@revisum/contracts";
 
 const STEP_TIMEOUT_MILLISECONDS = 8000;
 const AT_ONCE_MILLISECONDS = 4000;
@@ -143,7 +144,7 @@ function driversThatDie(death: Death | null, members: DyingMembers) {
 const dyingAfterTheHover: DyingMembers = ({ session, die }) => ({
     act: async (action: PerformableAction, guard: ActionGuard) => {
         const acted = await session.act(action, guard);
-        if (action.type === "hover") {
+        if (action.type === StepType.Hover) {
             await die();
         }
         return acted;

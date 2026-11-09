@@ -55,6 +55,7 @@ import {
     projectWith,
 } from "../engine/run/values/examples/RunPlan.ts";
 import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
+import { DriverErrorCode } from "@revisum/contracts";
 
 const PORT_MEMBERS: readonly (keyof Session)[] = [
     "screenshotHidingFields",
@@ -128,7 +129,7 @@ describe("Using a fake port", () => {
     describe("given a fake session with an override", () => {
         describe("when the overridden method is called", () => {
             test("then it should answer as the override says and note the call", async () => {
-                const refused = failure({ code: "timeout" as const, detail: "slow" });
+                const refused = failure({ code: DriverErrorCode.Timeout, detail: "slow" });
                 const session = fakeSession({ navigate: () => Promise.resolve(refused) });
                 assert.deepEqual(
                     await session.navigate("https://app.example/", scriptsEnabled),

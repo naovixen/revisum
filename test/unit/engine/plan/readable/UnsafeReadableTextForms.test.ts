@@ -12,6 +12,7 @@ import { CART_COUNT_CHECK, INLINE_READ, css } from '../unsafe-features/examples/
 import {
   OPEN_CART, parseAll, parsedWith, planFromText, readingOf, smallUnsafePlan, unsafeGoldenText, type JsonRecord, type ParsePlan,
 } from './examples/UnsafeMark.ts';
+import { ApprovalSubjectKind, ProvenanceBasis, PlanSource, PlanFormat } from '@revisum/contracts';
 
 const NESTED_CLICK_LINE = 'Unsafe: Click css "button" containing text "Add" inside 2nd css "li.product"';
 const INLINE_RUN_LINE = 'Unsafe: Run inline read page script returning blockCount at "/blocks" remembering field blockCount as blockCount:';
@@ -49,9 +50,9 @@ const inlineText = (statement: string, scriptLines: readonly string[]): string =
 };
 
 function textDraft(content: string): PlanDraft {
-  return { format: 'text', content, provenance: { source: 'hand-written', basis: 'declared' } };
+  return { format: PlanFormat.Text, content, provenance: { source: PlanSource.HandWritten, basis: ProvenanceBasis.Declared } };
 }
-const actor = () => unverified({ kind: 'plan', hash: 'unsafe-readable-text-forms' }, 'local');
+const actor = () => unverified({ kind: ApprovalSubjectKind.Plan, hash: 'unsafe-readable-text-forms' }, 'local');
 
 function parserErrors(text: string, parsePlan: ParsePlan = parseAll): readonly DraftError[] {
   const admitted = admitDraft(textDraft(text), parsePlan, memoryEventSink(), actor());

@@ -14,6 +14,7 @@ import {
     type Parsed,
 } from "@revisum/engine";
 import { tokenShapedText } from "../../evidence/examples/EvidenceRun.ts";
+import { PlanErrorCode } from "@revisum/contracts";
 
 const OLDEST_AGE = 150;
 
@@ -21,7 +22,7 @@ const readName: FieldReader<string> = (input, path, issues) => {
     if (typeof input === "string") {
         return input;
     }
-    issues.push({ code: "wrong_type", path });
+    issues.push({ code: PlanErrorCode.WrongType, path });
     return INVALID;
 };
 const readAge: FieldReader<number> = (input, path, issues) =>
@@ -352,7 +353,7 @@ describe("Using readFields", () => {
                 const issues: Issues = [];
                 const parsed = readFields({ name: "Ada" }, "$", issues, {
                     name: (input: unknown, path: string, readerIssues: Issues) => {
-                        readerIssues.push({ code: "unknown_value", path });
+                        readerIssues.push({ code: PlanErrorCode.UnknownValue, path });
                         return input;
                     },
                 });

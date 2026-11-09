@@ -21,6 +21,7 @@ import {
     type ResolvedLocator,
     type Result,
 } from "@revisum/engine";
+import { StepType, PolicyVerdictKind } from "@revisum/contracts";
 
 export const FAKE_ELEMENT: OneElementRead = {
     count: 1,
@@ -84,7 +85,7 @@ function guardDenial(
     guard: ActionGuard,
 ): DriverError | null {
     const verdict = guard(element, dialogText);
-    return verdict.kind === "deny"
+    return verdict.kind === PolicyVerdictKind.Deny
         ? { code: DriverErrorCode.PolicyDenied, detail: `denied by the ${verdict.rule} rule` }
         : null;
 }
@@ -125,7 +126,7 @@ export function actOnOpenPage(
     action: PerformableAction,
     guard: ActionGuard,
 ): Result<void, DriverError> {
-    if (action.type === "dialog") {
+    if (action.type === StepType.Dialog) {
         return answerDialog(page, action, guard);
     }
     if (page.dialogText !== null) {

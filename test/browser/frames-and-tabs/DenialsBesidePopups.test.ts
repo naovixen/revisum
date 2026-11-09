@@ -15,6 +15,7 @@ import {
 import { capabilityHarness } from "#test-support/browser/harnesses/CapabilityHarness.ts";
 import { TARGET, htmlPage, routedPagesHarness } from "../../support/browser/harnesses/RoutedPagesHarness.ts";
 import { scriptsEnabled } from "#test-support/browser/ScriptsEnabled.ts";
+import { PolicyRuleId, PolicyVerdictKind } from "@revisum/contracts";
 
 // Long enough for the press's own step to have ended, well inside the time a press lets a page open one.
 const POPUP_AFTER_THE_PRESS_MILLISECONDS = 500;
@@ -122,7 +123,7 @@ describe("Using a run in a real browser", () => {
                     assert.ok(pressed.ok, JSON.stringify(pressed));
                     const denied = await session.act(
                         onItsOwn.actionStep(click(testId("delete"))),
-                        () => ({ kind: "deny", rule: "irreversible-action", stepIndex: 2 }),
+                        () => ({ kind: PolicyVerdictKind.Deny, rule: PolicyRuleId.IrreversibleAction, stepIndex: 2 }),
                     );
                     assert.ok(session.unsupportedOpenings() > 0, "the popup opened");
                     assert.equal(denied.ok ? "acted" : denied.error.code, "policy-denied");

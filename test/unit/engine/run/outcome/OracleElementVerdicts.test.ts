@@ -31,6 +31,7 @@ import {
     TWO_ELEMENTS,
     verdictName,
 } from "../examples/ShownElement.ts";
+import { DomReadKind, ElementTextKind, ElementStateKind } from "@revisum/contracts";
 
 const ELEMENT_CASES: readonly {
     readonly check: string;
@@ -94,7 +95,7 @@ const ELEMENT_CASES: readonly {
     },
     {
         check: "an enabled",
-        assertion: { kind: "enabled" },
+        assertion: { kind: ElementStateKind.Enabled },
         cases: [
             { probe: "an enabled element", seen: SHOWN_ELEMENT, verdict: PASSED },
             { probe: "a disabled element", seen: DISABLED, verdict: FAILED },
@@ -102,7 +103,7 @@ const ELEMENT_CASES: readonly {
     },
     {
         check: "a disabled",
-        assertion: { kind: "disabled" },
+        assertion: { kind: ElementStateKind.Disabled },
         cases: [
             { probe: "a disabled element", seen: DISABLED, verdict: PASSED },
             { probe: "an enabled element", seen: SHOWN_ELEMENT, verdict: FAILED },
@@ -110,7 +111,7 @@ const ELEMENT_CASES: readonly {
     },
     {
         check: "a textEquals with its own spacing",
-        assertion: { kind: "textEquals", value: safe(" Order placed ") },
+        assertion: { kind: ElementTextKind.TextEquals, value: safe(" Order placed ") },
         cases: [
             { probe: "the same words, spaced differently", seen: SHOWN_ELEMENT, verdict: PASSED },
             {
@@ -127,7 +128,7 @@ const ELEMENT_CASES: readonly {
     },
     {
         check: "a textContains with its own spacing",
-        assertion: { kind: "textContains", value: safe("Order   placed") },
+        assertion: { kind: ElementTextKind.TextContains, value: safe("Order   placed") },
         cases: [
             { probe: "the same words, spaced differently", seen: SHOWN_ELEMENT, verdict: PASSED },
             {
@@ -144,7 +145,7 @@ const ELEMENT_CASES: readonly {
     },
     {
         check: "a valueEquals",
-        assertion: { kind: "valueEquals", value: safe("Ada Lovelace") },
+        assertion: { kind: ElementTextKind.ValueEquals, value: safe("Ada Lovelace") },
         cases: [
             { probe: "that value", seen: SHOWN_ELEMENT, verdict: PASSED },
             {
@@ -157,7 +158,7 @@ const ELEMENT_CASES: readonly {
     },
     {
         check: "a valueContains",
-        assertion: { kind: "valueContains", value: safe("Love") },
+        assertion: { kind: ElementTextKind.ValueContains, value: safe("Love") },
         cases: [
             { probe: "a value holding it", seen: SHOWN_ELEMENT, verdict: PASSED },
             {
@@ -211,18 +212,18 @@ const ELEMENT_CASES: readonly {
         cases: [
             {
                 probe: "that class",
-                seen: { ...SHOWN_ELEMENT, dom: { kind: "classes", classes: ["is-active"] } },
+                seen: { ...SHOWN_ELEMENT, dom: { kind: DomReadKind.Classes, classes: ["is-active"] } },
                 verdict: PASSED,
             },
             {
                 probe: "other classes",
-                seen: { ...SHOWN_ELEMENT, dom: { kind: "classes", classes: ["is-active-now"] } },
+                seen: { ...SHOWN_ELEMENT, dom: { kind: DomReadKind.Classes, classes: ["is-active-now"] } },
                 verdict: FAILED,
             },
             { probe: "no DOM read", seen: SHOWN_ELEMENT, verdict: FAILED },
             {
                 probe: "another kind of read",
-                seen: { ...SHOWN_ELEMENT, dom: { kind: "attribute", value: "is-active" } },
+                seen: { ...SHOWN_ELEMENT, dom: { kind: DomReadKind.Attribute, value: "is-active" } },
                 verdict: FAILED,
             },
         ],
@@ -233,12 +234,12 @@ const ELEMENT_CASES: readonly {
         cases: [
             {
                 probe: "other classes",
-                seen: { ...SHOWN_ELEMENT, dom: { kind: "classes", classes: ["is-active"] } },
+                seen: { ...SHOWN_ELEMENT, dom: { kind: DomReadKind.Classes, classes: ["is-active"] } },
                 verdict: PASSED,
             },
             {
                 probe: "that class",
-                seen: { ...SHOWN_ELEMENT, dom: { kind: "classes", classes: ["is-empty"] } },
+                seen: { ...SHOWN_ELEMENT, dom: { kind: DomReadKind.Classes, classes: ["is-empty"] } },
                 verdict: FAILED,
             },
             { probe: "no DOM read", seen: SHOWN_ELEMENT, verdict: FAILED },
@@ -254,18 +255,18 @@ const ELEMENT_CASES: readonly {
         cases: [
             {
                 probe: "that style, spaced differently",
-                seen: { ...SHOWN_ELEMENT, dom: { kind: "computedStyle", value: "rgb(1,  2, 3)" } },
+                seen: { ...SHOWN_ELEMENT, dom: { kind: DomReadKind.ComputedStyle, value: "rgb(1,  2, 3)" } },
                 verdict: PASSED,
             },
             {
                 probe: "another style",
-                seen: { ...SHOWN_ELEMENT, dom: { kind: "computedStyle", value: "rgb(9, 9, 9)" } },
+                seen: { ...SHOWN_ELEMENT, dom: { kind: DomReadKind.ComputedStyle, value: "rgb(9, 9, 9)" } },
                 verdict: FAILED,
             },
             { probe: "no DOM read", seen: SHOWN_ELEMENT, verdict: FAILED },
             {
                 probe: "another kind of read",
-                seen: { ...SHOWN_ELEMENT, dom: { kind: "classes", classes: [] } },
+                seen: { ...SHOWN_ELEMENT, dom: { kind: DomReadKind.Classes, classes: [] } },
                 verdict: FAILED,
             },
         ],
@@ -276,17 +277,17 @@ const ELEMENT_CASES: readonly {
         cases: [
             {
                 probe: "that value",
-                seen: { ...SHOWN_ELEMENT, dom: { kind: "attribute", value: "ascending" } },
+                seen: { ...SHOWN_ELEMENT, dom: { kind: DomReadKind.Attribute, value: "ascending" } },
                 verdict: PASSED,
             },
             {
                 probe: "that value spaced differently",
-                seen: { ...SHOWN_ELEMENT, dom: { kind: "attribute", value: " ascending" } },
+                seen: { ...SHOWN_ELEMENT, dom: { kind: DomReadKind.Attribute, value: " ascending" } },
                 verdict: FAILED,
             },
             {
                 probe: "no such attribute",
-                seen: { ...SHOWN_ELEMENT, dom: { kind: "attribute", value: null } },
+                seen: { ...SHOWN_ELEMENT, dom: { kind: DomReadKind.Attribute, value: null } },
                 verdict: FAILED,
             },
             { probe: "no DOM read", seen: SHOWN_ELEMENT, verdict: FAILED },
@@ -298,18 +299,18 @@ const ELEMENT_CASES: readonly {
         cases: [
             {
                 probe: "no such attribute",
-                seen: { ...SHOWN_ELEMENT, dom: { kind: "attribute", value: null } },
+                seen: { ...SHOWN_ELEMENT, dom: { kind: DomReadKind.Attribute, value: null } },
                 verdict: PASSED,
             },
             {
                 probe: "an empty attribute",
-                seen: { ...SHOWN_ELEMENT, dom: { kind: "attribute", value: "" } },
+                seen: { ...SHOWN_ELEMENT, dom: { kind: DomReadKind.Attribute, value: "" } },
                 verdict: FAILED,
             },
             { probe: "no DOM read", seen: SHOWN_ELEMENT, verdict: FAILED },
             {
                 probe: "another kind of read",
-                seen: { ...SHOWN_ELEMENT, dom: { kind: "classes", classes: [] } },
+                seen: { ...SHOWN_ELEMENT, dom: { kind: DomReadKind.Classes, classes: [] } },
                 verdict: FAILED,
             },
         ],

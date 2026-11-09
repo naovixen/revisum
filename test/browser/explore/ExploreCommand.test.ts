@@ -28,6 +28,7 @@ import {
   withExploreRun, type ExploreRun, type ExploreSetup, type SessionCall,
 } from './examples/ExploreCommandPorts.ts';
 import { shareBrowserInThisFile } from '#test-support/browser/ShareBrowserInThisFile.ts';
+import { AuditEventKind, GuaranteeLevel } from '@revisum/contracts';
 
 shareBrowserInThisFile();
 
@@ -61,7 +62,7 @@ for (const { name, start } of [
   test(`a start URL on ${name} stops with explore-origin-refused before the isolated runner starts`, async () => {
     await withExploreRun({
       argv: () => exploreArguments(start(), ['--json']),
-      runner: (site) => watchedFakeRunner({ level: 'isolated', output: containerPageMap(site.origin).printed }),
+      runner: (site) => watchedFakeRunner({ level: GuaranteeLevel.Isolated, output: containerPageMap(site.origin).printed }),
     }, (run) => assertStoppedEarly(run, 'explore-origin-refused'));
   });
 }
@@ -306,7 +307,7 @@ test('the draft is admitted with source explore-draft, basis core-recorded and t
     const expected = { source: 'explore-draft', basis: 'core-recorded', reference: pageMapReference(run) };
     assert.match(expected.reference, /^sha256:[0-9a-f]{64}$/);
     assert.deepEqual(exploreData(run)['provenance'], expected);
-    const submissions = run.events.recorded.filter((recorded) => recorded.event.kind === 'plan.submitted');
+    const submissions = run.events.recorded.filter((recorded) => recorded.event.kind === AuditEventKind.PlanSubmitted);
     assert.equal(submissions.length, 1, JSON.stringify(run.events.recorded));
     assert.deepEqual(submissions[0]?.event.planProvenance, expected);
   });
@@ -393,7 +394,7 @@ test('--after naming a plan whose approval is for another plan\'s hash stops wit
 test('an unapproved --after plan stops before the isolated runner starts', async () => {
   await withExploreRun({
     ...afterRun([], SIGN_IN_PLAN, ['--json']),
-    runner: (site) => watchedFakeRunner({ level: 'isolated', output: containerPageMap(site.origin).printed }),
+    runner: (site) => watchedFakeRunner({ level: GuaranteeLevel.Isolated, output: containerPageMap(site.origin).printed }),
   }, (run) => assertStoppedEarly(run, 'after-plan-unapproved'));
 });
 
@@ -434,7 +435,7 @@ test('counter-example: the approved login plan the gate allows does act on the p
 test('in the isolated runner, the typed name is never on the crawl\'s command line', async () => {
   await withExploreRun({
     ...afterRun(async (project) => [await approvalOfPlan(SIGN_IN_PLAN, project)], SIGN_IN_PLAN, ['--json']),
-    runner: (site) => watchedFakeRunner({ level: 'isolated', output: containerPageMap(site.origin).printed }),
+    runner: (site) => watchedFakeRunner({ level: GuaranteeLevel.Isolated, output: containerPageMap(site.origin).printed }),
   }, (run) => {
     assert.ok((run.runner?.execs.length ?? 0) > 0, `the crawl was not run in the container: ${run.outcome.stdout}`);
     assert.equal(JSON.stringify(run.runner?.execs.map((exec) => exec.command)).includes(run.loginName), false, 'the typed name is on a command line');
@@ -503,7 +504,7 @@ test('with no isolated runner and no --host, the command stops with explore-runn
 test('a runner that fails to start gives explore-runner-unavailable, and nothing is crawled', async () => {
   await withExploreRun({
     argv: (site) => exploreArguments(home(site), ['--json']),
-    runner: () => watchedFakeRunner({ level: 'isolated', startFails: true }),
+    runner: () => watchedFakeRunner({ level: GuaranteeLevel.Isolated, startFails: true }),
   }, (run) => {
     assert.deepEqual(exploreErrorCodes(run), ['explore-runner-unavailable']);
     assert.deepEqual(run.runner?.execs, []);
@@ -516,7 +517,7 @@ test('a runner that fails to start gives explore-runner-unavailable, and nothing
 test('a runner whose guarantee level is host gives explore-runner-unavailable, and nothing is crawled', async () => {
   await withExploreRun({
     argv: (site) => exploreArguments(home(site), ['--json']),
-    runner: (site) => watchedFakeRunner({ level: 'host', output: containerPageMap(site.origin).printed }),
+    runner: (site) => watchedFakeRunner({ level: GuaranteeLevel.Host, output: containerPageMap(site.origin).printed }),
   }, (run) => {
     assert.deepEqual(exploreErrorCodes(run), ['explore-runner-unavailable']);
     assert.deepEqual(run.runner?.execs, []);
@@ -590,7 +591,7 @@ test('with --host, the human output says egress was not enforced', async () => {
 test('counter-example: in the isolated runner, the map is the container\'s, written canonically, the output says egressEnforced true and no host browser opens', async () => {
   await withExploreRun({
     argv: (site) => exploreArguments(home(site), ['--json']),
-    runner: (site) => watchedFakeRunner({ level: 'isolated', output: containerPageMap(site.origin).printed }),
+    runner: (site) => watchedFakeRunner({ level: GuaranteeLevel.Isolated, output: containerPageMap(site.origin).printed }),
   }, (run) => {
     assert.deepEqual(exploreErrorCodes(run), [], run.outcome.stdout);
     assert.equal(pageMapText(run), containerPageMap(run.site.origin).canonical);
@@ -606,7 +607,7 @@ test('counter-example: in the isolated runner, the map is the container\'s, writ
 test('counter-example: in the isolated runner, the human output does not say egress was not enforced', async () => {
   await withExploreRun({
     argv: (site) => exploreArguments(home(site), []),
-    runner: (site) => watchedFakeRunner({ level: 'isolated', output: containerPageMap(site.origin).printed }),
+    runner: (site) => watchedFakeRunner({ level: GuaranteeLevel.Isolated, output: containerPageMap(site.origin).printed }),
   }, (run) => {
     assert.equal(run.outcome.exitCode, 0, run.outcome.stderr);
     assert.doesNotMatch(`${run.outcome.stdout}\n${run.outcome.stderr}`, /not enforced/i);

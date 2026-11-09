@@ -11,6 +11,7 @@ import {
   acceptDialog, click, denied, dismissDialog, element, label, localeOf, parsedPlan, planOf, press, role,
   stepAt, testGate, testId, withPolicy, type JsonRecord,
 } from './examples/Policy.ts';
+import { PolicyVerdictKind } from '@revisum/contracts';
 
 type GuardCall = {
   readonly steps: readonly unknown[];
@@ -173,19 +174,19 @@ const ALLOWS_NOTHING = withPolicy({ allowedIrreversibleNames: [] });
 for (const [what, projectInput, expected] of [
   ['allows', ALLOWS_DELETE_ACCOUNT, ALLOWED], ['no longer allows', ALLOWS_NOTHING, denied('irreversible-action', 1)],
 ] as const) {
-  test(`a click resolving to "Delete account" when the project ${what} that name is ${expected.kind === 'allow' ? 'allowed' : 'denied'}`, async () => {
+  test(`a click resolving to "Delete account" when the project ${what} that name is ${expected.kind === PolicyVerdictKind.Allow ? 'allowed' : 'denied'}`, async () => {
     const verdict = await guard({
       steps: [OPEN_ACCOUNT_PAGE, click(DANGER_ZONE)], stepIndex: 1, element: element({ role: 'button', name: 'Delete account' }), projectInput,
     });
     assert.deepEqual(verdict, expected);
   });
 
-  test(`pressing Enter in the "Delete account" form when the project ${what} that name is ${expected.kind === 'allow' ? 'allowed' : 'denied'}`, async () => {
+  test(`pressing Enter in the "Delete account" form when the project ${what} that name is ${expected.kind === PolicyVerdictKind.Allow ? 'allowed' : 'denied'}`, async () => {
     const verdict = await guard({ steps: [OPEN_ACCOUNT_PAGE, press(PASSWORD, 'Enter')], stepIndex: 1, element: passwordField('Delete account'), projectInput });
     assert.deepEqual(verdict, expected.kind === 'allow' ? ALLOWED : denied('irreversible-submit', 1));
   });
 
-  test(`accepting the dialog "Revoke all API keys?" when the project ${what} that text is ${expected.kind === 'allow' ? 'allowed' : 'denied'}`, async () => {
+  test(`accepting the dialog "Revoke all API keys?" when the project ${what} that text is ${expected.kind === PolicyVerdictKind.Allow ? 'allowed' : 'denied'}`, async () => {
     const verdict = await guard({
       steps: [OPEN_ACCOUNT_PAGE, OPEN_KEYS, acceptDialog], stepIndex: 2, element: NO_ELEMENT, dialogText: 'Revoke all API keys?', projectInput,
     });

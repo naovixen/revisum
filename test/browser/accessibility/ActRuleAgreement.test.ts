@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
-import { ALL_RULES, launchBrowser, scan, type Browser, type Outcome, type PageDriver } from '@revisum/auditor-act';
+import { ALL_RULES, launchBrowser, scan, type Browser, Outcome, type PageDriver } from '@revisum/auditor-act';
 import { fullTierOnly, isFullTier } from '#test-support/TestTier.ts';
 import { BROWSERS } from '#test-support/browser/Browsers.ts';
 import { ACT_CASE_PREFIX, ACT_TEST_CASES, startAccessibilityServer, type AccessibilityServer } from '#test-support/browser/harnesses/AccessibilityServer.ts';
@@ -36,7 +36,7 @@ async function scoreCases(browser: Browser, origin: string): Promise<CaseScore[]
       const own = scanned.runs.find((ruleRun) => ruleRun.ruleId === testCase.ruleId)?.outcome ?? 'inapplicable';
       scores.push({ ruleId: testCase.ruleId, testcaseId: testCase.testcaseId, expected: testCase.expected, own });
     } catch (error) {
-      scores.push({ ruleId: testCase.ruleId, testcaseId: testCase.testcaseId, expected: testCase.expected, own: 'cantTell', error: (error as Error).message });
+      scores.push({ ruleId: testCase.ruleId, testcaseId: testCase.testcaseId, expected: testCase.expected, own: Outcome.CantTell, error: (error as Error).message });
       await page.close().catch(() => undefined);
       page = await browser.newPage();
     }

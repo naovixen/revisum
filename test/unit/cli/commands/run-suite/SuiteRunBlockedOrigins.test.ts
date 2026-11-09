@@ -6,21 +6,22 @@ import { describe, test } from "node:test";
 import type { EgressEvent } from "@revisum/contracts";
 import { recordedReport } from "../../../engine/evidence/examples/EvidenceRun.ts";
 import { runDeclaredSuite } from "./examples/SuiteRun.ts";
+import { EgressDecision, EgressChannel } from "@revisum/contracts";
 
 const blockedInBrowserForm = (origin: string): EgressEvent => ({
     origin,
-    channel: "page",
-    decision: "blocked",
+    channel: EgressChannel.Page,
+    decision: EgressDecision.Blocked,
 });
 const blockedByTheProxy = (origin: string): EgressEvent => ({
     origin,
-    channel: "unattributed",
-    decision: "blocked",
+    channel: EgressChannel.Unattributed,
+    decision: EgressDecision.Blocked,
 });
 const allowedByTheProxy = (origin: string): EgressEvent => ({
     origin,
-    channel: "unattributed",
-    decision: "allowed",
+    channel: EgressChannel.Unattributed,
+    decision: EgressDecision.Allowed,
 });
 
 const blockedOriginsOf = async (

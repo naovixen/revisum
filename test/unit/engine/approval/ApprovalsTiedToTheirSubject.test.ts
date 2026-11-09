@@ -16,6 +16,7 @@ import {
     type FixtureRepository,
     type TestRepository,
 } from "./examples/MemoryApprovalStore.ts";
+import { ApprovalSubjectKind, AccountType } from "@revisum/contracts";
 
 const MAINTAINER = "maintainer-mia";
 const PULL_REQUEST = "12";
@@ -51,7 +52,7 @@ const landed = (
         commit,
         branch: fixture.protectedBranch,
         login,
-        type: isBot ? "bot" : "user",
+        type: isBot ? AccountType.Bot : AccountType.User,
         at: "2026-10-23T09:00:00Z",
     });
 };
@@ -67,12 +68,12 @@ function assertRefusedWithAnyCode(
 }
 
 const holdoutAt = (path: string): ApprovalSubject => ({
-    kind: "holdout-plan",
+    kind: ApprovalSubjectKind.HoldoutPlan,
     hash: HOLDOUT_PLAN_HASH,
     path,
 });
 const planAt = (path: string): ApprovalSubject => ({
-    kind: "plan",
+    kind: ApprovalSubjectKind.Plan,
     hash: planHash(parsedSignupPlan()),
     path,
 });

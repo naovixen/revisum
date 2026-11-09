@@ -49,6 +49,7 @@ import {
   TEST_CERTIFICATE, draftWorkspace, loadDraftCommand, localPlanner, protectedBranchWith, startFakePlanner,
   type CommandOutcome, type DraftCommandPorts, type DraftWorkspace, type FakePlanner, type JsonRecord,
 } from '../../../unit/cli/commands/examples/DraftCommand.ts';
+import { ApprovalSubjectKind, RunnerErrorCode } from '@revisum/contracts';
 
 // ---- The site --------------------------------------------------------------------------------------
 
@@ -286,7 +287,7 @@ export function watchedFakeRunner(options: WatchedFakeRunnerOptions): WatchedFak
   const runner = fakeRunner({
     async withRun(image, policy, use) {
       started.push(policy);
-      if (options.startFails === true) {return failure({ code: 'start-failed' });}
+      if (options.startFails === true) {return failure({ code: RunnerErrorCode.StartFailed });}
       const ended = await fakeRunEnding(handle, use);
       stops += 1;
       return ended;
@@ -323,7 +324,7 @@ export async function approvalOfPlan(text: string, project: JsonRecord): Promise
   const plan = await parsedPlan(text, project);
   const repository = openRepository('solo', (fixture) => { fixture.protectedFiles[PLAN_PATH] = plan; });
   try {
-    const verified = await repository.verify({ kind: 'plan', hash: planHash(plan), path: PLAN_PATH }, repository.lockdownProof());
+    const verified = await repository.verify({ kind: ApprovalSubjectKind.Plan, hash: planHash(plan), path: PLAN_PATH }, repository.lockdownProof());
     if (!verified.ok) {assert.fail(`the plan was not approved: ${verified.error}`);}
     return verified.value.approval;
   } finally {
