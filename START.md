@@ -50,7 +50,8 @@ Architecture refactor:
   - [x] Move test data, tests and helpers, with their imports and paths (`e88db4c`). Goldens and fixtures all exact renames. Stale paths left for phase 5: `CLAUDE.md` names the old `tools/check-tests-apart.ts` (now `tools/repo-rules/commits/CheckTestsApart.ts`), and `docs/prompts/session-00-seed.md`, `session-core-review.md` and `session-decision-assessment.md` have one old path each and need the founder's agreement
   - [x] Verify the move at `4a95f3e`: `npm run check:linux` green (78 minutes) and `npm run check:containers` green (168 of 170, 2 skipped); goldens rename-only; test counts reconciled
   - [x] Sweeps, each its own commit pair: domain strings to constants, `curly`, Prettier; new ESLint rules on. Baselined for phase 6: 730 magic strings and 101 size entries (assumptions 34 and 35)
-  - [ ] Carried findings: 193, 196, 245, 294, 320, 326, 332, 356
+  - [x] Carried findings: 193, 196, 245, 294, 320, 326, 332, 356, with each fix tested. `engine/src/project/` may no longer import `engine/src/plan/`, by rule
+  - [ ] Phase-end checks: `npm run check:linux`, `npm run check:containers`
   - [ ] After the founder pushes: drop the legacy `fixtures/` and `golden/` globs
 - [ ] Phase 5: docs and final trust-path review; the founder pushes
 - [ ] Phase 6: test titles and remaining suppressions (may run alongside M3)
