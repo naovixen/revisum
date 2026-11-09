@@ -23,7 +23,7 @@ Changed by the founder, 2026-11-02: the plan language has one version, `"1.3"`, 
 
 ```ts
 // Brand, Result, Role, AllowedUrl, ElementAssertion, PageAssertion and PlanErrorCode are shared core types; see SPEC-27.
-export const PLAN_VERSION = { major: 1, minor: 1 } as const;
+export const PLAN_VERSION = { major: 1, minor: 3 } as const;
 export type Locator =
   | { by: 'role'; role: Role; name?: string }
   | { by: 'label'; label: string }
@@ -59,7 +59,7 @@ export type PlanLimits = { readonly maximumPlanBytes: number; readonly maximumSt
 export type Project = Pick<ProjectData, 'origins' | 'secretNames' | 'fixtures' | 'packs' | 'limits'>;
 export type PlanError = { readonly code: PlanErrorCode; readonly path: string }; // never echoes a value
 export function planParser(project: Project): (input: unknown) => Result<Plan, readonly PlanError[]>;
-export function assertBranded(plan: unknown): asserts plan is Plan;            // called first in run()
+export function assertBranded(plan: unknown): asserts plan is Plan;            // called in run(), straight after assertCleared (SPEC-03), before any side effect
 export type AiText = Brand<string, 'AiText'>;                                     // stored as a suggestion only
 export function parseAiText(input: unknown, maximumCharacters: number): Result<AiText, PlanError>;
 ```
@@ -72,7 +72,7 @@ export function parseAiText(input: unknown, maximumCharacters: number): Result<A
 - **Limits and references.** `maximumFrameDepth` joins the project's `limits`; a frame inside a frame has depth 2. The project file gains `secretNames` and `fixtures` lists (empty by default) so the parser can check `secretName` and `upload` references; SPEC-02 builds on them.
 - **AI text.** `parseAiText` uses the same codes as the parser's text rules and accepts line breaks.
 - **Coverage study (AC-SPEC-01-01).** Changed by the founder, 2026-11-02: `assessCoverage` and `tools/coverage-study.ts` are removed, and the data and reports stay in `docs/coverage-study/`. The study is a data file, `docs/coverage-study/intents.json`: one entry per sampled test intent, with its suite, source URL, test name, verdict and reason, and for an expressible intent a v1.1 plan that must parse. Engine's `assessCoverage(input: unknown, parse)` decodes it and returns each intent's verdict and reason and the expressible share. An intent marked expressible whose plan does not parse counts as not expressible. `tools/coverage-study.ts` runs it and writes `docs/coverage-study/report.md`.
-- **Schema and changelog (AC-SPEC-01-10).** No release build exists before SPEC-17, so the check runs in `npm run lint`. Engine's `planJsonSchema()` builds the schema from the same tables the decoders use, with no new dependency. The check fails when `docs/plan-language/plan.schema.json` differs from it, when a golden plan in `golden/plans/` doesn't validate against it, or when its sha256 is missing from the newest entry in `docs/plan-language/CHANGELOG.md`.
+- **Schema and changelog (AC-SPEC-01-10).** No release build exists before SPEC-17, so the check (`tools/repo-rules/docs/CheckPlanSchema.ts`) runs in `npm run lint`. Engine's `planJsonSchema()` builds the schema from the same tables the decoders use, with no new dependency. The check fails when `docs/plan-language/plan.schema.json` differs from it, when a golden plan in `test/golden/plans/` doesn't validate against it, or when its sha256 is missing from the newest entry in `docs/plan-language/CHANGELOG.md`.
 
 ## Acceptance criteria
 
@@ -101,3 +101,5 @@ M1.
 ## Satisfies
 
 FR-01, FR-02, FR-03, NFR-15
+
+**Amendment (2026-11-09, architecture refactor).** `PLAN_VERSION` now shows the one version, the order of checks at the start of `run()` is named, and the golden plans' folder and the schema check's file are corrected. No criterion or guarantee changed.

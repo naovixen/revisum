@@ -18,7 +18,7 @@ Let people and tools write plans in whatever way fits their workflow, while ever
     - `declared` when an author names it for a file (`hand-written` by default, or `customer-llm`).
     - The source is recorded and shown, never trusted: it changes no gate, approval or metric.
   - **Route b, the customer's own LLM or agent:** it writes either form against the published JSON Schema and grammar reference. MCP (SPEC-18, phase 2a) accepts both forms.
-  - **Route c, `core draft` (M2; moved from M4, founder, 2026-10-29).** It turns the acceptance criteria of a spec, or of a ticket saved as Markdown, into a readable draft through the `AiPlanner` port, on the customer's own key or a local model.
+  - **Route c, `core draft` (M2; moved from M4, founder, 2026-10-29).** It turns the acceptance criteria of a spec, or of a ticket saved as Markdown, into a readable draft through the `DraftPlanner` port, on the customer's own key or a local model.
     - The criteria are extracted deterministically from Markdown.
     - The planner sees only the criteria text, the grammar version, and the project's declared origins and targets. It never sees secrets, page content or artefacts. This egress is listed in the logging manifest (SPEC-09).
     - Model output is typed `unknown` and bounded by `parseAiText` (SPEC-01) before it becomes a draft.
@@ -42,7 +42,7 @@ Let people and tools write plans in whatever way fits their workflow, while ever
 Readable grammar v1 (statements are case-insensitive; writePlanText prints them as shown)
 
 Plan: <name>                                   header, required
-Version: 1.1                                   header, required
+Version: 1.3                                   header, required; the only version (SPEC-01)
 Targets: <target>[, <target>]                  header, required
 Origin: <origin>                               header, optional; "Go to /path" resolves against it
 Criterion: <criterion id>                      sets the criterion id of the Expect lines that follow
@@ -65,7 +65,7 @@ Strings are double-quoted; \" and \\ are the only escapes. Blank lines are ignor
 
 Example:
   Plan: Sign in
-  Version: 1.1
+  Version: 1.3
   Targets: chromium-stable
   Origin: https://staging.example.org
   Go to /login
@@ -77,7 +77,7 @@ Example:
 
 ### Readable syntax for plan 1.2 (addition, 2026-10-28)
 
-**In short.** Every construct of plan language 1.2 gets one readable form here. So do the 1.1 constructs the grammar above leaves out: the `urlPath` check, `storageState` and the meta headers. The reader only turns lines into plain JSON fields, and `parsePlan` alone decides what is allowed. So a 1.2 statement in a `Version: 1.1` plan is read as usual and then refused with the code a 1.1 parser gives. As in JSON, nothing in the text can express script, CSS, XPath, a pattern or a sleep. The rules below hold for the 1.1 statements too.
+**In short.** Every construct of plan language 1.2 gets one readable form here. So do the 1.1 constructs the grammar above leaves out: the `urlPath` check, `storageState` and the meta headers. The reader only turns lines into plain JSON fields, and `parsePlan` alone decides what is allowed. So a plan declaring any version but `1.3` is read as usual and then refused with `version_unsupported` (SPEC-01); the version numbers here are the history of how the language grew. As in JSON, nothing in the text can express script, CSS, XPath, a pattern or a sleep. The rules below hold for the 1.1 statements too.
 
 **Writing text exactly.**
 
@@ -124,13 +124,13 @@ Example:
   - A check's `criterionId` path maps to its `Criterion:` line, so a parser error about it is reported on that line.
 
 ```
-Readable grammar v1: the plan 1.2 addition (it reads plans of version 1.1 too)
+Readable grammar v1: the plan 1.2 addition (every plan declares version 1.3)
 
 Headers, written in this order
 Plan: <header text>                            meta.title
 Feature: <feature id>                          meta.featureId
 Spec: <header text>                            meta.specReference
-Version: 1.2                                   or 1.1
+Version: 1.3
 Targets: <target>[, <target>]
 Saved session: secret <SECRET_NAME>            storageState (language 1.1)
 Clock: <day> at <HH:MM>                        clock
@@ -152,7 +152,7 @@ Locators and text
              "first" is "position": "first"; "1st" is "position": 1. The suffix must be the English one
              (1st, 2nd, 3rd, 4th, 11th, 12th, 13th, 21st, 101st); any other suffix is bad-locator.
 <text>     = "<quoted text>" | {<value name>}
-In the 1.1 statements above, every "<text>" may also be a {reference} in a 1.2 plan, and every
+In the 1.1 statements above, every "<text>" may also be a {reference}, and every
 <locator> may take a position and an attribute. Without "in attribute", attribute is left out.
 
 Steps
@@ -223,7 +223,7 @@ Expect clipboard contains|does not contain <text>
 - Strings holding a lone surrogate (half of a UTF-16 pair) pass the parser and survive the round trip in memory, but not in a UTF-8 file. The parser could refuse them as `unsafe_text`.
 - `DraftRequest.grammarVersion` still says `v1`, although the grammar now covers 1.2.
 
-**Golden plans as text.** One line or more per 1.2 feature, from the golden plan that uses it (`golden/plans/`). The 1.1 golden plans need only the grammar above, the meta headers and `Expect page path is`; for example, `account-closure` has `Expect page path is "/goodbye"`.
+**Golden plans as text.** One line or more per 1.2 feature, from the golden plan that uses it (`test/golden/plans/`). The 1.1 golden plans need only the grammar above, the meta headers and `Expect page path is`; for example, `account-closure` has `Expect page path is "/goodbye"`.
 
 | Feature | Golden plan | Text |
 |---|---|---|
@@ -255,8 +255,8 @@ The plan clock and run values (`booking-next-month`), then service calls, `expec
 Plan: The first slot of the month can be booked
 Feature: BOOKING-1
 Spec: specs/booking.md#first-slot
-Version: 1.2
-Targets: playwright-chromium
+Version: 1.3
+Targets: cdp-chromium
 Clock: start of next month at 09:00
 Values:
   slotDay is date start of next month as day of month
@@ -273,8 +273,8 @@ Expect test id "selected-day" has text {slotDay}
 Plan: A new order is paid in the backend and cleaned up
 Feature: ORDERS-3
 Spec: specs/orders.md#backend-state
-Version: 1.2
-Targets: playwright-chromium
+Version: 1.3
+Targets: cdp-chromium
 Call createOrder with customerName "Ada Lovelace", contactEmail "ada@example.com", quantity 2, region "eu", giftWrap false, deliveryDay "2026-11-02" remembering field orderId as orderId
 Go to path "orders" / {orderId}
 Click button "Confirm order"
@@ -286,7 +286,7 @@ Clean up:
 
 ### Readable syntax for plan 1.3 (addition, 2026-10-29)
 
-**In short.** Every construct plan language 1.3 adds (SPEC-36) gets one readable form here: CSS and XPath locators with their `inside` chains, DOM checks, remembering an attribute, page scripts by name or inline, and database commands, in steps and in `Clean up:`. Every line that holds one starts with the mark `Unsafe:`, so no reader can miss it. A line without the mark can hold none, so on such lines, as in 1.2, nothing can express script, CSS or XPath. The rules of the 1.2 addition still hold; this section only adds to them. The reader still turns lines into plain JSON fields and never consults the project, so `parsePlan` alone decides. A disabled feature is refused with `unsafe_feature_disabled`. A 1.3 construct in a `Version: 1.2` or `Version: 1.1` plan is refused with the code that version's parser gives. Each error is placed on its marked line.
+**In short.** Every construct plan language 1.3 adds (SPEC-36) gets one readable form here: CSS and XPath locators with their `inside` chains, DOM checks, remembering an attribute, page scripts by name or inline, and database commands, in steps and in `Clean up:`. Every line that holds one starts with the mark `Unsafe:`, so no reader can miss it. A line without the mark can hold none, so on such lines, as in 1.2, nothing can express script, CSS or XPath. The rules of the 1.2 addition still hold; this section only adds to them. The reader still turns lines into plain JSON fields and never consults the project, so `parsePlan` alone decides. A disabled feature is refused with `unsafe_feature_disabled`. Each error is placed on its marked line.
 
 **Writing text exactly.**
 
@@ -391,14 +391,14 @@ The example's source is `() => {`, LF, a tab, `const rows = document.querySelect
 - U+2028, U+2029 and U+0085 would stand raw in a script line, where an editor may show them as line breaks or they may go unseen in review. The one plan parser refuses them in a script source as `unsafe_text` (Build notes, "Line separators in scripts"), so a script line never holds one, and a source that needs one writes its escape in the script's own code.
 - An inline check's opening line holds the effect, the returned fields and the check, so it is longer than its JSON. Inline scripts are rare, and a proposal can't run one.
 
-**Golden plans as text.** Each of the six 1.3 golden plans (`golden/unsafe-plans/`) reads back to its JSON file byte for byte, through `parsePlan` with every feature enabled and `writePlanJson`. Each starts with the same five headers, with its own title and the file's name as the spec anchor:
+**Golden plans as text.** Each of the six 1.3 golden plans (`test/golden/unsafe-plans/`) reads back to its JSON file byte for byte, through `parsePlan` with every feature enabled and `writePlanJson`. Each starts with the same five headers, with its own title and the file's name as the spec anchor:
 
 ```
 Plan: <title>
 Feature: CART-1
 Spec: specs/cart.md#<file name>
 Version: 1.3
-Targets: playwright-chromium
+Targets: cdp-chromium
 ```
 
 Its steps follow.
@@ -565,9 +565,9 @@ export interface ChatDrafter { reply(conversationId: string, message: string): P
 - **Grammar version.** `grammarVersion` stays `"v1"` until the readable format's first release; the 1.2 forms are part of v1.
 - **Line separators in scripts.** U+2028, U+2029 and U+0085 in `ScriptSource` are refused as `unsafe_text` by the one plan parser, so script lines never hide a line break.
 - **Drafts with unsafe lines.** `admitDraft` adds no rule of its own. The project's enablement decides each unsafe feature, and SPEC-36's gate refuses inline scripts in any unapproved plan, which every draft is.
-- **Building the 1.3 readable forms.** `test/unit/engine/plan/readable/UnsafeFeatureReadableText.test.ts` asserts that unsafe plans are refused with `no-readable-form`. Once the forms are built that is no longer true. Flipping it to "every unsafe golden plan has readable text" is a change to a committed test, so it needs the founder's approval first.
+- **Building the 1.3 readable forms.** `test/unit/engine/plan/readable/UnsafeFeatureReadableText.test.ts` asserts that `readablePlanText` gives `writePlanText`'s text for every unsafe golden plan.
 - **Text errors.** A statement's own error is at column 1, and any other inside the faulty token. Comments are whole lines starting with `#`.
-- **Plan 1.3 in text (addition, 2026-10-29).** Every unsafe construct of plan 1.3 (SPEC-36) now has a readable form, defined in "Readable syntax for plan 1.3" above. So AC-SPEC-28-01's round trip covers the golden plans in `golden/unsafe-plans/` too, parsed against a project that enables all six features. This supersedes SPEC-36's M1 note that they stay JSON.
+- **Plan 1.3 in text (addition, 2026-10-29).** Every unsafe construct of plan 1.3 (SPEC-36) now has a readable form, defined in "Readable syntax for plan 1.3" above. So AC-SPEC-28-01's round trip covers the golden plans in `test/golden/unsafe-plans/` too, parsed against a project that enables all six features. This supersedes SPEC-36's M1 note that they stay JSON.
 - **No readable form.** `readablePlanText` refuses only a construct the readable grammar has no form for, with text code `no-readable-form` at that construct's path. None remains: every plan 1.3 construct has a form, so it always returns text, and `writePlanText` writes every parsed plan. The code stays in `TextErrorCode` for any future construct that reaches the language before its readable form does.
 - **Unsafe mark codes.** `TextErrorCode` gains `missing-unsafe-mark` and `unneeded-unsafe-mark`, for a line whose `Unsafe:` mark doesn't match what it holds.
 - **Grammar version, 1.3.** The 1.3 forms are part of v1 too, so `grammarVersion` stays `"v1"`.
@@ -614,3 +614,5 @@ M1 (readable format, conversion, `admitDraft`, provenance); M2 (`draft`, moved f
 ## Satisfies
 
 FR-44, FR-45, FR-46, FR-47, FR-48
+
+**Amendment (2026-11-09, architecture refactor).** The examples use the `cdp-chromium` target, since the Playwright driver is removed and phase 1 is Chromium only, and `Version: 1.3`, the language's one version. The golden folders, the port the draft command uses and the note on the 1.3 readable forms' test now match the repository. The founder's example keeps its meaning: AC-SPEC-28-06 still reads it to its golden file. No criterion or guarantee changed.

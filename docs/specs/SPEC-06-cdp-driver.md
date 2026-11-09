@@ -6,22 +6,25 @@ Drive stock Chromium through core's own Chrome DevTools Protocol client, with no
 
 ## Scope and non-goals
 
-- **In:** the own-driver spike's CDP client and shared session layer (P4); the capabilities plan v1.1 needs (iframes, dialogs, uploads, crash recovery); auto-wait (attached, visible, stable, enabled, receives events); role locators from the accessibility tree; headless shell in CI; Linux flake hardening; (changed by the founder, 2026-11-02: the Playwright fallback adapter is removed, so CDP is the only driver); re-validation on every new Chrome for Testing build with fix hours logged (NFR-14); the rule for returning to Playwright stays in the MVP plan's kill criteria (research `09`).
-- **Non-goals:** popups, downloads and multiple pages (`unsupported-step` until phase 2); a general Playwright-class API; Firefox (SPEC-19).
+- **In:** the own-driver spike's CDP client and shared session layer (P4); the capabilities plan v1.1 needs (iframes, dialogs, uploads, crash recovery); auto-wait (attached, visible, stable, enabled, receives events); role locators from the accessibility tree; headless shell in CI; Linux flake hardening; (changed by the founder, 2026-11-02: the Playwright fallback adapter is removed, so CDP is the only driver and phase 1 is Chromium only); re-validation on every new Chrome for Testing build with fix hours logged (NFR-14); there is no Playwright fallback to return to, so the upkeep flag (AC-08) asks instead whether the own driver is still worth its upkeep.
+- **Non-goals:** popups, downloads and multiple pages (`unsupported-step` until phase 2); a general Playwright-class API; Firefox and every engine other than Chromium in phase 1 (SPEC-19).
 
 ## Interfaces and types
 
 ```ts
-export type AdapterInfo = { readonly id: AdapterId; readonly version: string; readonly protocol: 'cdp' | 'bidi' | 'webdriver-classic' };
+export type AdapterInfo = { readonly id: string; readonly version: string; readonly protocol: string; readonly cannotPin?: readonly string[] };
 // What a session starts with; nothing else from the run environment reaches it.
 export type SessionEnvironment = {
-  readonly secrets: SecretStore; readonly fixtures: readonly FixtureReference[];
-  readonly seed: number; readonly clockStartMilliseconds: number; readonly policy: PolicyGate;
+  readonly baseUrl: BaseUrl; readonly allowedOrigins: readonly string[];
+  readonly seed: number; readonly fixedTimeMilliseconds: number;
+  readonly sensitiveSelectors: readonly string[]; readonly timeoutMilliseconds: number;
+  readonly virtualTimers?: boolean;
 };
 export interface BrowserDriver {
   readonly info: AdapterInfo;                       // e.g. { id: 'cdp', version, protocol: 'cdp' }
-  supports(target: Target): true | Unavailable;
+  supports(target: Target): Result<true, Unavailable>;
   open(target: Target, environment: SessionEnvironment): Promise<Result<Session, Unavailable>>;
+  build?(target: Target): Promise<Result<BrowserBuild, BuildFailure>>;   // SPEC-05
 }
 // Session (the composition of the driver ports), DriverErrorCode and DriverError are shared core types; see SPEC-27.
 export type UpkeepRecord = { browser: 'chrome' | 'firefox'; major: number; fixHours: number; revalidatedAt: string };
@@ -31,14 +34,12 @@ export type UpkeepRecord = { browser: 'chrome' | 'firefox'; major: number; fixHo
 
 The seeded `contracts` code and the tests built on it win where they differ from the block above. Marked additions are new with this spec.
 
-- **Seeded shapes stay.** `AdapterInfo`, `SessionEnvironment` and `BrowserDriver` keep their seeded fields; `supports` returns `Result<true, Unavailable>`. Policy reaches the driver as the `ActionGuard` the engine passes to each `act` call, and a secret as `act`'s `secret` argument, not through the environment. `UpkeepRecord` lives in `tools/`, not `contracts`.
-- **The guard stays optional on `act`.** Two seeded tests call `act` without one, so making it required would change committed tests. This replaces the M1 exit's "`Session.act`'s guard becomes required". Instead:
-  - the engine passes a guard on every `act` call, and a proof checks this;
-  - both real drivers, given a guard, resolve the element, build its `ResolvedElement`, ask the guard, and dispatch nothing on a deny (AC-09). For a dialog step the guard gets the dialog's text.
+- **Seeded shapes stay.** Policy reaches the driver as the `ActionGuard` the engine passes to each `act` call, and a secret inside the fill `act` is given (`PerformableFill`), not through the environment. `UpkeepRecord` lives in `tools/`, not `contracts`.
+- **The guard is required on `act`** (architecture refactor; `act(action, guard)`), so a call without one doesn't compile. With every port the driver implements now required, `performs` and `DRIVER_FEATURES` are gone. The driver resolves the element, builds its `ResolvedElement`, asks the guard, and dispatches nothing on a deny (AC-09). For a dialog step the guard gets the dialog's text.
 - **Steps this spec makes real on the CDP driver:** `hover`, `select`, `upload` (a declared fixture file set on the file input), `frame` (its steps run inside the iframe's document) and `dialog` (accept or dismiss the open dialog, checking `expectText`). The engine stops reporting these as `unsupported-step`. `remember` stays unsupported until SPEC-30's driver parts.
 - **New driver error codes** (addition): `target-crashed`, when the page's renderer dies (CDP `Inspector.targetCrashed` or a closed target); and `unsupported-step`, when a step makes the page open a popup or a second page, or start a download. The popup is closed, the download is cancelled and its partial file deleted, and the step fails. Downloads by a `download` step and `newTab` stay with SPEC-31's driver parts.
 - **A crash** fails the step that was running with `target-crashed`, skips the rest, and `close()` still ends every process the driver started (AC-04, AC-07).
-- **Headless shell** (AC-01). `tools/browsers/ChromeForTestingBuild.ts` also installs the `chrome-headless-shell` build matching `CHROME_FOR_TESTING_BUILD`. The contract suite runs on a second CDP target that uses it, through the same driver with a different executable path.
+- **Headless shell** (AC-01). `tools/browsers/ChromeForTestingBuild.ts` also installs the `chrome-headless-shell` build matching `CHROME_FOR_TESTING_BUILD`. The contract suite (`test/browser/lifecycle/DriverContract.test.ts`) runs on a second CDP target that uses it, through the same driver with a different executable path.
 - **Auto-wait** (AC-03) keeps the seeded checks (attached, visible, stable, enabled, receives the click). The limit for "never actionable" is the step timeout plus 1,500 ms.
 - **Runtime imports** (AC-06). A lint in `tools/` fails when any package in the default runtime set imports, or depends on, `playwright`, `playwright-core`, `puppeteer`, `puppeteer-core`, `webdriverio`, `selenium-webdriver` or `chrome-remote-interface`. The runtime set is every package under `packages/`. `npm run check` runs it. Changed by the founder, 2026-11-02: `driver-playwright`, which the set used to exempt, is removed; `playwright-core` stays only as a root dev dependency for evidence mode's test workload (`docs/decisions/dev-dependencies.md`).
 - **Upkeep** (AC-08):
@@ -46,7 +47,7 @@ The seeded `contracts` code and the tests built on it win where they differ from
   - `tools/scheduled/SummariseUpkeep.ts` decodes them and reports the average `fixHours` over the first six Chrome majors. When that average is over 1.8 it prints a flag naming the kill criterion and exits 1. Changed by the founder, 2026-11-02: there is no Playwright fallback to return to, so the flag asks whether the own driver is still worth its upkeep. With fewer than six records, it reports the running average without flagging.
   - A weekly scheduled CI job reads the latest stable Chrome for Testing version from its public version list. When that major is newer than the pinned one, the job reruns the contract and capability suites against the new build. It fails when the new major has no upkeep record.
   - The session adds the record when it moves the pin; the founder's push approves it. Tests use fixture records and a fixture version list, never the network.
-- **Capability runs** (AC-02). The capability tests for iframes, dialogs, uploads and a crashed tab run 20 times in one test file, against local fixture pages, in `npm run check:linux`.
+- **Capability runs** (AC-02). The capability tests for iframes, dialogs, uploads and a crashed tab run 20 times in one test file (`test/browser/lifecycle/CdpCapabilities.test.ts`), against local fixture pages, in `npm run check:linux`.
 
 ## Acceptance criteria
 
@@ -72,3 +73,5 @@ M2 (design-partner alpha at its exit).
 ## Satisfies
 
 FR-08, NFR-14
+
+**Amendment (2026-11-09, architecture refactor).** The driver types match the code, the guard is required on `act`, the suites' test files are named, and Playwright's removal and phase 1 being Chromium only are recorded. No criterion or guarantee changed.

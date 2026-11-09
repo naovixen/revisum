@@ -37,13 +37,13 @@ Create core's product repository, separate from the research repository, seeded 
     3. **Comments say what and why in plain English and stand alone.** A comment never cites a spec, research docs, claim ids or spike names. (Changed by the founder, 2026-11-02: a comment used to be allowed to add "see `docs/specs/SPEC-nn-<name>.md`".)
     4. **Traceability lives in commit trailers, not in code.** `SPEC-nn` and `AC-SPEC-nn-mm` ids appear in commit trailers and in `docs/`, never in a name, a test, a comment or a string under `packages/`, `test/` or `tools/`. The tools that read specs and trailers are the exception. (Changed by the founder, 2026-11-02: test metadata `criterion: 'AC-SPEC-01-03'` is gone, and so is the trace index.)
     5. **A CI naming lint enforces rules 1–4** (`NamingLintConfig`). `docs/glossary.md` maps each domain term to its code name.
-- **Non-goals:** new features; Playwright on the default path; hosting; publishing to npm (SPEC-16); a hardware or signed key for core's own approvals.
+- **Non-goals:** new features; Playwright as a driver (architecture refactor: the driver is removed and phase 1 is Chromium only, through the CDP driver); hosting; publishing to npm (SPEC-16); a hardware or signed key for core's own approvals.
 
 ## Interfaces and types
 
 ```ts
-// One constant carries the placeholder name; nothing else hard-codes it.
-export const PRODUCT = { name: 'core', schemaNamespace: 'core' } as const;
+// One constant carries the name; nothing else hard-codes it.
+export const PRODUCT = { name: 'revisum', schemaNamespace: 'revisum' } as const;
 
 // The checks every third-party component on the trust path must pass to stay on the default path.
 export type DependencyCheck =
@@ -96,6 +96,7 @@ export type NamingLintConfig = {
   readonly bannedText: readonly { readonly pattern: RegExp; readonly why: string }[];      // matched on the whole identifier
   readonly bannedInComments: readonly { readonly pattern: RegExp; readonly why: string }[];
   readonly allowedWords: readonly string[];                 // exact, case-sensitive exceptions to bannedWords
+  readonly allowedStringValues: readonly string[];          // exact string values allowed although they match a banned word; never names
   readonly spellOut: Readonly<Record<string, string>>;      // abbreviation -> word to write instead; a match fails
   readonly allowedAbbreviations: readonly string[];         // any other abbreviation fails code review
   readonly standardNames: Readonly<Record<string, string>>; // acronym -> full name; each also in docs/glossary.md
@@ -105,8 +106,9 @@ export type NamingLintConfig = {
   readonly specReadingFiles: readonly string[];             // added 2026-11-02: the tools that read specs and trailers, exempt from it
 };
 export const NAMING_LINT: NamingLintConfig = {
-  include: ['packages/**', 'test/**', 'proofs/**', 'fixtures/**', 'golden/**', 'scripts/**', '.github/**', '*.json'],
-  exclude: ['docs/**', 'seed/provenance.json', 'fixtures/naming-lint/**', '**/node_modules/**'], // the lint's own failing fixtures
+  include: ['packages/**', 'tools/**', 'test/**', 'proofs/**', 'fixtures/**', 'golden/**', 'scripts/**', '.github/**', '*.json'],
+  exclude: ['docs/**', 'package-lock.json', 'tools/repo-rules/naming/NamingLint.ts', 'tools/eslint/eslint.config.js', 'tools/eslint/package-lock.json',
+    'eslint-suppressions.json', 'fixtures/naming-lint/**', '**/node_modules/**', '**/dist/**', '**/*.tsbuildinfo'], // the lint's own config spells out what it bans
   bannedWords: [
     { pattern: /^r(1[0-3]|[1-9])$/i, why: 'research requirement id' },
     { pattern: /^(rc|fr|nfr|up)\d{2}$/i, why: 'role criterion, requirement or user-problem id' },
@@ -127,6 +129,7 @@ export const NAMING_LINT: NamingLintConfig = {
     { pattern: /^\s*\(?\s*(see\s+)?(docs\/specs\/)?SPEC-\d{2}[\w.-]*\s*\)?\s*\.?\s*$/i, why: 'a spec reference cannot be the whole comment' },
   ],
   allowedWords: ['P1', 'P2', 'P3', 'P4'],                   // severity labels, an industry convention
+  allowedStringValues: ['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12'], // the function keys a press step may name
   spellOut: { ac: 'criterion', cfg: 'config', ctx: 'context', env: 'environment', err: 'error', max: 'maximum',
     mb: 'megabytes', md: 'markdown', min: 'minimum', ms: 'milliseconds', msg: 'message', opts: 'options',
     pct: 'percent', perf: 'performance', prev: 'previous', ref: 'reference', repo: 'repository', seq: 'sequence',
@@ -149,14 +152,14 @@ export const NAMING_LINT: NamingLintConfig = {
 
 - **Where each check runs.**
   - Checks that read only files go in `npm run lint`, so the scratch-copy lint tests in `test/proofs/` exercise them. They must not need Git: the scratch copy is not a repository.
-  - Checks that need test outcomes or Git history run in a new last step of `npm run check`, `npm run gates`, after `npm run replay`.
-  - Test outcomes: `tools/test-runner/RunTestFolder.ts` adds a reporter module from `tools/` that writes one JSON line per test (file, full name with suite names joined by ` > `, line, passed, duration) to `.test-results/`, which Git ignores. A test id is `<file>#<full name>`. A test's criterion is read from its source at the reported line, as the naming lint reads it.
+  - Checks that need test outcomes or Git history run in the last step of `npm run check:push`, `npm run gates`, after `npm run replay`.
+  - Test outcomes: `tools/test-runner/RunTestFolder.ts` adds a reporter module from `tools/` that writes one JSON line per test (file, full name with suite names joined by ` > `, line, passed, duration) to `.test-results/`, which Git ignores. A test id is `<file>#<full name>`.
   - `DependencyReview`, `DependencyCheck`, `GuaranteeRow` and `GuaranteeMap` live in `tools/`, beside the checks that use them: they describe this repository's build, and no package imports them. `TEST_SET` stays in `tools/repo-rules/commits/CheckTestsApart.ts`.
   - The root configuration the gates need (`package.json` scripts, `.gitignore`, `licences.json`, `.github/workflows/ci.yml`) changes in the code commit, as earlier specs' code commits did. CODEOWNERS gives `.github/` to the founder, who reads it before pushing.
   - Tests never write to the real `node_modules`: the scratch copy links it.
 - **Dependency reviews (AC-SPEC-00-04).**
   - `tools/repo-rules/docs/DependencyReviews.ts` holds one typed `DependencyReview` per component, transcribed from `docs/decisions/browser-and-audit-dependencies.md`: `axe-core` 4.14.0 `default`. (Changed by the founder, 2026-11-02: the `playwright-core` review is removed with `driver-playwright`; `playwright-core` is a root dev dependency only, recorded in `docs/decisions/dev-dependencies.md`.)
-  - The trust path is every package that `package-lock.json` installs as a non-development dependency of a workspace package. Today that is those two. Development-only packages (`typescript`, `@types/node`, `@puppeteer/browsers`) are off it. Browser builds are locked by SPEC-05, not here.
+  - The trust path is every package that `package-lock.json` installs as a non-development dependency of a workspace package. Today that is `axe-core` alone. Development-only packages (`typescript`, `prettier`, `@types/node`, `@puppeteer/browsers`, `playwright-core`) are off it. Browser builds are locked by SPEC-05, not here.
   - The lint fails when such a package has no review; when the review's version is not the exact version in the lock file and in every manifest; when a check is `fail` and the decision is `default`; or when an evidence entry that is a repository path does not exist. `partial` does not fail.
   - Tests: scratch-copy lint with a planted dependency that has no review, and with a `default` review given a `fail`.
 - **Tests apart (AC-SPEC-00-05).**
@@ -174,7 +177,7 @@ export const NAMING_LINT: NamingLintConfig = {
   - A malformed commit can't be amended. So the main session checks each message before committing (`node tools/repo-rules/commits/CommitTrailers.ts --message <file>`). A malformed commit already made is listed, with its reason, in a known-exceptions list in the tool by a later commit, which the founder reads.
   - `agentAuthoredShare` is commits with `Agent:` over commits since the cut-over; `specLinkedShare` is commits with `Spec:` or `Criteria:` over the same.
   - The criteria traced are the criterion ids in `docs/specs/` named in a `Criteria:` trailer since the trailer cut-over, over all criterion ids in `docs/specs/`. (Changed by the founder, 2026-11-02: this replaces `tracedCriteriaShare`, which counted passing tagged tests.)
-  - `flakyRunRate` for one run is 0 or 1, as SPEC-27's `RunRecord.flakyPair`. When a test file fails, `run-test-folder` reruns it once, only to measure. The run still fails (no retries), and it is flaky if the rerun passes. Rates over many runs are SPEC-15's.
+  - `flakyRunRate` for one run is 0 or 1, as SPEC-27's `RunRecord.flakyPair`. When a test file fails, `tools/test-runner/RunTestFolder.ts` reruns it once, only to measure. The run still fails (no retries), and it is flaky if the rerun passes. Rates over many runs are SPEC-15's.
   - Output: `.test-results/project-metrics.json` (a `RunRecord`, the four metrics and `approvalStrength: 'declared'`) and a Markdown summary. The `ci` job checks out full history (`fetch-depth: 0`). On push to `main` it appends the summary to the job summary and uploads `.test-results/` as an artefact: action pinned by commit hash, kept 90 days, well inside the free quota.
   - Tests: scratch Git repositories built by the test, with fixture commits and a fixture results file. Each share equals a hand count; a malformed trailer fails.
 - **Licences (AC-SPEC-00-08).**
@@ -204,10 +207,9 @@ export const NAMING_LINT: NamingLintConfig = {
   - The lint adds a shape check of `seed-provenance.json`: a 40-hex commit, 64-hex hashes (including `mergedFrom` sources), unique `to` paths inside this repository, and `reusedCriteria` spec ids that exist in `docs/specs/`.
   - Tests: a scratch Git repository built by the test stands in for the research repository.
 - **Criterion ids (AC-SPEC-00-15).**
-  - Built: the naming lint rejects a criterion id anywhere but a test's `criterion` value.
-  - Add: a `criterion` value must name a criterion in `docs/specs/`.
+  - Built: the naming lint rejects a spec number or criterion id in a comment or string of a TypeScript file under `packages/`, `test/` or `tools/`, apart from the tools in `specReadingFiles`, and a criterion id in JSON data. There is no `criterion` test value any more (changed by the founder, 2026-11-02).
   - There is no trace index (changed by the founder, 2026-11-02). Trailers live in Git, not in files.
-  - Tests: scratch-copy lint with an id planted in a code string and in a comment, and with a test naming `AC-SPEC-99-01`.
+  - Tests: scratch-copy lint with an id planted in a code string and in a comment. The case of a test naming `AC-SPEC-99-01` went with the `criterion` value.
 - **Glossary (AC-SPEC-00-16).**
   - `tools/repo-rules/docs/CheckGlossary.ts` runs in the lint. Code names are the backticked tokens in the "Code name" column of the Domain terms and Metrics tables.
   - A token resolves when it is an exported declaration in `packages/*/src` or `tools/`; a string literal or property name declared in `packages/*/src` (step names, union members such as `runTimers`); or, when it holds `/` or a file extension, a tracked path. Tokens of other shapes, such as JSON examples, are skipped.
@@ -284,3 +286,5 @@ M0 (week 0).
 ## Satisfies
 
 NFR-07, NFR-08, NFR-09, NFR-12, NFR-13
+
+**Amendment (2026-11-09, architecture refactor).** The `PRODUCT` value, the `NAMING_LINT` block, `npm run gates` now in `npm run check:push`, the name of the test runner and of the development-only packages, and the note on criterion ids now match the code. It also records that Playwright is removed as a driver and that phase 1 is Chromium only. No criterion or guarantee changed.

@@ -7,7 +7,7 @@ Users name exactly what to test with, and core runs that or says why it can't (u
 ## Scope and non-goals
 
 - **In:** `Target` with `kind`, `adapter`, `engine`, `version`, `device`, `fidelity`, `provider`, `locale`, `timezone`, `colorScheme`, `reducedMotion`, `required` and vendor-namespaced `vendorExtensions`; the nine target-resolution rules (research `05` Finding 2); `core lock` writing a lockfile of exact builds and executable hashes; "tested on" wording as a function of fidelity; `nonHermeticInputs` for adapters that can't pin.
-- **Non-goals:** cloud farm and device-bridge providers (SPEC-25); automatic upgrade of browsers.
+- **Non-goals:** cloud farm and device-bridge providers (SPEC-25); automatic upgrade of browsers; engines other than Chromium in phase 1 (architecture refactor: the CDP driver is the only one, so a Firefox or WebKit target stays declarable, ends `engine-not-supported` and is never substituted, until SPEC-19 adds a driver for it).
 
 ## Interfaces and types
 
@@ -45,7 +45,7 @@ The seeded `contracts` code and the tests built on it win where they differ from
 - **`Target` keeps its seeded fields.** `device` stays the closed `DeviceProfileId` set; "phone profile" means `phone-390`, "desktop" `desktop-1280`.
 - **Amendment, 2026-11-02 (founder).** A target has no `kind` and no `provider`. Nothing read them, yet both entered the manifest and project hashes, so `{"kind":"native-app","provider":"cloud"}` recorded an untrue claim. The project parser refuses either as `unknown_field`, a manifest holding either is `version-unsupported`, and `TargetKind` and `TargetProvider` are gone. Where this spec names them, in its scope, its `Target` block and the note below, read it without them. SPEC-25 reintroduces what it needs when it is built. The `provider-unavailable` reason stays.
 - **New `Target` fields are optional** (addition): `kind`, `version`, `fidelity`, `provider`, `required`, `vendorExtensions`. The project parser sets each only when the project file gives it, so existing manifests and replay hashes don't change. Code reads them through engine helpers with these defaults: `kind` `browser`; `version` the adapter's own build, pinned by the lockfile; `provider` `local`; `required` `true`; `fidelity` `engine` on a desktop or laptop profile, `engine-emulated` on a tablet or phone profile. Keys in `vendorExtensions` must be `vendor:name`; any other key is rejected with its JSON path. Every value is checked against its closed set.
-- **`AdapterRegistry`** is built from the run context's `drivers` map by an engine function `adapterRegistry(drivers)`; `find` returns `null` for an unregistered id.
+- **`AdapterRegistry`** is built from the run's `drivers` port by an engine function `adapterRegistry(drivers)`; `find` returns `null` for an unregistered id.
 - **Resolution** follows research `05` §2 in this order: (1) not in the matrix: `not-declared`; (2) adapter not registered: `adapter-not-registered`, no fallback; (3) `supports(target)` refuses: `engine-not-supported` or `device-not-supported`, and no other adapter is tried; (4) lock entry present and the build's hash differs: `build-mismatch`; (5) launch or provider failure: `launch-failed` or `provider-unavailable`; (6) retries use the same target only; (7) required versus optional, below; (8) `testedOn` wording; (9) `nonHermeticInputs`.
 - **Builds** (addition to `BrowserDriver`, optional so existing test drivers stay valid): `build?(target): Promise<Result<BrowserBuild, BuildFailure>>`, where `BrowserBuild = { version, executablePath }` and `BuildFailure = { code: 'lock-download-failed' | 'lock-offline' | UnavailableReason; detail }`. An adapter without `build` can't pin its browser, so its runs list `browser-build` under `nonHermeticInputs` when a lockfile is in use.
 - **Lockfile** `targets.lock.json` beside `project.json`: `{ schema, entries: LockEntry[] }`, entries sorted by target id, canonical JSON with a final newline. A hand-written engine decoder parses it; unknown keys are rejected.
@@ -81,3 +81,5 @@ M2.
 ## Satisfies
 
 FR-07
+
+**Amendment (2026-11-09, architecture refactor).** It records that phase 1 is Chromium only, and says the registry is built from the run's `drivers` port. `device-not-supported`, which AC-SPEC-05-03, the `UnavailableReason` block and resolution step 3 name, is no longer in the code; that text is left as it was for the founder to rule on. No criterion or guarantee changed.

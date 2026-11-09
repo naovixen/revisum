@@ -7,7 +7,7 @@ Containment stops invalid plans, not harmful valid ones. An origin allow-list an
 ## Scope and non-goals
 
 - **In:**
-  - typestate `Planned -> Authorised | Denied`;
+  - typestate: the gate turns a parsed plan into a `ClearedRun` (plan, project, target and standing held together) or a denial, and `run()` takes only a `ClearedRun`;
   - a static check: undeclared origins, production origins, plans over limits, and actions whose locator name matches an irreversible pattern;
   - a runtime guard called by the driver before every action with the resolved element: irreversible `click`; `press` of Enter or Space, or `submit`, in a form whose submit control matches; `navigate` to a URL matching a declared destructive pattern; `dialog accept` whose dialog text matches; any action on a control with no accessible name, unless the project allows it by test id;
   - irreversible patterns (delete, pay, send, revoke and project additions) declared per locale in the trusted project; a target locale with no pattern set is denied;
@@ -17,18 +17,23 @@ Containment stops invalid plans, not harmful valid ones. An origin allow-list an
 ## Interfaces and types
 
 ```ts
+// A constant object and a type of the same name in contracts. Later specs add the last four.
 export type PolicyRuleId =
   | 'irreversible-action' | 'irreversible-submit' | 'destructive-navigation' | 'irreversible-dialog'
-  | 'unnamed-control' | 'no-locale-patterns' | 'undeclared-origin' | 'production-origin' | 'over-limit';
-export type PolicyDecision =
-  | { kind: 'allow'; plan: Authorised }
-  | { kind: 'deny'; rule: PolicyRuleId; stepIndex: number | null };
-export type Authorised = Brand<Plan, 'Authorised'>;
-export type IrreversiblePatterns = Readonly<Record<Locale, readonly string[]>>;   // case-insensitive whole-word, from the trusted project
+  | 'unnamed-control' | 'no-locale-patterns' | 'undeclared-origin' | 'production-origin' | 'over-limit'
+  | 'side-effect-in-proposal' | 'inline-script-in-proposal' | 'unsafe-feature-disabled' | 'undeclared-secret';
+export type PlanDenial = { kind: 'deny'; rule: PolicyRuleId; stepIndex: number | null; unrecorded?: true };
+// One outcome per target id: a run the gate cleared, or a target the plan or the matrix doesn't declare, on which nothing runs.
+export type TargetClearance = ClearedRun | TargetNotDeclared;
+export type PlanClearance = { kind: 'allow'; runs: readonly TargetClearance[] } | PlanDenial;
+export type RunClearance = { kind: 'allow'; run: ClearedRun } | TargetNotDeclared | PlanDenial;
+// A class with a private field: only the gate makes one, and run() takes nothing else.
+export class ClearedRun { readonly plan: Plan; readonly project: Project; readonly target: Target; readonly targetId: TargetId; readonly standing: PlanStanding }
+export type IrreversiblePatterns = Readonly<Partial<Record<Locale, readonly string[]>>>;   // case-insensitive whole-word, from the trusted project
 export interface PolicyGate {
-  decide(plan: Plan, project: TrustedProject, targets: readonly Target[]): PolicyDecision;               // pure, no I/O
-  guardAction(step: Step, stepIndex: number, element: ResolvedElement, dialogText: string | null, locale: Locale):
-    { kind: 'allow' } | { kind: 'deny'; rule: PolicyRuleId; stepIndex: number };                        // pure, no I/O
+  decide(plan: Plan, targetIds: readonly TargetId[], standing?: PlanStanding): PlanClearance;   // no I/O but a denial's audit event
+  clear(plan: Plan, targetId: TargetId, standing?: PlanStanding): RunClearance;                 // decide() for one target
+  guardAction(step: Step, stepIndex: number, element: ResolvedElement, dialogText: string | null, locale: Locale): GuardVerdict; // no I/O but a denial's audit event
 }
 ```
 
@@ -37,20 +42,19 @@ export interface PolicyGate {
 - **Testing a delete feature.** The project allows irreversible actions in the trusted `policy.allowedIrreversibleNames`: exact accessible names, case-insensitive, such as "Delete account". A person approves that list like any trusted file. An allowed name passes `irreversible-action`, `irreversible-submit` and `irreversible-dialog`. Runs stay automatic; the gate is a check inside every run.
 - **Production.** Denied by default for every plan. When the trusted `policy.allowProductionForApprovedPlans` is `true`, an approved plan may use production origins (SPEC-02's `planStanding`). A proposal never may.
 - **Test helpers.** Shared test helpers clear each plan through the gate before `run()`, in a tests commit of their own. SPEC-02's production test gains the explicit allowance (founder, 2026-10-28).
-- **Building the gate.** `policyGate({ project, events })` returns the `PolicyGate`. `decide(plan, targets, standing)` takes the plan's standing; a missing standing means a proposal. `guardAction` reads its patterns and allowances from the same project. Each denial appends one `plan.denied` event whose `code` is the rule.
-- **`Authorised`.** It is branded with its own key, so it stays a narrower `Plan` and doesn't collapse to `never` with SPEC-27's `Brand`. The key is a `unique symbol` declared in `contracts` and never exported, so an object written by hand (a spread plan, `Object.assign`) never type-checks as `Authorised`; only the gate's output does (M1 exit review).
-- **Authorisation belongs to one project.** The gate records each plan it clears with a hash of the project it cleared it under (everything but `provenance`). `run()` refuses, before any driver call, a plan cleared under another project, such as one whose `allowedIrreversibleNames` allowed the click.
+- **Building the gate.** `policyGate({ project, events })` returns the `PolicyGate`. `decide(plan, targetIds, standing)` takes the plan's standing, and `clear(plan, targetId, standing)` is the same for one target. A missing standing, or one approved for another plan's hash, means a proposal. `guardAction` reads its patterns and allowances from the same project. Each denial appends one `plan.denied` event whose `code` is the rule.
+- **`ClearedRun`.** It replaces the `Authorised` brand (`packages/engine/src/policy/ClearedRun.ts`). It is a class with a private field and the engine exports only its type, so an object written by hand, a copy or a spread never type-checks as one and fails `isCleared` at run time. Only the gate's output is one. `run()` calls `assertCleared` before any side effect, so an object the gate didn't make is refused whatever its type says.
+- **A cleared run belongs to one project.** The gate clears a plan together with the project, target and standing it judged, in one frozen value. A run under another project, such as one whose `allowedIrreversibleNames` allowed the click, can't be expressed, so `run()` needs no project hash to compare.
 - **Patterns.** Engine ships base sets for `en`, `de` and `fr` (delete, pay, send and revoke, and their equivalents); the project adds to them per locale. A locale like `fr-FR` falls back to `fr`. A locale with neither a base set nor a project set is denied with `no-locale-patterns`. A static check with no targets uses every set, so the engine's own always apply.
 - **Matching.** Names and patterns are compared after NFKC folding (full-width letters), removing format characters (soft hyphen, zero-width joiner) and splitting camelCase ("DeleteAccount" reads "Delete Account"). Matches stay whole-word, so "DeletedItems" and "UndeleteItem" pass. A false positive such as "PayPal" matching "pay" is accepted: it errs on the safe side. Allowed names still compare exactly, ignoring case and spacing.
 - **Destructive URLs.** A pattern is a URL path. It matches the same path, or one that continues it after a `/`. A click on a link whose resolved URL matches is `destructive-navigation`.
 - **Step index.** The first offending step, or `null` for `no-locale-patterns` and `over-limit`.
 - **Scope of each check.** The static check reads `navigate` and the locator names of clicks. Presses, submits and dialogs need the page, so the runtime guard checks them. `unnamed-control` doesn't apply to dialog steps. A runtime denial ends the run `Denied`, with no input event for that step.
-- **Dialog steps.** `ActionStep` includes `dialog`, so `run()` hands a dialog step to `Session.act` like any action, and the driver asks the guard first. `ActionGuard` is `(element, dialogText)`: for a dialog the element's fields are all null and `dialogText` is the open dialog's text; otherwise it is null. Until SPEC-06 the CDP and Playwright drivers refuse a dialog step (`literalActionStep` returns undefined) with `not-actionable`.
-- **Unrecorded denials.** A denial whose `plan.denied` append fails carries `unrecorded: true` on the `PolicyDecision`, the `GuardVerdict`, the `DeniedPlan` and the run's `denial`, so the outcome and the result hash differ from a recorded denial. `RunPorts.audit` is required, so no run can deny a plan without a sink to record it (founder, 2026-10-29).
+- **Dialog steps.** `PerformableAction` includes the resolved dialog step, so `run()` hands a dialog step to `Session.act` like any action, and the driver asks the guard first. `ActionGuard` is `(element, dialogText)`: for a dialog the element's fields are all null and `dialogText` is the open dialog's text; otherwise it is null.
+- **Unrecorded denials.** A denial whose `plan.denied` append fails carries `unrecorded: true` on the `PlanDenial`, the `GuardVerdict`, the `DeniedPlan` and the run's `denial`, so the outcome and the result hash differ from a recorded denial. `RunPorts.audit` is required, so no run can deny a plan without a sink to record it (founder, 2026-10-29).
 - **For SPEC-06 and the M1 exit review.**
-  - `Session.act(step, guard?)` takes the guard as optional for now, because seeded driver tests call `act(step)`. SPEC-06 must make every driver, CDP and Playwright alike, call the guard before every action, dialog steps included (passing the dialog's text), and make the guard required.
+  - `Session.act(action, guard)` requires the guard, so a call without one doesn't compile. The driver calls it before every action, dialog steps included (passing the dialog's text).
   - Denial events carry actor type `unverified`, because the gate can't know who wrote the plan.
-  - The driver contract test "accessibility snapshot exposes the heading…" failed once under load on Playwright Chromium and passed on rerun; watch it.
 - **Anchors.** Each rule id gets a `## <rule>` heading in `docs/errors.md` and joins the error-anchor list.
 
 ## Acceptance criteria
@@ -79,3 +83,5 @@ M1 (static check and guard logic); wired into the driver at M2.
 ## Satisfies
 
 FR-05
+
+**Amendment (2026-11-09, architecture refactor).** `Authorised` is gone: the gate gives a `ClearedRun`, which holds the plan, project, target and standing, and `run()` takes nothing else. The types, the gate's signatures and the notes on the guard, dialog steps and unrecorded denials now match the code, and the Playwright driver is no longer mentioned, since it is removed. No criterion or guarantee changed: a plan the gate has not cleared still can't be run, by type or at run time.
