@@ -1,0 +1,51 @@
+{
+  "plans": {
+    "account-closure": "e67e6cd952750f32ca46b7344bdc8caddba166b0e256ffe5ea9f67a03a3d4a42",
+    "booking-next-month": "54140fde9e146a5af2f57f30eb0f35c9867790410e0c76e2cab6da3ab6cd4e49",
+    "consent": "515e4d750b3958a8f2875f3b5f9d613cb331a13aa4e8ab42ade4eb91a3e03186",
+    "copied-invite-link": "efcd5fe1fa633399d3e140697a404dfcf5be7521ed662829e95079f46b4887fa",
+    "declared-test-id-attribute": "0768e3825f45e6f9f77cd753084a2c10b6acc5a279693aff820af4c9c1061365",
+    "environment": "bbfeaeba9c0762a01729a2d8c266e6726007ace3344a15702c061cc5d4a541cc",
+    "export-download": "7b2aae414ed6782256f0cee94222aad10ff2a763a17d23cf88c9f515a7ca513d",
+    "keyboard-shortcuts": "85e167f8473d49f233b45491a1772bbb0e5dc173f1aed848841400b21e17570e",
+    "like-requests-and-response": "d4191c235357ff96aceddb108072f88db4aa769def04d66d0834a0a95d42fd1b",
+    "link-target": "ffc178ca218d70643b45808077cc2244d50d4a6e032fe5c5773964fefb74a7fd",
+    "login-code-stub": "b738aeed47842434d2303b29d1021a8f477efaf1b98e89cd8292a80bc77f4fa1",
+    "long-chat-message": "a90b436b1ac61c7deb2ed1e3e45df274baf2012d8c3900fb4694f7ae603ee020",
+    "order-backend-state": "567de024dfdaae92248f435ffff42e33a24b5a59507b0d2c93aec4a8d1852a11",
+    "order-page-by-path": "782e5022c947095b6c06eeeb74cb491194017ecef0db21bfe2c7ddd03b199211",
+    "page-states": "c91ea4755a458e0a8a502926812a7c2ec80e85a6a997c8085c15a5600d7f4fb4",
+    "pinned-menu-storage": "b11f171ce685e589cba03d2b78ee1ca71cdd22418dfdadbea7afe24b06b1a42c",
+    "project-pages-prefix": "fd9797b32ce7b61f2733623fbaddf2d4ab89be2158a23cbe36e94aeb463d8922",
+    "remembered-copied-link": "db476595e8261d45a66d0dfc7c7a6f657257e8e1d04faa3c6181eaa2835afd2d",
+    "remembered-order-number": "2c15fa9bed2eee81871b41e9310d9d115ce203b7628f9aaf98e5e668b377d93c",
+    "second-tab-session": "9f0155b68448bd8f4637172fe6fb82a59025cae9daee9f710377c28b315cf0d9",
+    "server-rendered-metadata": "e565397bad12f676a05d2a072fbb80f7e8dcfbbb0703ab2d40e17e40d74cb6df",
+    "session-expiry-clock": "2fd73f39eeab41ee259e5cc58c0d579023169168606cb5270305d8833899065c",
+    "signup": "464f767862ceef4f16d86e222bdd18c14bd989bfada0c1bc262e8b2bfe3f3af8",
+    "third-search-result": "5fd77f52019bde70656f876ec94cf8e785781dd904a5621a07b6b86e5b653103",
+    "unique-sign-up": "cdc698cb37e6f70a3087acdf609aca863ba499087643d69d9a9a7fff1becefd6"
+  },
+  "runs": {
+    "open-orders": {
+      "state": "Passed",
+      "resultHash": "4bd6b9340d90ad0821cae5298eab02ca7170bc1085cbed6732c7802a544e2bf0",
+      "manifestHash": "7ad891ba75fe2081530d76e88fd2da5c5c3b7f575918379e42b12d84696e2a72"
+    },
+    "signup": {
+      "state": "Failed",
+      "resultHash": "2fcf857d80813f9db33fc8d809b343eeade2c2b448afa1e5264c20feeef1175c",
+      "manifestHash": "bfae855dc6516002fece29886a5320ef449b9faf29065c07507453cd1f4b542d"
+    },
+    "order-page-by-path": {
+      "state": "Passed",
+      "resultHash": "dd6804d63aeb5e3488ce53174b7b521f31f15d3cf008d8a69593906bc05260bc",
+      "manifestHash": "9f99c866a432fa2974ec8d4e5b1c2154077aaf3ba0901e68a5d9d0fabf156ec7"
+    },
+    "order-backend-state": {
+      "state": "Refused",
+      "resultHash": "a2dd438a342b51a334a252782c805372851f32bf0b94707ccebcaa598dfd9d29",
+      "manifestHash": null
+    }
+  }
+}

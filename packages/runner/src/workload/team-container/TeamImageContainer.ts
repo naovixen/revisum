@@ -1,0 +1,31 @@
+// A container of the team's own image: never root, under the pinned seccomp profile, with Revisum's
+// keep-alive as its main process, so the image's own entrypoint never runs.
+import { join } from "node:path";
+import type { ContainerOptions } from "../../containers/ContainerEngine.ts";
+import { SECCOMP_PROFILE } from "../../containers/RunImageContainer.ts";
+
+// The uid and gid used when the image's own user is root, or the image names none.
+const UNPRIVILEGED_USER = "1000:1000";
+
+// Root by name or by uid however it is spelled: Docker reads "00" as uid 0 too.
+const isRoot = (user: string): boolean => /^(root|0+)(:|$)/.test(user.trim());
+
+const containerUser = (imageUser: string | null): string =>
+    imageUser === null || isRoot(imageUser) ? UNPRIVILEGED_USER : imageUser;
+
+type TeamContainerFields = Omit<
+    ContainerOptions,
+    "user" | "seccompProfile" | "entrypoint" | "command"
+>;
+
+export const teamImageContainer = (
+    root: string,
+    imageUser: string | null,
+    fields: TeamContainerFields,
+): ContainerOptions => ({
+    ...fields,
+    user: containerUser(imageUser),
+    seccompProfile: join(root, SECCOMP_PROFILE),
+    entrypoint: "sleep",
+    command: ["infinity"],
+});

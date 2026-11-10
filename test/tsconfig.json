@@ -8,5 +8,9 @@
   },
   "include": [
     "**/*.ts"
+  ],
+  "exclude": [
+    "fixtures/**",
+    "golden/**"
   ]
 }

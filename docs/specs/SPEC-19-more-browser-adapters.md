@@ -11,6 +11,8 @@ Widen reach without weakening guarantees. It serves "we can't honestly say wheth
 
 ## Interfaces and types
 
+Changed by the founder, 2026-11-02: `driver-playwright` was removed, so there is no Playwright driver to start from. The plug-in below is built on its own, and Firefox comes through the BiDi client. Chromium-only until then.
+
 ```ts
 // GuaranteeLevel ('isolated' | 'host') is a shared core type; 'host' means no egress enforcement and no replay claim.
 export interface PlaywrightPlugin {

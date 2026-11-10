@@ -1,0 +1,334 @@
+// The policy gate's static check over declared calls. A plan with no approval is a proposal: it may
+// not make a write call unless the declaration allows it in proposals (side-effect-in-proposal).
+// Calls and cleanup calls together count toward the project's maximumCalls (over-limit). A call to
+// a service on a production origin is denied (production-origin). Each denial is recorded as a
+// plan.denied event with its rule, and a denied plan makes no call at all.
+import assert from "node:assert/strict";
+import { arch, platform } from "node:os";
+import { test } from "node:test";
+import { UntrustedRunOutcomeKind, createRunService } from "@revisum/engine";
+import {
+    OPEN_ACCOUNT_PAGE,
+    ORIGIN,
+    PRODUCTION_ORIGIN,
+    approvedStanding,
+    comparable,
+    decideOn,
+    deniedCodes,
+    parsedPlan,
+    parserProject,
+    policyProjectInput,
+    testGate,
+    type JsonRecord,
+    POLICY,
+    planOf,
+} from "../examples/Policy.ts";
+import { routedServiceCaller } from "../../run/executors/service-calls/examples/ShopService.ts";
+import { spyDriver } from "../../secrets/examples/SecretRun.ts";
+import { fakePorts } from "#test-support/fakes/FakePorts.ts";
+import { baseUrlOf } from "#test-support/builders/ClearRun.ts";
+
+const SHOP_ORIGIN = "http://127.0.0.1:4180";
+const SERVICES = [
+    { name: "shop", origin: SHOP_ORIGIN, private: true },
+    // The live shop's API, on the project's production origin.
+    { name: "live", origin: PRODUCTION_ORIGIN, private: false },
+];
+
+const order = { orderId: { kind: "identifier" } };
+const CALLS: JsonRecord = {
+    // A write the declaration does not allow in proposals.
+    createOrder: {
+        service: "shop",
+        method: "POST",
+        path: "/api/orders",
+        parameters: {},
+        effect: "write",
+        successStatuses: [201],
+        fields: { orderId: "/id" },
+    },
+    // A write the declaration allows in proposals.
+    seedCatalogue: {
+        service: "shop",
+        method: "POST",
+        path: "/api/test/catalogue",
+        parameters: {},
+        effect: "write",
+        successStatuses: [204],
+        allowInProposals: true,
+    },
+    getOrder: {
+        service: "shop",
+        method: "GET",
+        path: "/api/orders/{orderId}",
+        parameters: order,
+        effect: "read",
+        successStatuses: [200],
+        fields: { status: "/status" },
+    },
+    // A read of the live shop.
+    liveOrderCount: {
+        service: "live",
+        method: "GET",
+        path: "/api/orders/count",
+        parameters: {},
+        effect: "read",
+        successStatuses: [200],
+        fields: { count: "/count" },
+    },
+};
+
+// `policy` changes the shared policy, such as allowing production for approved plans.
+const projectInput = (
+    limits: Readonly<Record<string, number>> = {},
+    policy: JsonRecord = {},
+): JsonRecord =>
+    policyProjectInput({
+        services: SERVICES,
+        calls: CALLS,
+        limits: { stepTimeoutMilliseconds: 2000, ...limits },
+        policy: { ...POLICY, ...policy },
+    });
+
+const newerPlan = (steps: readonly unknown[], cleanup?: readonly unknown[]): JsonRecord => ({
+    ...planOf(steps),
+    version: "1.3",
+    ...(cleanup === undefined ? {} : { cleanup }),
+});
+
+const call = (name: string): JsonRecord => ({ type: "call", call: name, arguments: {} });
+const readOrderStatus: JsonRecord = {
+    type: "expectBackend",
+    call: "getOrder",
+    arguments: { orderId: "ord_1" },
+    field: "status",
+    assert: { kind: "equals", value: "paid" },
+    criterionId: "account.order-paid",
+};
+const liveCount: JsonRecord = {
+    type: "expectBackend",
+    call: "liveOrderCount",
+    arguments: {},
+    field: "count",
+    assert: { kind: "present" },
+    criterionId: "account.orders-counted",
+};
+
+type DecideOptions = {
+    readonly limits?: Readonly<Record<string, number>>;
+    readonly approved?: boolean;
+    readonly policy?: JsonRecord;
+};
+
+async function decide(raw: JsonRecord, options: DecideOptions = {}) {
+    const input = projectInput(options.limits, options.policy);
+    const tested = await testGate(input);
+    const plan = parsedPlan(raw, input);
+    const standing = options.approved === true ? await approvedStanding(plan) : undefined;
+    return { decision: comparable(decideOn(tested, plan, standing)), events: tested.events };
+}
+
+// ---- Writes in proposals ----------------------------------------------------------------------------
+
+test("a proposal that makes a write call its declaration does not allow in proposals is denied", async () => {
+    const { decision, events } = await decide(newerPlan([OPEN_ACCOUNT_PAGE, call("createOrder")]));
+    assert.deepEqual(decision, { kind: "deny", rule: "side-effect-in-proposal", stepIndex: 1 });
+    assert.deepEqual(deniedCodes(events), ["side-effect-in-proposal"]);
+});
+
+test("a proposal whose only such write is in cleanup is denied too", async () => {
+    const { decision } = await decide(newerPlan([OPEN_ACCOUNT_PAGE], [call("createOrder")]));
+    assert.equal(decision["kind"], "deny");
+    assert.equal(decision["rule"], "side-effect-in-proposal");
+});
+
+// Counter-examples: the same write in an approved plan, a write allowed in proposals, and reads.
+test("the same write call in an approved plan is allowed", async () => {
+    const { decision } = await decide(newerPlan([OPEN_ACCOUNT_PAGE, call("createOrder")]), {
+        approved: true,
+    });
+    assert.deepEqual(decision, { kind: "allow" });
+});
+
+test("a proposal may make a write call whose declaration sets allowInProposals", async () => {
+    assert.deepEqual(
+        (
+            await decide(
+                newerPlan([OPEN_ACCOUNT_PAGE, call("seedCatalogue")], [call("seedCatalogue")]),
+            )
+        ).decision,
+        { kind: "allow" },
+    );
+});
+
+test("a proposal may make read calls and backend checks", async () => {
+    const readCall = { type: "call", call: "getOrder", arguments: { orderId: "ord_1" } };
+    assert.deepEqual(
+        (await decide(newerPlan([OPEN_ACCOUNT_PAGE, readCall, readOrderStatus]))).decision,
+        { kind: "allow" },
+    );
+});
+
+// ---- The call limit ---------------------------------------------------------------------------------
+
+test("calls plus cleanup calls over maximumCalls are denied as over-limit", async () => {
+    const { decision, events } = await decide(
+        newerPlan(
+            [OPEN_ACCOUNT_PAGE, call("seedCatalogue"), call("seedCatalogue")],
+            [call("seedCatalogue")],
+        ),
+        { limits: { maximumCalls: 2 } },
+    );
+    assert.equal(decision["kind"], "deny");
+    assert.equal(decision["rule"], "over-limit");
+    assert.deepEqual(deniedCodes(events), ["over-limit"]);
+});
+
+test("calls plus cleanup calls up to maximumCalls are allowed", async () => {
+    for (const [steps, cleanup] of [
+        [2, 0],
+        [1, 1],
+        [0, 2],
+    ] as const) {
+        const plan = newerPlan(
+            [OPEN_ACCOUNT_PAGE, ...Array.from({ length: steps }, () => call("seedCatalogue"))],
+            Array.from({ length: cleanup }, () => call("seedCatalogue")),
+        );
+        assert.deepEqual(
+            (await decide(plan, { limits: { maximumCalls: 2 } })).decision,
+            { kind: "allow" },
+            `${steps} steps, ${cleanup} cleanup`,
+        );
+    }
+});
+
+test("with no limit set, 20 calls are allowed and 21 are denied as over-limit", async () => {
+    const calls = (count: number) => Array.from({ length: count }, () => call("seedCatalogue"));
+    assert.deepEqual(
+        (await decide(newerPlan([OPEN_ACCOUNT_PAGE, ...calls(19)], calls(1)))).decision,
+        { kind: "allow" },
+    );
+    const denied = (await decide(newerPlan([OPEN_ACCOUNT_PAGE, ...calls(20)], calls(1)))).decision;
+    assert.equal(denied["rule"], "over-limit");
+});
+
+// ---- Production services -------------------------------------------------------------------------------
+
+test("a call to a service on a production origin is denied as production-origin, in a proposal", async () => {
+    const { decision, events } = await decide(newerPlan([OPEN_ACCOUNT_PAGE, liveCount]));
+    assert.deepEqual(decision, { kind: "deny", rule: "production-origin", stepIndex: 1 });
+    assert.deepEqual(deniedCodes(events), ["production-origin"]);
+});
+
+test("a call to a service on a production origin is denied in an approved plan too", async () => {
+    const { decision } = await decide(newerPlan([OPEN_ACCOUNT_PAGE, liveCount]), {
+        approved: true,
+    });
+    assert.deepEqual(decision, { kind: "deny", rule: "production-origin", stepIndex: 1 });
+});
+
+test("a cleanup call to a production service is denied as production-origin", async () => {
+    const { decision } = await decide(
+        newerPlan([OPEN_ACCOUNT_PAGE], [{ type: "call", call: "liveOrderCount", arguments: {} }]),
+    );
+    assert.equal(decision["rule"], "production-origin");
+});
+
+test("a production service is allowed for an approved plan when the policy allows production for approved plans", async () => {
+    const { decision } = await decide(newerPlan([OPEN_ACCOUNT_PAGE, liveCount]), {
+        approved: true,
+        policy: { allowProductionForApprovedPlans: true },
+    });
+    assert.deepEqual(decision, { kind: "allow" });
+});
+
+test("a proposal calling a production service is denied even when the policy allows production for approved plans", async () => {
+    const policy = { allowProductionForApprovedPlans: true };
+    assert.deepEqual(
+        (await decide(newerPlan([OPEN_ACCOUNT_PAGE, liveCount]), { policy })).decision,
+        { kind: "deny", rule: "production-origin", stepIndex: 1 },
+    );
+    const cleanup = (
+        await decide(
+            newerPlan(
+                [OPEN_ACCOUNT_PAGE],
+                [{ type: "call", call: "liveOrderCount", arguments: {} }],
+            ),
+            { policy },
+        )
+    ).decision;
+    assert.equal(cleanup["rule"], "production-origin");
+});
+
+test("a backend check counts once toward maximumCalls, as a call step does", async () => {
+    const limits = { maximumCalls: 2 };
+    assert.deepEqual(
+        (
+            await decide(newerPlan([OPEN_ACCOUNT_PAGE, call("seedCatalogue"), readOrderStatus]), {
+                limits,
+            })
+        ).decision,
+        { kind: "allow" },
+    );
+    assert.deepEqual(
+        (await decide(newerPlan([OPEN_ACCOUNT_PAGE, readOrderStatus, readOrderStatus]), { limits }))
+            .decision,
+        { kind: "allow" },
+    );
+    const over = (
+        await decide(
+            newerPlan(
+                [OPEN_ACCOUNT_PAGE, call("seedCatalogue"), readOrderStatus],
+                [call("seedCatalogue")],
+            ),
+            { limits },
+        )
+    ).decision;
+    assert.equal(over["rule"], "over-limit");
+    const overByChecks = (
+        await decide(
+            newerPlan([OPEN_ACCOUNT_PAGE, readOrderStatus, readOrderStatus, readOrderStatus]),
+            { limits },
+        )
+    ).decision;
+    assert.equal(overByChecks["rule"], "over-limit");
+});
+
+// ---- No call is made for a denied plan -----------------------------------------------------------------
+
+test("a plan the gate denies for any of these rules makes zero calls and opens no browser", async () => {
+    const input = projectInput({ maximumCalls: 2 });
+    const project = parserProject(input);
+    const { caller, requests } = routedServiceCaller();
+    const spy = spyDriver();
+    const ports = fakePorts({ drivers: new Map([["cdp", spy]]), services: caller });
+    const base = {
+        project,
+        baseUrl: baseUrlOf(ORIGIN),
+        seed: 42,
+        fixedTimeMilliseconds: 0,
+        fixtures: [],
+        host: { platform: platform(), arch: arch() },
+    };
+    const planParserFor = (raw: unknown) => ({
+        ok: true as const,
+        value: parsedPlan(raw as JsonRecord, input),
+    });
+    const denied = [
+        newerPlan([OPEN_ACCOUNT_PAGE, call("createOrder")]),
+        newerPlan(
+            [OPEN_ACCOUNT_PAGE, call("seedCatalogue"), call("seedCatalogue")],
+            [call("seedCatalogue")],
+        ),
+        newerPlan([OPEN_ACCOUNT_PAGE, liveCount]),
+    ];
+    const rules: string[] = [];
+    for (const raw of denied) {
+        const outcome = await createRunService(ports).runUntrusted(raw, planParserFor, base);
+        assert.ok(outcome.kind === UntrustedRunOutcomeKind.Denied, JSON.stringify(outcome));
+        rules.push(outcome.rule);
+    }
+    assert.deepEqual(rules, ["side-effect-in-proposal", "over-limit", "production-origin"]);
+    assert.equal(requests.length, 0, "no call was made");
+    assert.equal(spy.calls.count("open"), 0, "no browser was opened");
+});

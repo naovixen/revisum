@@ -3,11 +3,11 @@
 ## In short
 
 - Every code of every closed error-code union has a heading here, so the link `errors#<code>` explains it.
-- `npm run lint` fails, naming the code, when a code has no heading or a heading names a code no union holds (`tools/check-error-anchors.ts`).
+- `npm run lint` fails, naming the code, when a code has no heading or a heading names a code no union holds (`tools/repo-rules/docs/CheckErrorAnchors.ts`).
 - Plan codes use underscores (`unknown_step`); every other union uses hyphens (`not-found`).
 - Each code says what was refused and what to do. Errors carry a code and a location, never the offending value, so private or hostile text is never echoed back.
 
-Plan errors (`PlanErrorCode`, from the plan parser in `engine`) come first, then readable plan errors (`TextErrorCode`, from the readable plan reader in `engine`) and suite output errors (`SuiteDecodeErrorCode`, from the evidence-mode decoders in `engine`), then step errors (`StepErrorCode`, decided by the engine at run time), then service call errors (`ServiceCallErrorCode`, from a declared call), then driver, runner, review recorder, event sink, command-line, approval, trust, policy and run refusal errors.
+Plan errors (`PlanErrorCode`, from the plan parser in `engine`) come first, then readable plan errors (`TextErrorCode`, from the readable plan reader in `engine`) and suite output errors (`SuiteDecodeErrorCode`, from the evidence-mode decoders in `engine`), then step errors (`StepErrorCode`, decided by the engine at run time), then service call errors (`ServiceCallErrorCode`, from a declared call), then driver, runner, review recorder, event sink, command-line, approval, trust, policy and run refusal errors, evidence run outcomes, the review items a run can raise (`RunReviewItemCode`) and why a target was unavailable (`UnavailableReason`).
 
 ## not_object
 
@@ -33,11 +33,11 @@ Plan error. A step's `type` is not one of the plan language's steps. Use one of 
 
 ## unknown_value
 
-Plan error. A value is not one of those allowed, such as an unknown role, key or audit mode, a malformed feature id, criterion id or capture name, a number out of range, or a secret name or fixture file the project does not declare.
+Plan error. A value is not one of those allowed, such as an unknown role, key or audit mode, a malformed feature id, criterion id or capture name, a number out of range, or a secret name or fixture file the project does not declare. A project's `write` call declaration that lists `pendingStatuses` is refused with it too: only a backend check reads them, and it only runs a `read`.
 
 ## invalid_url
 
-Plan error. A URL cannot be parsed, carries a user name or password, or is relative without starting with `/`.
+Plan error. A URL cannot be parsed, carries a user name or password, is relative without starting with `/`, or is not written as a path starting with `/` or an absolute `http://` or `https://` URL in lower case, with nothing before it. A path that starts with `//` once its dots are worked out, such as `/.//elsewhere.example/`, is also refused, because a browser would read it as another host.
 
 ## scheme_not_allowed
 
@@ -47,15 +47,13 @@ Plan error. A URL uses a scheme other than `http` or `https`.
 
 Plan error. An absolute URL's origin is not on the project's allow-list. Use a path, or add the origin to the trusted project configuration. In the project itself: a stub's or observed request's matcher names an origin that is neither allowed nor a declared service's, or a storage entry names an origin that is not allowed.
 
-As a run refusal, the run would reach one of the project's production origins, which only an approved plan may reach, and only when the project allows production for approved plans. No browser was opened.
-
 ## target_not_in_matrix
 
 Plan error. A plan names a target the project's matrix does not declare. Nothing is substituted: declare the target, or remove it from the plan.
 
 ## unsafe_text
 
-Plan error. Text holds control or bidirectional-override characters, or something that looks like script. Remove them.
+Plan error. Text holds control characters (C1 ones included), bidirectional marks or overrides, a zero width space, a word joiner, a byte order mark or another invisible character, U+2028 or U+2029, or something that looks like script. A person approving the plan could not read such text for what it holds. Remove them. The zero width joiner and non-joiner stay allowed, because emoji and Persian and Indic text need them, and so does the soft hyphen, which pages hold.
 
 ## too_large
 
@@ -69,11 +67,11 @@ Plan error. A text value is longer than allowed.
 
 ## duplicate
 
-Plan error. A target is listed twice, two capture steps share a name, a run value is defined twice (in `values` and by a `remember` step, or by two `remember` steps), or a `press` step holds the same modifier twice.
+Plan error. A target is listed twice, two capture steps share a name, a run value is defined twice (in `values` and by a `remember` step, or by two `remember` steps), or a `press` step holds the same modifier twice. In a project, a call declaration lists a status twice in `successStatuses` or in `pendingStatuses`, or lists one in both.
 
 ## version_unsupported
 
-Plan error. The plan's `version` is not one this engine reads. A current plan declares `"1.2"`, and a plan declaring `"1.1"` still parses exactly as it did. A version 1 plan is accepted only through `migratePlan`, which adds a criterion id to each assertion; a plan for a newer version is refused rather than run with parts skipped.
+Plan error. The plan's `version` is not the one this engine reads. A plan declares `"1.3"`; any other version, older or newer, is refused rather than run with parts skipped, and nothing migrates a plan to it.
 
 ## empty
 
@@ -81,13 +79,15 @@ Plan error. Required text or a required list is empty.
 
 ## vacuous
 
-Plan error. A check would pass on anything, or proves nothing traceable: a plan with no assertion, an empty assertion (`assert: {}`), a text or value assertion whose expected text is empty, a request count of `atLeast` 0, or an assertion without a `criterionId`. Give each assertion its expected text and the id of the acceptance criterion it checks.
+Plan error. A check would pass on anything, or proves nothing traceable: a plan with no assertion, an empty assertion (`assert: {}`), a text or value assertion whose expected text is blank (empty or only white space), a locator looking for blank text, a request count of `atLeast` 0, or an assertion without a `criterionId`. Give each assertion its expected text and the id of the acceptance criterion it checks.
+
+Evidence run outcome. The suite's report holds no test that ran: it has no tests, or every test was skipped. The run says nothing about the product, so it ends `Failed` and the merge gate stays shut, whatever the exit code. Check the suite's filters and any `test.skip()`.
 
 Evidence run outcome. The suite's report holds no tests, so the run checked nothing. It ends `Failed`, whatever the suite's exit code, and never opens the merge gate. Check the suite's paths, projects and `testMatch`.
 
 ## literal_secret
 
-Plan error. The plan holds a secret instead of naming one: literal text filled into a field whose locator names a password, passcode, token, secret or API key (or the German or French word for one), text shaped like a credential anywhere in the plan (a JSON Web Token, a `Bearer` value, or a key with a known prefix such as `ghp_`, `sk-` or `AKIA`), or saved storage state written into `storageState` itself. The error gives the path, never the text. Declare the secret's name in the project's `secretNames`, put its value in the secret store (a CI secret of the same name), and write `{ "secretName": "…" }` in the plan.
+Plan error. The plan holds a secret instead of naming one: literal text filled into a field whose locator names a password, passcode, token, secret or API key (or the German or French word for one), text shaped like a credential anywhere in the plan, names and query keys included (a JSON Web Token, a `Bearer` value, or a key with a known prefix such as `ghp_`, `sk-` or `AKIA`), or saved storage state written into `storageState` itself. The error gives the path, never the text. Declare the secret's name in the project's `secretNames`, put its value in the secret store (a CI secret of the same name), and write `{ "secretName": "…" }` in the plan.
 
 ## undefined_value
 
@@ -121,11 +121,11 @@ Project error. An evidence-mode suite's `paths` entry or `workingDirectory` is a
 
 ## unsafe_feature_disabled
 
-Plan error. A plan declaring `"1.3"` uses an unsafe feature its trusted `project.json` does not enable: a CSS or XPath locator (reported at the locator's `by`), a DOM check (at the assertion's `kind`, or a `remember` source's `read`), a named page script or a database command (at the step's `type`), or an inline script (at its `script.inline`). Every use is reported, and nothing under it is read or echoed. A person turns a feature on under `unsafeFeatures` in `project.json` on the protected branch; a change that turns one on in its own `project.json` runs without it until the change is approved and merged. Inline scripts need `pageScripts.allowInline: true` too. Runs using any unsafe feature are labelled unsafe and never count as verified evidence.
+Plan error. A plan uses an unsafe feature its trusted `project.json` does not enable: a CSS or XPath locator (reported at the locator's `by`), a DOM check (at the assertion's `kind`, or a `remember` source's `read`), a named page script or a database command (at the step's `type`), or an inline script (at its `script.inline`). Every use is reported, and nothing under it is read or echoed. A person turns a feature on under `unsafeFeatures` in `project.json` on the protected branch; a change that turns one on in its own `project.json` runs without it until the change is approved and merged. Inline scripts need `pageScripts.allowInline: true` too. Runs using any unsafe feature are labelled unsafe and never count as verified evidence.
 
-## no_criterion_id
+## not_loopback
 
-Migration error. A version 1 plan has an assertion with no entry in the criterion mapping, so the migration cannot say which acceptance criterion it checks. Add the criterion id to the mapping, keyed by the assertion step's JSON path, such as `$.steps[3]`.
+Project error. A `local` planner endpoint's `url` names a host off the loopback interface. A local endpoint may take plain http and no key, so it must be `localhost`, an address in `127.0.0.0/8` or `[::1]`. Serve the model on loopback, or declare it as a `customer-key` endpoint over https. The draft command reports it as `planner-endpoint-not-loopback`.
 
 ## unknown-statement
 
@@ -163,7 +163,7 @@ Readable plan error. A `Press` line names a key or modifier the plan language do
 
 Readable plan error. The text is larger than any plan may be, so none of it is read. Split the plan.
 
-Suite output error. A suite's JSON report or trace is over one of the project's `evidenceMode.limits`: its size, its number of tests or entries, or how deeply it nests (`maximumReportDepth`, 64 unless set). Nothing in it is used. Raise the limit in the trusted project file, or split the suite.
+Suite output error. A suite's JSON report or trace is over one of the project's `evidenceMode.limits`: its size, its number of tests or entries, or how deeply it nests (`maximumReportDepth`, 64 unless set). Nothing in it is used. Raise the limit in the trusted project file, or split the suite. A trace is also refused over 20,000 actions, and a finding over 20,000 steps keeps only its last ones; neither limit can be raised, and each is listed in the result's `evidence.decodeErrors`.
 
 ## suite-report-missing
 
@@ -171,7 +171,7 @@ Suite output error. The suite command wrote no JSON report into Revisum's output
 
 ## suite-report-invalid
 
-Suite output error. The suite's JSON report does not have the shape of a Playwright Test JSON report at the given path: a field of the wrong type, a status Playwright does not have, a test claiming to be `flaky` (impossible with `--retries=0`), more than one result for a test, a `__proto__`, `constructor` or `prototype` key, or an attachment path that leaves Revisum's output directory. Nothing in the report is used, and the run is never marked verified.
+Suite output error. The suite's JSON report does not have the shape of a Playwright Test JSON report at the given path: a field of the wrong type, a status Playwright does not have, a test claiming to be `flaky` (impossible with `--retries=0`), more than one result for a test, a `__proto__`, `constructor` or `prototype` key, or an attachment path that leaves Revisum's output directory. The same code refuses a report file that is a link leading out of that directory. Nothing in the report is used, and the run is never marked verified.
 
 ## suite-report-unsupported
 
@@ -179,7 +179,7 @@ Suite output error. The report comes from a reporter or Playwright version Revis
 
 ## trace-invalid
 
-Suite output error. A trace archive the suite attached is not a readable Playwright trace: it is truncated, or an entry name holds `..` or an absolute path. Nothing is extracted from it.
+Suite output error. A trace archive the suite attached is not a readable Playwright trace: it is missing, truncated, not a regular file, reached through a link leading out of Revisum's output directory, or an entry name holds `..` or an absolute path. Nothing is extracted from it.
 
 ## trace-unsupported
 
@@ -203,17 +203,35 @@ Readable plan error. The plan holds a construct the readable `.plan` format has 
 
 ## value-empty
 
-Step error. A run value used by the step is empty where text is needed, or has no text yet. The step fails at run time, before anything is sent to the page, and every later step is skipped.
+Step error. A run value used by the step is blank where text is needed (empty, or only white space, which any text contains, so a check against it proves nothing), or has no text yet. The step fails at run time, before anything is sent to the page, and every later step is skipped. Blank text written in a plan's check or locator is refused earlier, as `vacuous`.
 
 ## value-unsafe
 
-Step error. A run value used by the step breaks the safe-text rules, or is `""`, `.` or `..` where a path template uses it as a segment, which would drop or climb a segment. The step fails before any navigation or input.
+Step error. A run value used by the step breaks the safe-text rules, or is `.` or `..` where a path template uses it as a segment, which would climb a segment. The step fails before any navigation or input.
 
 ## value-too-long
 
 Step error. A run value used by the step is longer than the project's `maximumTextLength`. The step fails before anything is sent to the page. Shorten the value's prefix, or raise the limit in the trusted project.
 
 The clipboard text an `expectClipboard` or a clipboard `remember` reads is also `value-too-long` when it is longer than the project's `limits.maximumClipboardCharacters` (20,000 unless the project sets it, at most 200,000). The text is never recorded.
+
+## value-holds-secret
+
+Step error. A step would have remembered a secret: its element is a field a secret was typed into, or the text it read holds one of the plan's secrets, in any form the leak scan looks for. It applies wherever the value comes from: the page, a response, the clipboard, a page script, a database command or a declared call. The step fails and every later step is skipped; a `call`, `evaluate` or `database` step also ends the run `Errored`, since a failed one could not set up the test. No value is kept and no hash of it is recorded as a remembered value, since a hash of a short secret is as good as the secret. Remember something else; a plan never needs to read a secret it was given.
+
+## capture-left-out
+
+Step error, on a step that passes. A `capture` took no image, because a field a secret was typed into is still on the page but its locator no longer finds it, such as when its label has changed or been removed, so it could not be masked and what it holds may still be on screen. Text drawn as pixels is out of reach of any later scan, so no image is kept rather than one that may show the secret. The step does not fail, because a capture checks nothing: the steps' verdict stands.
+
+A field that has gone does not cause this: when the page has removed it, or its document was replaced, as after most sign-ins, there is nothing left to mask and the capture is taken as usual. The exception is a page that has rendered the field afresh under another label, still holding what was typed or part of it: no locator finds that one, so no image is kept. If you do see this code, make the field's locator still find it when the capture runs, capture before typing the secret, or type plain text into that field first.
+
+## a11y-violations
+
+Step error. An `a11yAudit` step in `gate` mode found accessibility findings, so the step fails and every later step is skipped. The findings are kept in the step's result, sorted by rule. In `report` mode the same findings are kept and the step passes. Fix what the findings name, or audit in `report` mode while you do.
+
+## adapter-error
+
+Step error. The browser adapter threw, a read of the page failed for a reason that is the adapter's own, or the browser refused to let a request the step made go on. What the step saw is unknown, so the run ends `Errored`, not `Failed`: it could not test, which says nothing about the product. The adapter's message goes only to the redacted event log, never into the result. Run the plan again on a working browser; if it recurs on one page, look at the event log for that step.
 
 ## state-not-exposed
 
@@ -253,7 +271,7 @@ Service call error. A call that remembers a field, or a backend check, got a res
 
 ## response-too-large
 
-Service call error. The response is larger than the declaration's `maximumResponseBytes` (default 1 MiB). Reading stops at the limit and the step fails. Ask the API for less, or raise the limit in the declaration.
+Service call error. The response is larger than the declaration's `maximumResponseBytes` (default 1 MiB). Reading stops just past the limit and the step fails, with no hash of the body. A backend check that gets a 502, 503 or 504 its declaration does not list fails with `service-unreachable` instead, however long the gateway's page. Ask the API for less, or raise the limit in the declaration.
 
 ## field-missing
 
@@ -261,15 +279,17 @@ Service call error. The response is JSON, but a field's JSON pointer names nothi
 
 ## service-unreachable
 
-Service call error. The caller could not connect to the declared service. A `call` that cannot connect ends the run `Errored`: it could not test, which is not a product failure. Cleanup still runs. Check that the service is up and its origin in `services` is right.
+Service call error. The caller could not connect to the declared service, or a backend check got a 502, 503 or 504, which says a gateway could not get an answer from it. Either way the run ends `Errored`: it could not test, which is not a product failure. A `call` that cannot connect ends it the same way. A backend check stops there, without waiting out its timeout or sending its read again. Cleanup still runs. Check that the service is up and its origin in `services` is right.
+
+The step's record shows which happened: a status of 502, 503 or 504 is a gateway's answer, and no status means no connection. Declaring the status changes this. In `successStatuses` it is judged as a success. In `pendingStatuses` the check polls on it, and ends `Errored` with this code only if it is still the last status when the check timeout runs out. A `call` is not affected: it reports any status it does not count as success as `unexpected-status`.
 
 ## call-timeout
 
-Service call error. The service did not answer within the declaration's `timeoutMilliseconds` (default 10 s). A `write` call is never sent again. Raise the timeout in the declaration, or make the test API faster.
+Service call error. The service did not answer within the declaration's `timeoutMilliseconds` (default 10 s). A `call` or a backend check that times out ends the run `Errored`: it could not test, which is not a product failure. The call is never sent again, whether a `write` or a backend check's read. Cleanup still runs. Raise the timeout in the declaration, or make the test API faster.
 
 ## unexpected-status
 
-Service call error. The service answered with a status the declaration's `successStatuses` does not list. A redirect is never followed: it is judged like any other status. A `call` that gets one ends the run `Errored`. Add the status to `successStatuses` if it means success.
+Service call error. The service answered with a status the declaration's `successStatuses` does not list. A redirect is never followed: it is judged like any other status. A `call` that gets one ends the run `Errored`, and `pendingStatuses` mean nothing to it. A backend check that gets one stops there and ends the run `Failed`, unless `pendingStatuses` lists it or it is a 502, 503 or 504 (see `service-unreachable`). Add the status to `successStatuses` if it means success, or to `pendingStatuses` on a `read` declaration if it means "not ready yet", such as a 404 until a background job finishes.
 
 ## egress-blocked
 
@@ -285,7 +305,14 @@ Service call error. A cleanup call failed; its record keeps the cause. The verdi
 
 ## not-found
 
-Driver error. A locator matched no element on the page.
+Driver error. A locator matched no element on the page. Open shadow roots count as the page, nested ones too, for every locator kind but XPath, so counts include them, and masks and the sensitive read reach them.
+
+Two limits, where a person can see an element and a locator cannot. `absent`, `hidden` and `countEquals 0` still pass on such an element, so check it another way:
+
+- **A closed shadow root.** In-page code cannot enter one, so only a role locator sees inside it, through the browser's accessibility engine. A label, text, test id or css locator finds nothing there, and a mask cannot reach it.
+- **XPath.** An XPath expression never enters a shadow root, open or closed.
+
+A css selector matches within one root, as it does in the browser: `.panel .error` does not match across a shadow boundary, though `.error` alone finds the element. An aria-labelledby id names an element in the same root; only an element reference set by the page's script (`ariaLabelledByElements`) can reach out of one.
 
 ## ambiguous
 
@@ -297,15 +324,17 @@ Driver error. The element was found but could not be acted on in time: it was hi
 
 ## timeout
 
-Driver error. The browser did not finish the operation within the session's time limit.
+Driver error. The browser did not finish the operation within the session's time limit. An action fails with it when the browser is still handling its input after the step timeout, or the page answers nothing for that long, which is what a navigation whose server holds its answer looks like: the browser answers nothing about a page while that navigation waits. Check the server rather than the page, or raise `stepTimeoutMilliseconds` in the trusted project if the navigation is just slow.
 
 ## navigation-failed
 
-Driver error. The browser could not load the page.
+Driver error. The browser could not load the page. An `expectPage` check fails with it too when the browser shows its own error page in place of the page, whatever the address bar says: the server refused the connection, the allow-list blocked it, or an HTTP error status came with an empty body, which Chromium also replaces with its error page, so a person would see that and not the application's page. A page that sends a body with its error status is a page that loaded.
+
+Every check of an element on such a page fails with it too, at once, `absent`, `hidden` and `countEquals 0` included, as does a `remember` read from it: the browser's own page holds nothing of the application, so nothing can be said about what the application shows.
 
 ## policy-denied
 
-Driver error. The policy gate's runtime guard refused the action once the driver had resolved its element, so no input event was sent. The run ends `Denied`, naming the policy rule; see that rule below.
+Driver error. The policy gate's runtime guard refused the action once the driver had resolved its element, so no input event was sent. The run ends `Denied`, naming the policy rule; see that rule below. A click is judged on every attempt, by the element found, the element the pointer would hit, and the interactive element around that: a wrapper or an icon cannot lend its name to a control it holds or sits in. A driver asked to act with no guard at all refuses the same way; a run always gives one.
 
 ## no-download
 
@@ -329,15 +358,19 @@ Driver error. The browser cannot keep the clipboard inside its own memory, so th
 
 ## target-crashed
 
-Driver error. The page's renderer died, or its browser target closed, while the step ran. The step fails, every later step is skipped, and the session still closes and ends every browser process. Run the plan again; if it keeps crashing, the page itself may exhaust the renderer's memory.
+Driver error. The page's renderer died, its browser target closed, the browser died or the connection to it closed, while the step ran. The step fails, every later step is skipped, and the session still closes and ends every browser process. Run the plan again; if it keeps crashing, the page itself may exhaust the renderer's memory.
 
 ## unsupported-step
 
-Driver error. The step needs something this run cannot do yet: the driver does not perform this kind of step, or the step made the page open a popup or a second page, or start a download. The popup is closed and the download cancelled, with nothing of it kept, and every later step is skipped. Run the plan on a target whose driver performs the step, or change the step.
+Driver error. The step made the page open a popup or a second page, or start a download no download step claimed. The popup is closed and the download cancelled, with nothing of it kept, and every later step is skipped. Change the step, or claim the file with a download step. The same code means a step named an iframe whose document runs in another process, turned scripts off inside a frame, or reached the driver still holding a value reference. A backend check whose call the run's project declares a write fails with this code too, with nothing sent: a check polls, and a write is never sent twice.
 
 ## assertion-failed
 
-Driver error. A `dialog` step's `expectText` is not the text of the dialog the page opened, so nothing answered the dialog. Check the expected text, or the step before it that opens the dialog.
+Step error. A check did not pass: what the step expected is not what the page, the app or the service gave by the step timeout, so the step fails, every later step is skipped and the run ends `Failed`. It is the product failure every check step can give: an element, page, download, storage, request, response, clipboard, page script, database or backend check whose expected value, count or state did not hold. A failed check keeps a redacted observation where one is safe, such as a count or `differs`, never the text itself. Check what the step expects against the app, or the step before it that should have brought the app there.
+
+A `dialog` step fails with it when its `expectText` is not the text of the dialog the page opened, so nothing answered the dialog. Check the expected text, or the step before it that opens the dialog.
+
+A backend check fails with it when the check timeout runs out on a field that does not pass, or on a status in `pendingStatuses` other than 502, 503 or 504. The step's record keeps the last status. A pending answer's body is never read, so raise the timeout, or check why the job did not finish.
 
 ## selector-invalid
 
@@ -350,6 +383,14 @@ Driver error. A page script threw, its promise was rejected, or its source is no
 ## script-timeout
 
 Driver error. A page script did not settle within its `timeoutMilliseconds` (5 seconds unless its declaration sets it), measured in real time. The step fails, every later step is skipped, and the run ends `Errored`. Make the script's promise settle, or raise the declaration's timeout in the trusted project.
+
+## page-unreadable
+
+Driver error. A check could not read the page: every read threw or went unanswered until the step timeout, so nothing is known about what is on it. The check fails rather than passes, `absent` and `hidden` included, because a page the run cannot read is not an empty page. Every later step is skipped. Look for page scripts that replace DOM functions such as `querySelectorAll`, a frame the page has removed, or a navigation whose server holds its answer: the browser answers nothing about a page while that navigation waits.
+
+## dialog-open
+
+Driver error. A check ran while an `alert`, `confirm` or `prompt` dialog held the page, so it could not be read. The check fails at once rather than passes, `absent` and `hidden` included, and every later step is skipped. Add a `dialog` step to answer the dialog before the check.
 
 ## image-missing
 
@@ -365,13 +406,15 @@ Workload runner error and run refusal, for an evidence run: the local workload i
 
 ## egress-unenforceable
 
-Runner log entry. Network egress cannot be enforced on this host: Docker could not create a network with no route out, or a probe from inside the run container reached an address outside. The run still starts, at the `host` guarantee level, and claims no hermetic isolation.
+Runner log entry. Network egress cannot be enforced on this host: Docker could not create a network with no route out, or a probe from inside the run container reached an address outside. The run still starts, at the `host` guarantee level, and claims no hermetic isolation. The same entry is logged, and the runner falls to `host`, when what the proxy decided cannot be read back whole during a run.
 
 Run refusal, for an evidence run (`run --suite`): Revisum never runs a team's own suite code without egress control, so the run is refused before any suite code runs. Run it on a host where the isolated runner can enforce egress.
 
 ## workload-start-failed
 
 Workload runner error and run refusal, for an evidence run. The workload container did not start, or the request could not be run: a working directory outside the checkout, an empty command, a variable name no environment can hold, a path Docker cannot mount, or no Docker daemon to answer. No suite code ran. The runner's log says which.
+
+`runSuite` also refuses with this code when the output folder holds the checkout, or when it cannot delete an earlier `report.json` or `test-results` from the folder, since a leftover could not be told from what this run writes. A setup command may have run by then. Give the suite a folder of its own whose files the host user can delete.
 
 ## start-failed
 
@@ -490,7 +533,7 @@ Command-line error, from `draft --explore --after`. The plan `--after` names has
 
 ## explore-runner-unavailable
 
-Command-line error, from `draft --explore`. The crawl runs in the isolated runner, but there is none, it did not start, it could not enforce egress, or the crawl inside it gave no usable page map. Nothing was drafted. Start Docker and pull the pinned run image, or give `--host` to crawl in a browser on this machine, where egress is not enforced.
+Command-line error, from `draft --explore`. The crawl runs in the isolated runner, but there is none, it did not start, it could not enforce egress, or the crawl inside it crashed or gave no usable page map; a crashed crawl says so in its `reason`. Nothing was drafted. Start Docker and pull the pinned run image, or give `--host` to crawl in a browser on this machine, where egress is not enforced.
 
 ## explore-start-unreachable
 
@@ -526,7 +569,7 @@ Approval error. The protected-branch code-owners file does not name the reviewer
 
 ## stale-commit
 
-Approval error. The review is on a commit older than the last commit that changed the subject. Ask for a review of the latest commit.
+Approval error. The review is on a commit older than the last commit that changed the subject, so ask for a review of the latest commit. Or, on the agent lock-down route, the proof names a commit other than the last one touching the subject on the protected branch, so land the subject through the maintainer and name that commit.
 
 ## unknown-key
 
@@ -542,7 +585,7 @@ Approval error. The signature was made without the user-presence flag. Sign agai
 
 ## subject-mismatch
 
-Approval error. The proof does not match the subject: the review is not an approval, the subject has no path, or the change does not touch the subject.
+Approval error. The proof does not match the subject: the review is not an approval, the reviewer's latest review of that commit requests changes, the subject has no path, a plan's path resolves outside `plans/`, or the change does not touch the subject. A holdout plan is judged on `holdouts.json`, whatever path it names.
 
 ## version-control-unavailable
 
@@ -594,7 +637,15 @@ Policy error. A target's locale has no irreversible pattern set: the engine ship
 
 ## undeclared-origin
 
-Policy error. The plan navigates to an origin the trusted project does not list in `origins`, although the project it was parsed against did. Plans are held to the trusted project: add the origin there, with an approval, or change the plan.
+Policy error. The plan navigates to an origin the trusted project does not list in `origins`, although the project it was parsed against did, or it names a call, command, stub, storage entry or page script the trusted project does not declare. Plans are held to the trusted project: add the origin or declaration there, with an approval, or change the plan.
+
+## unsafe-feature-disabled
+
+Policy error. The plan uses an unsafe feature that the project clearing it does not enable under `unsafeFeatures`, although the project it was parsed against did. This applies whatever the plan's standing, and nothing runs. Enable the feature in the trusted project, with an approval, or change the plan. Not the plan error `unsafe_feature_disabled`, which the parser gives.
+
+## undeclared-secret
+
+Policy error. The plan names a secret, in a fill, in `storageState` or as an argument, that the project clearing it does not list in `secretNames`, although the project it was parsed against did. This applies whatever the plan's standing, and nothing runs. Declare the name in the trusted project, with an approval, or change the plan.
 
 ## production-origin
 
@@ -612,6 +663,17 @@ Policy error. A plan with no approval makes a `write` call, in its steps or its 
 
 Policy error. A plan with no approval holds an inline page script: its source and its claimed effect are the plan's own, and no person declared them, so it runs only once the plan is approved. Approve the plan, or move the script into a file under `plans/scripts/` and declare it under `unsafeFeatures.pageScripts.scripts`.
 
+## origin-not-allowed
+
+Run refusal, for either of two reasons, checked in this order before anything else:
+
+- The run's base URL is on an origin the project does not declare. Every relative path in the plan resolves against the base URL, and the browser may reach only the project's origins, so each relative navigate would fail part way through the run. Run against a base URL on a declared origin, or add the origin to the trusted project configuration.
+- The run would reach one of the project's production origins, which only an approved plan may reach, and only when the project allows production for approved plans.
+
+The refusal names the origin. No browser was opened. Not the plan error `origin_not_allowed`.
+
+Step error, too. A `navigate` or `newTab` step's final URL is on an origin the project does not allow, so nothing was loaded and every later step is skipped. Use a path on an allowed origin, or add the origin to the trusted project configuration.
+
 ## secret-missing
 
 Run refusal. The plan names a secret, in a fill, in `storageState` or as a call's argument, or makes a call whose declaration sends one in a header, that the secret store cannot resolve, or the run was given no secret store at all. The run ends `Refused` before any browser opens or any call is made; the refusal names the secret, never a value. Set the CI secret or environment variable of that exact name (an empty value counts as missing).
@@ -619,6 +681,18 @@ Run refusal. The plan names a secret, in a fill, in `storageState` or as a call'
 ## services-unavailable
 
 Run refusal. The plan makes a `call` or `expectBackend`, or has `cleanup` calls, but the run was given no service caller. The run ends `Refused` before any browser opens or any call is made. Run it where the service caller is wired in; until the isolated runner lands, only a caller a test supplies is available.
+
+## storage-state-unsupported
+
+Run refusal. The plan names saved browser storage state in `storageState`, and no driver can load it into a session yet. A plan that names it relies on being signed in, so the run ends `Refused` before any browser opens, rather than running without it. Sign in through the plan's own steps for now.
+
+## element-check-unsupported
+
+Run refusal. The plan checks that an element is `checked`, `unchecked` or `focused`, and no driver's probe reports those states yet, so the check could only ever fail. A plan holding one, inside a frame or a new tab too, still parses, and its run ends `Refused` before any browser opens, so no earlier step acts for nothing. Check what the state changes on the page instead, or leave the check out.
+
+## database-commands-unavailable
+
+Run refusal. The plan has a `database` or `expectDatabase` step, or a `database` step in its `cleanup`, but the run was given no database command runner. The run ends `Refused` before any browser opens or any command runs, so no test data is left behind. Run it where the command runner is wired in.
 
 ## script-source-missing
 
@@ -640,6 +714,64 @@ Evidence run outcome. The suite's setup command exited with a non-zero code, so 
 
 Evidence run outcome. The suite's JSON report was missing or refused; the result's `evidence.decodeErrors` give each code and JSON path. The run ends `Errored`, with no tests.
 
+## egress-unread
+
+Evidence run outcome. What the egress proxy decided could not be read back, or the proxy could not write all of it, such as when its `/tmp` is full. That is not the same as a proxy that blocked nothing, so the run ends `Errored` and its guarantee statement does not claim egress was enforced. Rerun, and look at what flooded the proxy if it recurs.
+
+Plan run outcome, as a review item. The run's egress could not say what it refused, such as when an isolated run can't read its proxy's list as it closes. An empty `blockedOrigins` would claim nothing was refused, so the run ends `Errored`, whatever its steps found, and its guarantee statement does not claim egress was enforced. Each step keeps its own outcome, and the log holds why the read failed. Check that the proxy container is up, then rerun.
+
 ## suite-not-declared
 
 Run refusal. The trusted project's `evidenceMode` section declares no suite of the name `run --suite` was given, so no container starts. Names are exact and lowercase; use one from `evidenceMode.suites[].name`.
+
+## spec-ambiguous
+
+Review item, on an evidence run. A test's `criterion` annotation has a description that is not a valid criterion id, or holds text the redactor removes, so the link was dropped and its text never kept; the item names the test and the annotation's index. The verdict does not change, but the merge gate stays shut. Write the annotation's description as the criterion id alone.
+
+## expected-failure
+
+Review item, on an evidence run. A test the suite marks as expected to fail did fail. Playwright counts that as expected, so the verdict does not change, but a person should see why a failing test is kept, and the merge gate stays shut. Fix the product and remove the mark, or record why the test stays.
+
+## project-without-tests
+
+Review item, on an evidence run. A project in `evidenceMode.suites[].projects` has no test in the report, so less was tested than declared. The merge gate stays shut. Check its name against the suite's config.
+
+## suite-output-unread
+
+Review item, on an evidence run. A trace was refused, or a finding's steps were cut, so the result shows less than the suite recorded. It names its place in `evidence.decodeErrors`, which gives the code and path. The merge gate stays shut. Look at the decode error, and keep the suite's output within the evidence limits.
+
+## refusals-unread
+
+Review item, on a plan run. The run could not read, once its session had closed, which request decisions the browser refused, so the result does not claim it saw them all. A run that would have passed ends `Errored`, since one refusal would have stopped it passing; a run that did not pass keeps its verdict. The log holds why the read failed. Rerun on a working browser.
+
+## rewrites-unread
+
+Review item, on a plan run. The run could not read what the egress proxy rewrote, so it may have tested a rewritten app and has no verdict to give: it ends `Errored`, and its manifest records no rewrites. The log holds why the read failed. Check that the proxy container is up, then rerun.
+
+## stub-answers-unread
+
+Review item, on a plan run. The run could not read which stubs answered its requests, so the result lists none and does not claim that no stub answered. The verdict stands, since a stub only answers and never checks. The log holds why the read failed. Rerun if you need the list.
+
+## not-declared
+
+Target unavailable. The plan names a target the project's matrix does not declare, so no driver is asked and the run ends `TargetUnavailable`. Name the target in both the plan's `targets` and the project's `matrix`.
+
+## adapter-not-registered
+
+Target unavailable. The target names an adapter no driver is registered for, so nothing could open it and the run ends `TargetUnavailable`. Use an adapter this installation provides, such as `cdp`.
+
+## engine-not-supported
+
+Target unavailable. The target's adapter cannot drive the target's browser engine, such as the CDP adapter, which drives Chromium only, given a Firefox target. The run ends `TargetUnavailable`; nothing else is substituted. Pick an engine the adapter drives, or another adapter.
+
+## launch-failed
+
+Target unavailable. The browser could not be started or attached to, its build could not be fetched or is not where it should be, or its executable could not be hashed before launch. No step ran and the run ends `TargetUnavailable`. The detail says why. Install the pinned browser with `npm run browsers`, then rerun.
+
+## provider-unavailable
+
+Target unavailable. The cloud or device provider could not supply the target, so the run ends `TargetUnavailable`; another target is never substituted. Check the provider's status and your account, then rerun.
+
+## build-mismatch
+
+Target unavailable. The browser build on this machine is not the one the lockfile pins: another version, or the pinned version with other bytes. The run ends `TargetUnavailable` rather than test on a build nobody pinned. Install the pinned build, or re-lock on purpose and review the change.

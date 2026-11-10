@@ -1,0 +1,442 @@
+// Release notes from a run. The draft is deterministic and uses no AI: the same plan and results
+// always give the same bytes. An AI may only add a suggestion stored beside the draft, never
+// replace it, and never containing typed or expected values.
+import {
+    ResponseFieldTextKind,
+    ResponseFieldPresenceKind,
+    ResponseAssertionKind,
+    ResponseRead,
+    ClockAdvanceMode,
+    StubAction,
+    DialogAction,
+    ScriptMode,
+    StepType,
+    StructuralLocatorKind,
+    SemanticLocatorKind,
+    literalText,
+    referencedValueName,
+    RememberElementRead,
+    RequestCountKind,
+    StepOutcome,
+    TerminalState,
+    type AiWriter,
+    type ArtifactReference,
+    type ArtifactStore,
+    type ClipboardAssertion,
+    type ClockAdvance,
+    type Locator,
+    type Plan,
+    type RememberedElementSource,
+    type RememberRead,
+    type RememberSource,
+    type REQUEST_COUNT_KINDS,
+    type RequestCount,
+    type ResponseAssertion,
+    type ScriptChoice,
+    type Step,
+    type StorageAssertion,
+    type TextOrValue,
+    type PlanErrorCode,
+    type PlanRunResult,
+} from "@revisum/contracts";
+import { parseAiText } from "../drafting/AiText.ts";
+import { isInlineChoice } from "../plan/IsInlineChoice.ts";
+
+const MARKDOWN_SPECIAL = /[\\`*_[\]<>#|!()]/g;
+// Markdown-safe text: every character with a Markdown meaning gets a backslash.
+export const markdownEscape = (text: string): string =>
+    text.replace(MARKDOWN_SPECIAL, (character) => `\\${character}`);
+// Text for inside a code span, where backslash escapes do not apply.
+const codeSpanText = (text: string): string => text.replace(/`/g, "'");
+
+const ASSERTION_TEXT: {
+    readonly [Kind in Extract<Step, { type: "expect" }>["assert"]["kind"]]: string;
+} = {
+    visible: "is visible",
+    hidden: "is hidden",
+    enabled: "is enabled",
+    disabled: "is disabled",
+    textEquals: "has the expected text",
+    textContains: "contains the expected text",
+    valueEquals: "has the expected value",
+    valueContains: "contains the expected value",
+    absent: "is absent",
+    checked: "is checked",
+    unchecked: "is not checked",
+    focused: "has focus",
+    countEquals: "matches the expected number of times",
+    selected: "is selected",
+    unselected: "is not selected",
+    expanded: "is expanded",
+    collapsed: "is collapsed",
+    pressed: "is pressed",
+    unpressed: "is not pressed",
+    current: "is marked as current",
+    hrefEquals: "links to the expected address",
+    hasClass: "has the expected class",
+    lacksClass: "lacks the excluded class",
+    computedStyleEquals: "has the expected computed style",
+    attributeEquals: "has the expected attribute value",
+    attributeAbsent: "lacks the attribute",
+};
+const PAGE_ASSERTION_TEXT: {
+    readonly [Kind in Extract<Step, { type: "expectPage" }>["assert"]["kind"]]: string;
+} = {
+    title: "title",
+    urlPath: "URL path",
+    url: "URL",
+    urlPathStartsWith: "URL path prefix",
+    metaContent: "meta tag",
+    canonicalUrl: "canonical URL",
+};
+const BACKEND_ASSERTION_TEXT: {
+    readonly [Kind in Extract<Step, { type: "expectBackend" }>["assert"]["kind"]]: string;
+} = {
+    present: "is present",
+    absent: "is absent",
+    equals: "has the expected text",
+    contains: "contains the expected text",
+    numberEquals: "has the expected number",
+};
+const DOWNLOAD_ASSERTION_TEXT: {
+    readonly [Kind in Extract<Step, { type: "expectDownload" }>["assert"]["kind"]]: string;
+} = {
+    fileNameEquals: "file name",
+    mediaTypeEquals: "media type",
+    sizeAtMost: "largest size",
+    sizeAtLeast: "smallest size",
+    contentContains: "expected content",
+    contentExcludes: "excluded content",
+};
+
+// A value reference is shown by its name: the value itself is run data, not plan text.
+const plainText = (text: TextOrValue): string =>
+    literalText(text) ?? `{${referencedValueName(text) ?? ""}}`;
+
+function describeLocator(locator: Locator): string {
+    switch (locator.by) {
+        case SemanticLocatorKind.Role:
+            return `the "${markdownEscape(plainText(locator.name))}" ${locator.role}`;
+        case SemanticLocatorKind.Label:
+            return `the "${markdownEscape(plainText(locator.label))}" field`;
+        case SemanticLocatorKind.Text:
+            return `the text "${markdownEscape(plainText(locator.text))}"`;
+        case SemanticLocatorKind.TestId:
+            return `the \`${codeSpanText(plainText(locator.testId))}\` element`;
+        // The selector or expression is the plan's own literal text, never a value.
+        case StructuralLocatorKind.Css:
+            return `the element found by CSS \`${codeSpanText(locator.selector)}\``;
+        case StructuralLocatorKind.Xpath:
+            return `the element found by XPath \`${codeSpanText(locator.expression)}\``;
+    }
+}
+
+// Where a navigate step goes: its path, or a path template's segments with values by name.
+function describeNavigation(url: Extract<Step, { type: "navigate" }>["url"]): string {
+    if (typeof url === "string") {
+        return new URL(url, "http://relative.invalid").pathname;
+    }
+    return `/${url.segments.map(plainText).join("/")}`;
+}
+
+// One plain-English line per step. Values typed or expected are never included.
+export function describeStep(step: Step): string {
+    switch (step.type) {
+        case StepType.Navigate:
+            return `Opened \`${codeSpanText(describeNavigation(step.url))}\`${step.scripts === ScriptMode.Disabled ? " with scripts off" : ""}`;
+        case StepType.Click:
+            return `Clicked ${describeLocator(step.locator)}`;
+        case StepType.Download:
+            return `Downloaded a file from ${describeLocator(step.locator)} as "${step.name}"`;
+        case StepType.Hover:
+            return `Hovered over ${describeLocator(step.locator)}`;
+        case StepType.Fill:
+            return `Filled in ${describeLocator(step.locator)}`;
+        case StepType.Select:
+            return `Chose an option in ${describeLocator(step.locator)}`;
+        case StepType.Upload:
+            return `Uploaded a fixture file to ${describeLocator(step.locator)}`;
+        case StepType.Press:
+            return `Pressed ${[...(step.modifiers ?? []), step.key].join("+")} on ${describeLocator(step.locator)}`;
+        case StepType.Frame:
+            return `Inside ${describeLocator(step.locator)}: ${step.steps.map(describeStep).join("; ")}`;
+        case StepType.Dialog:
+            return `${step.action === DialogAction.Accept ? "Accepted" : "Dismissed"} the next dialog`;
+        case StepType.Expect:
+            return `Checked that ${describeLocator(step.locator)} ${ASSERTION_TEXT[step.assert.kind]}`;
+        case StepType.ExpectPage:
+            return `Checked the page ${PAGE_ASSERTION_TEXT[step.assert.kind]}`;
+        case StepType.ExpectDownload:
+            return `Checked the ${DOWNLOAD_ASSERTION_TEXT[step.assert.kind]} of download "${step.download}"`;
+        case StepType.NewTab:
+            return `In a new tab at \`${codeSpanText(describeNavigation(step.url))}\`: ${step.steps.map(describeStep).join("; ")}`;
+        case StepType.A11yAudit:
+            return `Ran automated accessibility rules (${step.mode} mode)`;
+        case StepType.Capture:
+            return `Captured screenshot "${step.name}"`;
+        case StepType.Call:
+            return `Called the declared \`${codeSpanText(step.call)}\` service call`;
+        case StepType.ExpectBackend:
+            return `Checked that field "${markdownEscape(step.field)}" of \`${codeSpanText(step.call)}\` ${BACKEND_ASSERTION_TEXT[step.assert.kind]}`;
+        case StepType.Remember:
+            return `Remembered ${describeRememberSource(step.from)} as {${step.name}}`;
+        case StepType.Stub:
+            return `${step.action === StubAction.Start ? "Started" : "Stopped"} the declared \`${codeSpanText(step.stub)}\` stub`;
+        case StepType.ResetRequests:
+            return `Reset the count of \`${codeSpanText(step.request)}\` requests`;
+        case StepType.ExpectRequests:
+            return `Checked ${REQUEST_COUNT_TEXT[requestCountKind(step.count)]} of \`${codeSpanText(step.request)}\` requests`;
+        case StepType.ExpectResponse:
+            return `Checked that the latest \`${codeSpanText(step.request)}\` response ${describeResponseAssertion(step.assert)}`;
+        case StepType.SetStorage:
+            return `Wrote the declared \`${codeSpanText(step.entry)}\` storage entry`;
+        case StepType.RemoveStorage:
+            return `Removed the declared \`${codeSpanText(step.entry)}\` storage entry`;
+        case StepType.ExpectStorage:
+            return `Checked that the \`${codeSpanText(step.entry)}\` storage entry ${STORAGE_ASSERTION_TEXT[step.assert.kind]}`;
+        case StepType.AdvanceClock:
+            return `Advanced the page's clock by ${describeClockAdvance(step.by)}${step.mode === ClockAdvanceMode.SkipAhead ? ", skipping ahead" : ""}`;
+        case StepType.ExpectClipboard:
+            return `Checked that the clipboard ${CLIPBOARD_ASSERTION_TEXT[step.assert.kind]}`;
+        case StepType.Evaluate:
+            return `Ran ${describeScript(step.script)}`;
+        case StepType.ExpectScript:
+            return `Checked that field "${markdownEscape(step.field)}" of ${describeScript(step.script)} ${BACKEND_ASSERTION_TEXT[step.assert.kind]}`;
+        case StepType.Database:
+            return `Ran the declared \`${codeSpanText(step.command)}\` database command`;
+        case StepType.ExpectDatabase:
+            return `Checked that field "${markdownEscape(step.field)}" of \`${codeSpanText(step.command)}\` ${BACKEND_ASSERTION_TEXT[step.assert.kind]}`;
+    }
+}
+
+// A page script by its declared name; an inline script's text is never quoted.
+const describeScript = (script: ScriptChoice): string =>
+    isInlineChoice(script)
+        ? "an inline page script"
+        : `the declared \`${codeSpanText(script)}\` page script`;
+
+// "1 minute", "10 minutes": the amount is a whole number the plan wrote, never page data.
+const describeClockAdvance = (by: ClockAdvance): string =>
+    `${by.amount} ${by.amount === 1 ? by.unit.slice(0, -1) : by.unit}`;
+
+const CLIPBOARD_ASSERTION_TEXT: { readonly [Kind in ClipboardAssertion["kind"]]: string } = {
+    textEquals: "holds the expected text",
+    textContains: "contains the expected text",
+    textExcludes: "does not contain the excluded text",
+};
+
+const ELEMENT_READ_TEXT: { readonly [Read in RememberRead]: string } = {
+    text: "the text",
+    value: "the value",
+};
+
+// What a remember step reads of its element: an attribute it names, its text or its value.
+function describeElementRead(from: RememberedElementSource): string {
+    if (from.read === RememberElementRead.Attribute) {
+        return `the \`${codeSpanText(from.attribute)}\` attribute`;
+    }
+    return ELEMENT_READ_TEXT[from.read];
+}
+
+function describeRememberSource(from: RememberSource): string {
+    if ("element" in from) {
+        return `${describeElementRead(from)} of ${describeLocator(from.element)}`;
+    }
+    if ("clipboard" in from) {
+        return "the clipboard's text";
+    }
+    const field = `field "${markdownEscape(from.field)}" of the latest \`${codeSpanText(from.response)}\` response`;
+    return from.read === ResponseRead.Text ? field : `the length of ${field}`;
+}
+
+const REQUEST_COUNT_TEXT: { readonly [Kind in (typeof REQUEST_COUNT_KINDS)[number]]: string } = {
+    equals: "the exact number",
+    atLeast: "the least number",
+    atMost: "the greatest number",
+};
+function requestCountKind(count: RequestCount): RequestCountKind {
+    if (RequestCountKind.Equals in count) {
+        return RequestCountKind.Equals;
+    }
+    return RequestCountKind.AtLeast in count ? RequestCountKind.AtLeast : RequestCountKind.AtMost;
+}
+
+function describeResponseAssertion(assertion: ResponseAssertion): string {
+    switch (assertion.kind) {
+        case ResponseAssertionKind.StatusEquals:
+            return "has the expected status";
+        case ResponseFieldPresenceKind.FieldPresent:
+            return `has field "${markdownEscape(assertion.field)}"`;
+        case ResponseFieldPresenceKind.FieldAbsent:
+            return `has no field "${markdownEscape(assertion.field)}"`;
+        case ResponseFieldTextKind.FieldEquals:
+            return `has the expected text in field "${markdownEscape(assertion.field)}"`;
+        case ResponseFieldTextKind.FieldContains:
+            return `contains the expected text in field "${markdownEscape(assertion.field)}"`;
+    }
+}
+
+const STORAGE_ASSERTION_TEXT: { readonly [Kind in StorageAssertion["kind"]]: string } = {
+    present: "is present",
+    absent: "is absent",
+    equals: "has the expected value",
+};
+
+// A run's row in the table of where the plan was verified: what it ran on and how many steps passed,
+// or, for a run that ended before any step, why.
+const notRunRow = (result: PlanRunResult, reason: string, stepCount: number): string =>
+    `| ${result.targetId} | - | - | - | - | ${result.state}: ${reason} | 0 of ${stepCount} |`;
+
+function verifiedOnRow(result: PlanRunResult, stepCount: number): string {
+    switch (result.state) {
+        // A refusal's row has always given no reason.
+        case TerminalState.Refused:
+            return notRunRow(result, "", stepCount);
+        case TerminalState.TargetUnavailable:
+            return notRunRow(result, result.unavailable.reason, stepCount);
+        case TerminalState.Passed:
+        case TerminalState.Failed:
+        case TerminalState.Errored:
+        case TerminalState.Denied: {
+            if (result.manifest === null) {
+                return notRunRow(result, "the browser driver failed", stepCount);
+            }
+            const { target, browser } = result.manifest;
+            const passed = result.steps.filter(
+                (step) => step.outcome === StepOutcome.Passed,
+            ).length;
+            return `| ${result.targetId} | ${browser.name} ${browser.version} | ${target.device} | ${target.locale} | ${target.timezone} | ${result.state} | ${passed} of ${stepCount} |`;
+        }
+    }
+}
+
+export function releaseNoteDraft(plan: Plan, results: readonly PlanRunResult[]): string {
+    const lines: string[] = [
+        `## ${markdownEscape(plan.meta.title)} (${markdownEscape(plan.meta.featureId)})`,
+        "",
+        `Spec: \`${codeSpanText(plan.meta.specReference)}\``,
+        "",
+        "### Verified on",
+        "",
+        "| Target | Browser | Device | Locale | Time zone | Result | Steps passed |",
+        "|---|---|---|---|---|---|---|",
+    ];
+    lines.push(...results.map((result) => verifiedOnRow(result, plan.steps.length)));
+    lines.push(
+        "",
+        "### What was checked",
+        "",
+        ...plan.steps.map((step, index) => `${index + 1}. ${describeStep(step)}`),
+    );
+
+    const screenshots = results.flatMap((result) =>
+        result.steps.flatMap((step) => (step.artifact === undefined ? [] : [step.artifact])),
+    );
+    if (screenshots.length > 0) {
+        lines.push(
+            "",
+            "### Screenshots",
+            "",
+            ...screenshots.map(
+                (artifact) => `- \`${artifact.name}\` (sha256 ${artifact.sha256.slice(0, 12)})`,
+            ),
+        );
+    }
+
+    const audits = results.flatMap((result) =>
+        result.steps.flatMap((step) =>
+            step.findings === undefined
+                ? []
+                : [{ target: result.targetId, findings: step.findings }],
+        ),
+    );
+    if (audits.length > 0) {
+        lines.push("", "### Accessibility (automated rules only)", "");
+        for (const audit of audits) {
+            const listed = audit.findings
+                .map(
+                    (finding) =>
+                        `${finding.ruleId} (${finding.impact}, ${finding.elementCount} element${finding.elementCount === 1 ? "" : "s"})`,
+                )
+                .join(", ");
+            lines.push(
+                `- ${audit.target}: ${audit.findings.length === 0 ? "no rule violations found" : listed}`,
+            );
+        }
+        lines.push(
+            "",
+            "Automated rules cover only part of WCAG 2.2 AA. This is not a conformance claim.",
+        );
+    }
+
+    lines.push(
+        "",
+        "### Provenance",
+        "",
+        ...results.map(
+            (result) =>
+                `- ${result.targetId}: manifest ${result.manifestHash === null ? "none" : result.manifestHash.slice(0, 16)}, result ${result.resultHash.slice(0, 16)}`,
+        ),
+    );
+    lines.push(
+        "",
+        "_Draft generated deterministically from the plan and the run results. No AI was used._",
+        "",
+    );
+    return lines.join("\n");
+}
+
+const MAXIMUM_SUGGESTION_LENGTH = 20_000;
+// Why a suggestion was refused, in the words the release artefacts have always used.
+const REJECTION_REASONS: Partial<Readonly<Record<PlanErrorCode, string>>> = {
+    wrong_type: "not-text",
+    empty: "empty",
+    too_long: "too-long",
+    unsafe_text: "unsafe-text",
+};
+
+export type ReleaseArtefacts = {
+    readonly draft: ArtifactReference;
+    readonly suggestion: ArtifactReference | null;
+    readonly suggestionRejected: string | null;
+};
+
+// Stores the deterministic draft, then optionally an AI suggestion beside it, never instead of it.
+export async function writeReleaseNotes(
+    plan: Plan,
+    results: readonly PlanRunResult[],
+    store: ArtifactStore,
+    writer?: AiWriter,
+): Promise<ReleaseArtefacts> {
+    const text = releaseNoteDraft(plan, results);
+    const draft = await store.put(
+        "release-notes.md",
+        new TextEncoder().encode(text),
+        "text/markdown",
+    );
+    if (writer === undefined) {
+        return { draft, suggestion: null, suggestionRejected: null };
+    }
+    let proposal: unknown;
+    try {
+        proposal = await writer.suggest(text);
+    } catch {
+        return { draft, suggestion: null, suggestionRejected: "writer-error" };
+    }
+    // The suggestion is outside input: it is parsed before anything is stored, and stored only if it passes.
+    const parsed = parseAiText(proposal, MAXIMUM_SUGGESTION_LENGTH);
+    if (!parsed.ok) {
+        return {
+            draft,
+            suggestion: null,
+            suggestionRejected: REJECTION_REASONS[parsed.error.code] ?? parsed.error.code,
+        };
+    }
+    const banner = `<!-- AI suggestion, not reviewed. The source of truth is release-notes.md (sha256 ${draft.sha256}). -->\n`;
+    const suggestion = await store.put(
+        "release-notes.suggestion.md",
+        new TextEncoder().encode(banner + parsed.value),
+        "text/markdown",
+    );
+    return { draft, suggestion, suggestionRejected: null };
+}

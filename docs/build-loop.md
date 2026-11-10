@@ -13,11 +13,11 @@ How the main session runs the plan on its own. Helpers never read this; their br
 0. **Align.** Where the spec's types or criteria contradict the seeded tests, the spec follows the tests and new rules become marked additions (SPEC-27 is the example). Commit as a docs change.
 1. **Tests.** A fresh helper gets `docs/prompts/session-tests.md` with `<NN>` filled in. Check its change is test-set only, then commit it alone.
 2. **Code.** A fresh helper gets `docs/prompts/session-code.md` with `<NN>` and `<TESTS-COMMIT>`. If it says a test looks wrong, stop and ask (never fix a committed test). When `npm run check` is green, commit.
-   - One standing exception (founder, 2026-10-28): when a spec adds an error code the design already declares, a tests commit adds it to the pinned lists in `test/proofs/error-code-exhaustiveness.ts` and `test/proofs/error-anchors.test.ts`. The lists only grow; no other test change is covered.
+   - One standing exception (founder, 2026-10-28): when a spec adds an error code the design already declares, a tests commit adds it to the pinned lists in `test/proofs/repo-rules/composition-root/DescribePlanError.ts` and `test/proofs/repo-rules/running/ErrorAnchors.test.ts`. The lists only grow; no other test change is covered.
 3. **Linux.** If the spec touches browsers, screenshots, fonts or replay, run `npm run check:linux` (start Docker Desktop if needed).
 4. **Record.** Add a row to `docs/decisions/velocity.md`, tick the spec in `START.md`, and commit both.
 
-Before every commit: `git diff --cached --name-only | node tools/check-tests-apart.ts`.
+Before every commit: `git diff --cached --name-only | node tools/repo-rules/commits/CheckTestsApart.ts`.
 
 ## Questions
 
@@ -57,7 +57,7 @@ When the last spec of a milestone is committed:
 
 - **The main session reads summaries, not files.** Use `git diff --stat`, `grep` and helper reports. Send long command output to a file in the scratchpad and read only the summary lines.
 - **One helper per step**, with its brief plus at most 20 lines of known facts. Don't repeat what `CLAUDE.md` says; helpers load it.
-- **Helpers iterate on one package** (`npm test -w <package>`) and run `npm run check` once at the end.
+- **Helpers iterate on one test folder** (`node tools/test-runner/RunTestFolder.ts --without-browser test/unit/<package>`) and run `npm run check` once at the end.
 - **Research is narrow.** The `Explore` helper reads excerpts, not whole research docs. Use the web only when the repo can't answer.
 - **Reviews only at milestone exits**, and only for trust-path specs.
 - **A fresh session per milestone.** It starts from `START.md`, not from a long conversation.

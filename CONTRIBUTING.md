@@ -4,7 +4,7 @@
 
 - Every change starts from a spec in `docs/specs/`. Work from its acceptance criteria and nothing else.
 - Tests and code are written by **separate agents with fresh contexts, in separate commits**. Tests are committed first; the code is then written against them, frozen.
-- `npm run check` must be green before code is committed. `npm run check:linux` repeats it on CI's pinned Linux image.
+- `npm run check` must be green before code is committed. `npm run check:linux` runs `npm run check:push`, which includes it, on CI's pinned Linux image.
 - The coding agent may commit. Only the founder pushes and merges. That push is the approval, recorded as `declared`. An AI agent's approval never counts, and nothing waits on a second person.
 
 ## The spec template
@@ -44,7 +44,7 @@ Rules for criteria:
   - **implicit:** no crash, no leak;
   - **metamorphic:** a relation between two runs;
   - **regression:** a golden file.
-- Criterion ids never change once merged. They are data: they appear in test metadata, commit trailers and the trace index, never in names.
+- Criterion ids never change once merged. They are data: they appear in `Criteria:` commit trailers and the trace index, never in names, tests or comments. Tests carry no criterion tag.
 
 ## The workflow
 
@@ -54,42 +54,50 @@ The founder drives one Claude Code session, which works through the spec queue i
 |---|---|---|---|
 | 1. Spec | Founder | Writes or approves the spec | `docs/specs/` |
 | 2. Types | Code helper | Adds the spec's types and ports, if they are new | `packages/`, `docs/` |
-| 3. Tests | Tests helper (`docs/prompts/session-tests.md`) | Writes at least one test per criterion, tagged `{ criterion: 'AC-SPEC-nn-mm' }`. Tests are expected to fail | `test/`, `proofs/`, `fixtures/`, `golden/` only |
+| 3. Tests | Tests helper (`docs/prompts/session-tests.md`) | Writes at least one test per criterion, with no reference to the spec. Tests are expected to fail | `test/` only |
 | 4. Commit | Main session | Checks the change is tests only, then commits it alone | — |
 | 5. Code | Code helper (`docs/prompts/session-code.md`) | Implements the spec until the frozen tests pass. Never edits a test: if one looks wrong, stops and explains | `packages/`, `tools/`, `docs/` only |
 | 6. Commit | Main session | Runs `npm run check`, then commits the code | — |
 | 7. Push | Founder | Reads the commits, then pushes to `main` | — |
 
 - An optional cold review uses `docs/prompts/session-review.md`, in a third fresh helper.
-- The test set is `test/`, `proofs/`, `fixtures/` and `golden/`. No commit may change it together with anything else; this stops a change editing a test to make its own code pass. Check staged files with `git diff --cached --name-only | node tools/check-tests-apart.ts`. CI runs the same check on pull requests, and on every push to `main` checks each pushed commit on its own (`--commits <from>..<to>`).
+- The test set is `test/`. No commit may change it together with anything else; this stops a change editing a test to make its own code pass. Check staged files with `git diff --cached --name-only | node tools/repo-rules/commits/CheckTestsApart.ts`. CI runs the same check on pull requests, and on every push to `main` or a `refactor/` branch checks each pushed commit on its own (`--commits <from>..<to>`).
 - `.github/CODEOWNERS` gives the test set and CI configuration to the founder.
 
 ## Definition of Done
 
 A spec is done when all of these hold:
 
-1. Every acceptance criterion has at least one test tagged with its id, committed before the code, in its own commit.
-2. `npm run check` is green locally and in CI, on the pinned Linux image, with no retries and no skipped tests.
-3. The `tests-apart` check passed on the tests commit and on the code commit.
-4. No runtime dependency was added to `contracts` or `engine`. Any new third-party package elsewhere has a dependency review in `docs/decisions/`, written before it was added.
-5. Generated files are regenerated once they exist: the guarantee table, logging manifest, JSON Schema and changelog.
+1. Every acceptance criterion has at least one test, committed before the code, in its own commit. The commits name the criteria in `Criteria:` trailers; no test, code or comment cites a spec.
+2. `npm run check` is green locally. In CI, on the pinned Linux image, every job passes: `npm run check`, the browser shards, proofs, replay, real containers and `npm run gates`. No retries and no skipped tests: a failed test file runs once more only to measure flakiness, and the run still fails.
+3. The `tests-apart` check passed on the tests commit and on the code commit. A commit that changes `test/golden/` names a row of `docs/decisions/refactor-defects.md` in a `Defect:` trailer.
+4. No runtime dependency was added to `contracts` or `engine`. Any new third-party package elsewhere has a dependency review in `docs/decisions/`, written before it was added. On the trust path it also has an entry in `tools/repo-rules/docs/DependencyReviews.ts`, or `npm run lint` fails.
+5. Generated files are regenerated once they exist: the guarantee table (`docs/guarantees.md`, by `node tools/metrics/GuaranteeMap.ts --write` after a green run; `npm run gates` fails when it differs), logging manifest, JSON Schema and changelog.
 6. The founder read the commits, including any change to assertions, and pushed them personally. That approval is recorded as `declared`.
 
 ## Commands
 
 | Command | Does |
 |---|---|
-| `npm run check` | Everything below, in order. Must be green before you finish |
-| `npm run check:linux` | `npm run check` on CI's pinned Linux image, in Docker. Needs Docker Desktop running |
-| `npm run typecheck` | `tsc --build` over every package and `tools/`. A wrong-way import between packages fails here |
-| `npm run lint` | Checks that read only files: licences and roles, folder layout, imports, dependency reviews, the cost record, the seed record, research links, deny rules and the glossary |
+| `npm run check` | `npm run typecheck`, `npm run lint`, `npm run lint:code`, `npm run lint:names` and `npm test`, in order. Must be green before you finish |
+| `npm run check:push` | `npm run check`, then `npm run test:browser`, `npm run proofs`, `npm run replay` and `npm run gates` |
+| `npm run check:linux` | `npm run check:push` on CI's pinned Linux image, in Docker. Needs Docker Desktop running |
+| `npm run check:containers` | Real-container tests (`test/containers/`). Needs Docker; CI runs them in their own job |
+| `npm run check:full` | `npm run check:push` on the full test tier: repeated runs and the headless-shell target |
+| `npm run typecheck` | `tsc --build` over every package, `tools/` and `test/`. A wrong-way import between packages fails here |
+| `npm run lint` | Checks that read only files, all in one process (`tools/repo-rules/RunRepositoryRules.ts`): licences and roles, folder layout, imports, dependency reviews, deny rules, the glossary and more. `node tools/repo-rules/RunRepositoryRules.ts --only <rule>[,<rule>]` runs just those |
+| `npm run lint:code` | ESLint's code rules, straight after `npm run lint`. Its config and local rules are in `tools/eslint/`; code that predates them is baselined in `eslint-suppressions.json` |
+| `npm run format` | Prettier over packages, tools and tests. `npm run format:check` only reports |
 | `npm run lint:names` | The naming lint's self-test, then the naming lint over the repository |
-| `npm test` | Unit and contract tests (`test/unit/`, `test/contract/`) |
+| `npm test` | The tests in `test/unit/` and `test/browser/` that drive no browser |
+| `npm run test:browser` | The tests in those folders that drive a browser, one file at a time |
 | `npm run proofs` | Hostile plans, secret leaks, egress, PII and audit-chain proofs (`test/proofs/`) |
 | `npm run replay` | Golden runs replayed and compared by hash (`test/replay/`) |
-| `npm run gates` | After the tests: the project's metrics and trace index from commit trailers and test results, and the guarantee map. CI runs it even when a test failed |
-| `npm run cost-report` | The month's declared hosted costs; fails over USD 5 at zero customers |
-| `npm test -w <package>` | Tests for one package, once it has a `test` script |
+| `npm run goldens:record` | Remakes `test/golden/closed-language` and, on Windows x64 only, `test/golden/replay/windows-signup`. Not part of `npm run check` |
+| `npm run gates` | After the tests: the project's metrics and trace index from commit trailers and test results, and the guarantee map; it fails if a test file has no result. CI runs it even when a test failed |
+| `node --test "test/unit/<package>/**/*.test.ts"` | One package's unit tests. Records nothing for the gates |
+| `npm run browsers` | Installs the pinned Chrome for Testing build into `.browsers/` |
+| `npm run benchmark` | The performance trend alarm, never a gate |
 
 ## Code rules
 
@@ -101,16 +109,16 @@ A spec is done when all of these hold:
 
 ## Naming rules
 
-The code must read without any other document.
+The code must read without any other document. File naming and the rest of the conventions are in `.claude/rules/`, and why they were chosen is in `docs/decisions/code-conventions.md`.
 
 - Name things after what they are or do, in words a new developer knows: `evaluatePolicy`, `DependencyReview`, `tracedCriteriaShare`.
 - No research or process ids in identifiers, file or folder names, JSON keys, error codes or flags.
 - No single-letter names except loop indices `i`, `j`, `k` and coordinates `x`, `y`, and never as an export. That includes generic type parameters: write `<Value>`, not `<T>`.
 - No unexplained abbreviations. Allowed: id, url, uri, html, css, json, http, api, cli, ci, pr, cdp, bidi, wcag, act, a11y, pii, sha256, svg, png, dom, os. Standard names (ai, mcp, sarif, junit, oidc, jwt, lti) are spelt out in `docs/glossary.md`.
-- Comments explain what and why in plain English. You may add "See `docs/specs/SPEC-nn-<name>.md`", but never as the only content.
-- The product name is written once, in `PRODUCT` in `packages/contracts/src/product.ts`.
+- Prefer readable code to comments: rename or extract first. Comment only what the code can't say, such as why, in plain English. Never cite a spec in a comment: code and tests read without the specs.
+- The product name is written once, in `PRODUCT` in `packages/contracts/src/product/Product.ts`.
 - `docs/glossary.md` maps each domain term to its code name. Add a row when you add a term.
-- `npm run lint:names` enforces these rules. Its configuration is `tools/naming-lint-config.ts`.
+- `npm run lint:names` enforces these rules. Its configuration is `tools/repo-rules/naming/NamingLint.ts`.
 
 ## Commit trailers
 
@@ -120,8 +128,10 @@ Whoever commits adds these; they feed the project's own metrics:
 Agent: <tool>/<version>       when an agent wrote the change
 Spec: SPEC-nn                 one per spec the commit implements
 Criteria: AC-SPEC-nn-mm, AC-SPEC-nn-mm
+Defect: <number>              when the commit changes a file under test/golden/
 ```
 
-- Keys are exact, one value per line, in the message's last paragraph. `Agent:` appears at most once, as `claude-code/<version>`; each `Spec:` and criterion id must exist in `docs/specs/`. A `Co-Authored-By:` naming Claude needs an `Agent:` line.
-- A commit can't be amended, so check the message first: `node tools/check-commit-trailers.ts --message <file>`.
-- `npm run gates` fails on a malformed commit after the trailer cut-over (`TRAILER_CUT_OVER` in `tools/project-metrics.ts`). One already made is listed with its reason in `KNOWN_MALFORMED_COMMITS` by a later commit.
+- Keys are exact, one value per line, in the message's last paragraph. `Agent:` appears at most once, as `<lower-case tool>/<semantic version>`, such as `claude-code/2.1.312`; each `Spec:` and criterion id must exist in `docs/specs/`. A `Co-Authored-By:` naming Claude needs an `Agent:` line.
+- Goldens are frozen from the reset commit on. `Defect:` must name a row in `docs/decisions/refactor-defects.md`; CI checks each pushed commit with `node tools/repo-rules/commits/CheckGoldenChanges.ts --commits <from>..<to>`.
+- A commit can't be amended, so check the message first: `node tools/repo-rules/commits/CommitTrailers.ts --message <file>`.
+- `npm run gates` fails on a malformed commit after the trailer cut-over (`TRAILER_CUT_OVER` in `tools/metrics/ProjectMetrics.ts`). One already made is listed with its reason in `KNOWN_MALFORMED_COMMITS` by a later commit.

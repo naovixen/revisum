@@ -1,0 +1,10 @@
+Plan: Sign in to Lantern Books
+Feature: SIGNIN-1
+Spec: specs/sign-in.md
+Version: 1.3
+Targets: explore-chromium
+Go to /sign-in.html
+Type secret EXPLORE_LOGIN_NAME into label "Name"
+Click button "Sign in"
+Criterion: AC-1
+Expect heading "Signed in" is visible

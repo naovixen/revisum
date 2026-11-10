@@ -1,10 +1,61 @@
 // Public entry point: the own Chromium driver over the Chrome DevTools Protocol, and the CDP
 // connection and launcher that the accessibility engine also uses.
-export { cdpDriver, CDP_ADAPTER_VERSION, type CdpDriverOptions } from './cdp-driver.ts';
-export { heldModifierKeys, type HeldModifierKey } from './modifier-keys.ts';
+export { cdpDriver, type CdpDriverOptions } from "./session/CdpDriver.ts";
+export { parseProxyServer, type ProxyServer } from "./capabilities/SessionEgress.ts";
 export {
-  CdpConnection, CdpError, DEFAULT_COMMAND_TIMEOUT_MILLISECONDS, type CdpSessionClient, type ConnectOptions,
-} from './cdp-connection.ts';
-export { ISOLATED_CHROMIUM_ARGUMENTS, launchChromium, type LaunchedChromium, type LaunchOptions } from './chromium-launcher.ts';
-export { PAGE_AUDIT_RULE_IDS, type AuditNode, type AuditRuleResult } from './page-audit.ts';
-export type { DriverSession, OwnBrowserDriver } from './page-operations.ts';
+    egressThroughExistingProxy,
+    type ConnectionFailure,
+    type EgressSource,
+    type RefusalReader,
+    type SessionEgress,
+} from "./capabilities/SessionEgress.ts";
+export { heldModifierKeys } from "./page/input/HeldModifierKeys.ts";
+export {
+    CdpConnection,
+    DEFAULT_COMMAND_TIMEOUT_MILLISECONDS,
+    type CdpSessionClient,
+} from "./connection/CdpConnection.ts";
+// The commands and events the accessibility engine sends and reads, each with its reply's decoder.
+export {
+    ATTACH_TO_TARGET,
+    BRING_TO_FRONT,
+    CAPTURE_SCREENSHOT,
+    CLOSE_TARGET,
+    CREATE_TARGET,
+    ENABLE_ACCESSIBILITY,
+    ENABLE_CSS,
+    ENABLE_DOM,
+    ENABLE_PAGE,
+    ENABLE_RUNTIME,
+    GET_FRAME_TREE,
+    GET_LAYOUT_METRICS,
+    GET_VERSION,
+    NAVIGATE,
+    SET_DEVICE_METRICS,
+    SET_FOCUS_EMULATION,
+} from "./connection/BrowserCommand.ts";
+export type { AccessibilityTreeNode, FrameTree } from "./connection/RemoteObject.ts";
+export { GET_FULL_ACCESSIBILITY_TREE } from "./connection/domains/AccessibilityDomain.ts";
+export { GET_MATCHED_STYLES } from "./connection/domains/CssDomain.ts";
+export {
+    DESCRIBE_NODE,
+    GET_DOCUMENT,
+    PUSH_NODES_BY_BACKEND_IDS,
+    RESOLVE_NODE,
+} from "./connection/domains/DomDomain.ts";
+export { CAPTURE_SNAPSHOT } from "./connection/domains/DomSnapshotDomain.ts";
+export {
+    CONTINUE_REQUEST,
+    ENABLE_REQUEST_HOLDING,
+    FAIL_REQUEST,
+} from "./connection/domains/FetchDomain.ts";
+export { DISPATCH_KEY_EVENT } from "./connection/domains/InputDomain.ts";
+export { CALL_FUNCTION_ON, EVALUATE, RELEASE_OBJECT } from "./connection/domains/RuntimeDomain.ts";
+export { LOAD_EVENT_FIRED, REQUEST_PAUSED } from "./connection/BrowserEvent.ts";
+export { launchChromium, type LaunchedChromium } from "./launch/LaunchChromium.ts";
+export type { DriverSession, OwnBrowserDriver } from "./session/DriverSession.ts";
+export type {
+    BrowserSource,
+    LaunchedSharedBrowser,
+    SharedBrowser,
+} from "./launch/SharedBrowser.ts";

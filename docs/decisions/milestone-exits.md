@@ -70,7 +70,7 @@ One section per milestone exit: what `docs/system-design.md` §7 asked for, the 
 
 - M2's specs are built, and the plan's three exit tests pass on the pinned Linux image. One part of §7's slice is proved only in pieces: no test runs a plan in the container and then replays that run (see the §7 slice below).
 - The cold review of SPEC-07 found 14 gaps, 3 of them high, and its new tests found a real hole: the run container could reach the Docker host through its network's gateway, so `isolated` overclaimed. All are fixed.
-- The isolation kill criterion stays open until CI's container step is green. CI has now run the gateway fix and every blocking test passed; one counter-example's setup failed, and its fix waits for the next push.
+- The isolation kill criterion is passing: CI's container step passed 105 of 105 on `55a0b5a`, with the gateway fix in.
 
 ### Decisions
 
@@ -82,7 +82,8 @@ One section per milestone exit: what `docs/system-design.md` §7 asked for, the 
 | The benchmark runs weekly and on manual dispatch, outside `check`; ARM results only if someone runs it on an arm64 machine, with no paid runner | Main session, 2026-10-31 |
 | Internal networks are created without a gateway, and the probe tries where it would be, so a Docker that keeps it gives `host` | Main session, 2026-11-01 |
 | An isolated plan with service calls and no recording loses `replay-identical`, with the reason `replies-not-recorded` | Main session, 2026-11-01 |
-| A refused or failed `--after` login stops with `plan-rejected`, with no new code. Open for the founder to confirm | Main session, 2026-11-01 |
+| A refused or failed `--after` login gets its own error code, `after-plan-failed`, with SPEC-16 (AC-SPEC-16-13); it stays `plan-rejected` until then | Founder, 2026-11-01 |
+| Joining the isolated path waits for SPEC-16 (AC-SPEC-16-11 and 12) rather than being done before M3 | Founder, 2026-11-01 |
 
 ### Findings
 
@@ -94,7 +95,7 @@ One section per milestone exit: what `docs/system-design.md` §7 asked for, the 
 | `npm run check:containers`, Docker Desktop | 105 of 105 |
 | `npm run check:linux`, pinned image | 0 failures; 4 skips (same counts; 3 of the skips are in `proofs`) |
 
-The skips are `test/contract/dom-checks.test.ts:62` (a driver without `rememberedValues`) and, on Linux, the three clipboard-proof tests that need xclip.
+The skips are `test/browser/element-state/DomChecks.test.ts:62` (a driver without `rememberedValues`) and, on Linux, the three clipboard-proof tests that need xclip.
 
 **§7 slice.**
 
@@ -137,10 +138,10 @@ The skips are `test/contract/dom-checks.test.ts:62` (a driver without `remembere
 | Signal | Status |
 |---|---|
 | Driver parity, by 2027-03-17 | Passing on the pinned image, locally and in CI on `7e78d28` |
-| Isolation, by 2027-03-17 | Open until CI's container step is green. On `7e78d28` it passed 104 of 105 with the gateway fix in: every blocking test passed, and the run reported `isolated`. The one failure was a counter-example's own setup, fixed in `27312b3`, which only CI can confirm because Docker Desktop doesn't take that path |
+| Isolation, by 2027-03-17 | Passing: CI's container step passed 105 of 105 on `55a0b5a` with the gateway fix in, on GitHub's runner. Before that, `7e78d28` passed 104 of 105; the one failure was a counter-example's own setup, fixed in `27312b3` |
 | Language fit | Resolved by the founder's pivot at M1 |
 | Velocity, M1 | Met at M1's exit |
-| Problem fit, 5 of 15 calls by 2027-01-25 | No calls recorded in this repo; not due |
+| Problem fit, 5 of 15 calls by 2027-01-25 | Set aside by the founder (2026-11-01): the aim is a demo, to judge feasibility from seeing it work. It does not stop the build |
 | Upkeep, velocity at M3 and later signals | Not due |
 
 ### Risks

@@ -1,5 +1,7 @@
 # Coverage study: step count
 
+The tool that produced this, `tools/coverage-study.ts`, was removed on 2026-11-02. It is in git history.
+
 ## In short
 
 - A second measure beside `report.md`. The official measure is still the whole-test count: **38 of 100 tests expressible (38.0%)**, unchanged.

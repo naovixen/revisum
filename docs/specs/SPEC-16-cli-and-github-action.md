@@ -6,7 +6,7 @@ Put core where teams already work, and let their agents drive it (AI-drivable, R
 
 ## Scope and non-goals
 
-- **In:** a CLI with JSON I/O: `validate`, `lock`, `run`, `export`, `review`, `approve` and `doctor`, plus `convert` (M1) and `draft` (M2, moved from M4 on 2026-10-29; `--explore` from SPEC-37) from SPEC-28; `validate` and `run` accept plans in JSON or readable text, each through `admitDraft`, with errors by line and column for text; `draft` writes an unapproved readable draft from a spec's acceptance criteria through the `AiPlanner` port on the customer's own key or a local model, and never runs or approves it; `approve` and `review` sign with a registered key where the optional signed route is set up (SPEC-02), or record `unverified`; typed errors from the shared `CliErrorCode` union (SPEC-27) with doc links; `doctor` diagnosing common setup faults (missing secret, undeclared origin, unpinned target, egress blocked, token scope); a GitHub Action wrapping the CLI that uploads SARIF and artefacts and posts the PR comment; npm release with provenance and an SBOM; dependencies pinned by hash with lifecycle scripts off.
+- **In:** a CLI with JSON I/O: `validate`, `lock`, `run`, `export`, `review`, `approve` and `doctor`, plus `convert` (M1) and `draft` (M2, moved from M4 on 2026-10-29; `--explore` from SPEC-37) from SPEC-28; `validate` and `run` accept plans in JSON or readable text, each through `admitDraft`, with errors by line and column for text; `draft` writes an unapproved readable draft from a spec's acceptance criteria through the `DraftPlanner` port on the customer's own key or a local model, and never runs or approves it; `approve` and `review` sign with a registered key where the optional signed route is set up (SPEC-02), or record `unverified`; typed errors from the shared `CliErrorCode` union (SPEC-27) with doc links; `doctor` diagnosing common setup faults (missing secret, undeclared origin, unpinned target, egress blocked, token scope); a GitHub Action wrapping the CLI that uploads SARIF and artefacts and posts the PR comment (the empty `action` package was removed by the architecture refactor, and this spec recreates it); npm release with provenance and an SBOM; dependencies pinned by hash with lifecycle scripts off.
 - **Non-goals:** other CI vendors' native plug-ins (JUnit covers them); MCP (SPEC-18); hosted runs.
 
 ## Interfaces and types
@@ -15,8 +15,9 @@ Put core where teams already work, and let their agents drive it (AI-drivable, R
 export type Command = 'validate' | 'lock' | 'run' | 'export' | 'review' | 'approve' | 'doctor' | 'convert' | 'draft';
 // core draft --from <spec.md> [--criteria AC-1,AC-3] --out plans/<name>.plan   (PlannerEndpoint from project config)
 // core convert <file> --to json|text
-export type CliOutput<Data> = { schema: `${string}.cli/v1`; command: Command; ok: boolean; data?: Data; errors?: readonly CliError[] };
-export type CliError = { code: CliErrorCode; path?: string; docs: `errors#${CliErrorCode}` };
+// In packages/cli/src/output/CliOutput.ts. The schema id is built from the PRODUCT constant.
+export type CliOutput<Data> = { schema: string; command: Command; ok: boolean; data?: Data; errors?: readonly CliError[]; closeFailure?: string };
+export type CliError = { code: CliErrorCode; path?: string; reason?: string; docs: `errors#${CliErrorCode}` };
 export type DoctorCheck = { id: 'secret-missing' | 'origin-undeclared' | 'target-unpinned' | 'egress-blocked' | 'token-scope'; status: 'ok' | 'fail'; fix: string };
 ```
 
@@ -38,6 +39,9 @@ runs: { using: node24, main: dist/action.js }
 - AC-SPEC-16-08: When any command fails, its JSON output shall carry a `CliErrorCode` and a docs link that resolves; an unknown command or flag shall return `usage` (oracle: specified).
 - AC-SPEC-16-09: When `draft` runs with `--json`, its output shall carry the draft path, `PlanSource` `draft-command`, the errors by line and `approved: false`; no run, approval or trusted-file write shall follow from the command (oracle: specified; golden transcript with a recorded planner response).
 - AC-SPEC-16-10: When `convert` runs on each golden plan in either form, the output shall equal the stored golden file of the other form (oracle: regression).
+- AC-SPEC-16-11: When `run` runs a plan in the run container and its manifest is replayed at the same level, the verdict shall be `identical`; replayed at another level, it shall never be a pass (oracle: specified; carried from the M2 exit).
+- AC-SPEC-16-12: When a fixture page in a real run container starts a worker, opens a popup or follows a redirect to an undeclared origin, each shall be blocked and recorded as an `EgressEvent` with that channel (oracle: specified; carried from the M2 exit, extends AC-SPEC-07-01).
+- AC-SPEC-16-13: When a `draft --explore --after` plan is refused or fails, the command shall stop with `after-plan-failed`, not `plan-rejected`, and write no draft (oracle: specified; carried from the M2 exit).
 
 ## Dependencies
 
@@ -51,3 +55,5 @@ M4 (public beta at its exit); `convert` ships with the readable format at M1 (SP
 ## Satisfies
 
 FR-21, FR-22, FR-46, NFR-09
+
+**Amendment (2026-11-09, architecture refactor).** The draft command's port and the `CliOutput` types match the code, and the note records that this spec recreates the `action` package. The command line itself, and its bin entry, are this spec's to add in `packages/cli/`; where these specs write `core draft`, the command is named from `PRODUCT`. No criterion or guarantee changed.

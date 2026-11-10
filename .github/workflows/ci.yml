@@ -1,71 +1,60 @@
-# Required checks: "ci" runs every gate; "tests-apart" stops a pull request that changes the
-# test set and the code it judges together. Both run in the dev container image, pinned by
-# digest, so local and CI runs see the same Linux, Node and fonts.
+# Required checks: "ci" passes only when every job and gate below passed; "tests-apart" stops a
+# pull request that changes the test set and the code it judges together. The fast checks run
+# first, so a push that fails them stops early; the slower suites then run side by side, and "ci"
+# gathers their results for the gates. Everything runs in the dev container image, pinned by digest,
+# so local and CI runs see the same Linux, Node and fonts. .github/workflows/full-tier.yml calls this
+# workflow weekly with the full test tier.
 name: ci
 
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, "refactor/**"]
+  workflow_call:
+    inputs:
+      tier:
+        description: Which tests run, as test/support/TestTier.ts reads it
+        type: string
+        required: true
 
 permissions:
   contents: read
 
+env:
+  PINNED_IMAGE: mcr.microsoft.com/devcontainers/typescript-node:24-bookworm@sha256:970eebf5b82d3800bdd9f46680e1c4c664d365d18603148540788356700ce301
+  REVISUM_TEST_TIER: ${{ inputs.tier || 'push' }}
+
 jobs:
   # The pinned image is started by hand rather than as a job container: it needs the seccomp
   # profile in .devcontainer/, and a job container starts before the repository is checked out.
-  ci:
+  # This job drives no browser, so it installs neither browsers nor their system libraries.
+  fast:
     runs-on: ubuntu-24.04
+    # The full tier repeats runs and adds targets, so it gets longer than a push.
+    timeout-minutes: ${{ inputs.tier == 'full' && 60 || 15 }}
     steps:
-      # Full history: the gates read commit trailers back to the cut-over.
+      # Full history: the commit checks read each pushed commit.
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           fetch-depth: 0
-      - name: Run every check and test in the pinned image
-        run: |
-          # The profile lets Chrome's sandbox create its namespaces, as in the dev container.
-          docker run --rm \
-            --security-opt seccomp=.devcontainer/seccomp-chrome-sandbox.json \
-            --volume "$GITHUB_WORKSPACE:/workspace" --workdir /workspace \
-            mcr.microsoft.com/devcontainers/typescript-node:24-bookworm@sha256:970eebf5b82d3800bdd9f46680e1c4c664d365d18603148540788356700ce301 \
-            bash -euo pipefail -c '
-              node --version | grep -q "^v24\." || { echo "Node 24 required, found $(node --version)"; exit 1; }
-              npm ci
-              # The system libraries the browsers need on Linux, installed as root.
-              node node_modules/playwright-core/cli.js install-deps chromium firefox webkit
-              # Chrome refuses to sandbox as root, so the browsers and the check run as "node".
-              chown -R node:node /workspace
-              su node -c "npm run browsers && npm run check:tests"
-            '
-      # The real-container tests (docs/decisions/container-tests.md) start the run image's
-      # containers on this runner's own Docker, so they show whether egress can be enforced in CI.
-      # The pinned image runs them with the runner's Docker socket and client mounted, and with the
-      # workspace at the same path as on the runner, so every folder the tests ask Docker to mount
-      # exists there too. Temporary folders, such as a workload's output folder, go in the runner's
-      # temp folder, also mounted at its own path, for the same reason. The step before installed
-      # the Linux dependencies and browsers they use.
-      - name: Run the real-container tests on the runner's Docker
-        run: |
-          docker run --rm \
-            --volume /var/run/docker.sock:/var/run/docker.sock \
-            --volume "$(command -v docker):/usr/local/bin/docker:ro" \
-            --volume /usr/libexec/docker/cli-plugins:/usr/libexec/docker/cli-plugins:ro \
-            --volume "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" --workdir "$GITHUB_WORKSPACE" \
-            --volume "$RUNNER_TEMP:$RUNNER_TEMP" --env TMPDIR="$RUNNER_TEMP" \
-            mcr.microsoft.com/devcontainers/typescript-node:24-bookworm@sha256:970eebf5b82d3800bdd9f46680e1c4c664d365d18603148540788356700ce301 \
-            bash -euo pipefail -c 'npm run check:containers'
-      # The gates run even when a test failed, so a failing or flaky run is still recorded; the job
-      # fails either way. They record the project's metrics and check the guarantee map.
-      - name: Record the project's metrics and check the guarantee map
-        if: always()
-        run: |
-          docker run --rm \
-            --volume "$GITHUB_WORKSPACE:/workspace" --workdir /workspace \
-            mcr.microsoft.com/devcontainers/typescript-node:24-bookworm@sha256:970eebf5b82d3800bdd9f46680e1c4c664d365d18603148540788356700ce301 \
-            bash -euo pipefail -c 'chown -R node:node /workspace && su node -c "npm run gates"'
-      # Commits reach main without a pull request, so each pushed commit is checked on its own.
-      - name: Fail if a pushed commit changes the test set and other files together
-        if: always() && github.event_name == 'push'
+      - name: Print how many cores this runner has
+        run: nproc
+      # The sources are checked out before this restores, so they are newer than the build
+      # information, and tsc compares their contents rather than trusting the cache.
+      - name: Keep TypeScript's build information between runs
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            packages/*/dist
+            packages/*/tsconfig.tsbuildinfo
+            tools/dist
+            tools/eslint/dist
+          key: typescript-build-${{ hashFiles('package-lock.json', 'tools/eslint/package-lock.json') }}-${{ github.sha }}
+          restore-keys: typescript-build-${{ hashFiles('package-lock.json', 'tools/eslint/package-lock.json') }}-
+      # Before any step changes the folder's owner, which git on the runner would refuse to read.
+      - name: Work out which commits this push added
+        id: pushed
+        if: github.event_name == 'push'
         env:
           PUSHED_FROM: ${{ github.event.before }}
           PUSHED_TO: ${{ github.sha }}
@@ -74,18 +63,188 @@ jobs:
           if [ "$PUSHED_FROM" = "0000000000000000000000000000000000000000" ]; then
             PUSHED_FROM="$(git rev-list --max-parents=0 "$PUSHED_TO" | tail -n 1)"
           fi
+          echo "commits=$PUSHED_FROM..$PUSHED_TO" >> "$GITHUB_OUTPUT"
+      - name: Run the types, lints and tests that need no browser in the pinned image
+        run: |
           docker run --rm \
             --volume "$GITHUB_WORKSPACE:/workspace" --workdir /workspace \
-            --env PUSHED_FROM --env PUSHED_TO \
-            mcr.microsoft.com/devcontainers/typescript-node:24-bookworm@sha256:970eebf5b82d3800bdd9f46680e1c4c664d365d18603148540788356700ce301 \
-            bash -euo pipefail -c 'chown -R node:node /workspace && su node -c "node tools/check-tests-apart.ts --commits $PUSHED_FROM..$PUSHED_TO"'
-      - name: Add the project's metrics to the job summary
+            --env REVISUM_TEST_TIER \
+            "$PINNED_IMAGE" \
+            bash -euo pipefail -c '
+              node --version | grep -q "^v24\." || { echo "Node 24 required, found $(node --version)"; exit 1; }
+              npm ci
+              chown -R node:node /workspace
+              su node -c "npm run check"
+            '
+      # Commits reach main without a pull request, so each pushed commit is checked on its own.
+      - name: Fail if a pushed commit changes the test set and other files together
         if: always() && github.event_name == 'push'
+        env:
+          PUSHED_COMMITS: ${{ steps.pushed.outputs.commits }}
+        run: |
+          docker run --rm \
+            --volume "$GITHUB_WORKSPACE:/workspace" --workdir /workspace \
+            --env PUSHED_COMMITS \
+            "$PINNED_IMAGE" \
+            bash -euo pipefail -c 'chown -R node:node /workspace && su node -c "node tools/repo-rules/commits/CheckTestsApart.ts --commits $PUSHED_COMMITS"'
+      - name: Fail if a pushed commit changes a golden without naming a defect
+        if: always() && github.event_name == 'push'
+        env:
+          PUSHED_COMMITS: ${{ steps.pushed.outputs.commits }}
+        run: |
+          docker run --rm \
+            --volume "$GITHUB_WORKSPACE:/workspace" --workdir /workspace \
+            --env PUSHED_COMMITS \
+            "$PINNED_IMAGE" \
+            bash -euo pipefail -c 'chown -R node:node /workspace && su node -c "node tools/repo-rules/commits/CheckGoldenChanges.ts --commits $PUSHED_COMMITS"'
+      - name: Keep this job's test results for the gates
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-results-fast
+          path: .test-results/
+          include-hidden-files: true
+          retention-days: 1
+          if-no-files-found: warn
+          overwrite: true
+
+  # Each browser shard runs its files one at a time, so more shards are the way to spend less
+  # time. The shard count below is written in each line; "npm run gates" fails if one is left out.
+  suites:
+    needs: fast
+    runs-on: ubuntu-24.04
+    timeout-minutes: ${{ inputs.tier == 'full' && 60 || 15 }}
+    name: ${{ matrix.suite }}
+    strategy:
+      # Every suite runs to its end, so a failing run still records all it can.
+      fail-fast: false
+      matrix:
+        include:
+          - suite: browser-shard-1
+            command: node tools/test-runner/RunTestFolder.ts --browser-shard 1/3 test/unit test/browser
+          - suite: browser-shard-2
+            command: node tools/test-runner/RunTestFolder.ts --browser-shard 2/3 test/unit test/browser
+          - suite: browser-shard-3
+            command: node tools/test-runner/RunTestFolder.ts --browser-shard 3/3 test/unit test/browser
+          - suite: proofs
+            command: npm run proofs
+          - suite: replay
+            command: npm run replay
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          fetch-depth: 0
+      - name: Keep the pinned browsers between runs
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .browsers
+          key: browsers-${{ hashFiles('tools/browsers/ChromeForTestingBuild.ts', 'package-lock.json') }}
+      - name: Run the suite in the pinned image
+        env:
+          SUITE_COMMAND: ${{ matrix.command }}
+        run: |
+          # The profile lets Chrome's sandbox create its namespaces, as in the dev container.
+          docker run --rm \
+            --security-opt seccomp=.devcontainer/seccomp-chrome-sandbox.json \
+            --volume "$GITHUB_WORKSPACE:/workspace" --workdir /workspace \
+            --env REVISUM_TEST_TIER --env SUITE_COMMAND \
+            "$PINNED_IMAGE" \
+            bash -euo pipefail -c '
+              node --version | grep -q "^v24\." || { echo "Node 24 required, found $(node --version)"; exit 1; }
+              npm ci
+              # The system libraries the browsers need on Linux, installed as root.
+              bash tools/browsers/install-system-libraries.sh
+              # Chrome refuses to sandbox as root, so the browsers and the suite run as "node".
+              chown -R node:node /workspace
+              # The runner saves the cache as another user, which must be able to read every file.
+              su node -c "npm run browsers && chmod -R a+rX .browsers && $SUITE_COMMAND"
+            '
+      - name: Keep this job's test results for the gates
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-results-${{ matrix.suite }}
+          path: .test-results/
+          include-hidden-files: true
+          retention-days: 1
+          if-no-files-found: warn
+          overwrite: true
+
+  # The real-container tests (docs/decisions/container-tests.md) start the run image's containers
+  # on this runner's own Docker, so they show whether egress can be enforced in CI. They write no
+  # results file: this job passing is their record, and "ci" fails if it doesn't.
+  containers:
+    needs: fast
+    runs-on: ubuntu-24.04
+    timeout-minutes: ${{ inputs.tier == 'full' && 60 || 15 }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          fetch-depth: 0
+      - name: Keep the pinned browsers between runs
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .browsers
+          key: browsers-${{ hashFiles('tools/browsers/ChromeForTestingBuild.ts', 'package-lock.json') }}
+      # The browsers run inside the run image, which brings its own system libraries.
+      - name: Install the dependencies and browsers the tests mount
+        run: |
+          docker run --rm \
+            --volume "$GITHUB_WORKSPACE:/workspace" --workdir /workspace \
+            "$PINNED_IMAGE" \
+            bash -euo pipefail -c '
+              npm ci
+              chown -R node:node /workspace
+              su node -c "npm run browsers && chmod -R a+rX .browsers"
+            '
+      # The pinned image runs them with the runner's Docker socket and client mounted, and with the
+      # workspace at the same path as on the runner, so every folder the tests ask Docker to mount
+      # exists there too. Temporary folders, such as a workload's output folder, go in the runner's
+      # temp folder, also mounted at its own path, for the same reason.
+      - name: Run the real-container tests on the runner's Docker
+        run: |
+          docker run --rm \
+            --volume /var/run/docker.sock:/var/run/docker.sock \
+            --volume "$(command -v docker):/usr/local/bin/docker:ro" \
+            --volume /usr/libexec/docker/cli-plugins:/usr/libexec/docker/cli-plugins:ro \
+            --volume "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" --workdir "$GITHUB_WORKSPACE" \
+            --volume "$RUNNER_TEMP:$RUNNER_TEMP" --env TMPDIR="$RUNNER_TEMP" \
+            --env REVISUM_TEST_TIER \
+            "$PINNED_IMAGE" \
+            bash -euo pipefail -c 'npm run check:containers'
+
+  # The gates run even when a test failed, so a failing or flaky run is still recorded; this job
+  # fails either way. After a failed "fast" job nothing else ran, so there is nothing to judge.
+  ci:
+    needs: [fast, suites, containers]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: ${{ inputs.tier == 'full' && 60 || 15 }}
+    steps:
+      # Full history: the gates read commit trailers back to the cut-over.
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          fetch-depth: 0
+      - name: Gather every job's test results
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: test-results-*
+          path: .test-results
+          merge-multiple: true
+      - name: Record the project's metrics, check the guarantee map, and require every test file's results
+        if: needs.fast.result == 'success'
+        run: |
+          docker run --rm \
+            --volume "$GITHUB_WORKSPACE:/workspace" --workdir /workspace \
+            "$PINNED_IMAGE" \
+            bash -euo pipefail -c 'chown -R node:node /workspace && su node -c "npm run gates"'
+      - name: Add the project's metrics to the job summary
+        if: always() && github.event_name != 'pull_request'
         run: |
           if [ -f .test-results/project-metrics.md ]; then cat .test-results/project-metrics.md >> "$GITHUB_STEP_SUMMARY"; fi
           if [ -f .test-results/guarantees.md ]; then cat .test-results/guarantees.md >> "$GITHUB_STEP_SUMMARY"; fi
-      - name: Keep the test results, metrics and trace index
-        if: always() && github.event_name == 'push'
+      - name: Keep the test results and metrics
+        if: always() && github.event_name != 'pull_request'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: test-results
@@ -93,10 +252,22 @@ jobs:
           include-hidden-files: true
           retention-days: 90
           if-no-files-found: warn
+          overwrite: true
+      - name: Fail unless every job passed
+        if: always()
+        env:
+          JOB_RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Job results: $JOB_RESULTS"
+          for result in $JOB_RESULTS; do
+            [ "$result" = "success" ] || exit 1
+          done
 
   tests-apart:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    # A job container can't read the workflow's env, so the digest is repeated here.
     container:
       image: mcr.microsoft.com/devcontainers/typescript-node:24-bookworm@sha256:970eebf5b82d3800bdd9f46680e1c4c664d365d18603148540788356700ce301
     steps:
@@ -106,4 +277,4 @@ jobs:
       - name: Fail if the test set and other files change together
         env:
           BASE_BRANCH: ${{ github.base_ref }}
-        run: git diff --name-only "origin/$BASE_BRANCH...HEAD" | node tools/check-tests-apart.ts
+        run: git diff --name-only "origin/$BASE_BRANCH...HEAD" | node tools/repo-rules/commits/CheckTestsApart.ts

@@ -51,7 +51,7 @@ export type ElementAssertion =
 export type PageAssertion =
   | { readonly kind: 'urlPath' | 'title'; readonly value: SafeText }
   | { readonly kind: 'url'; readonly value: AllowedUrl };                                          // addition: the whole absolute URL
-export type Box = { readonly x: number; readonly y: number; readonly width: number; readonly height: number }; // CSS px, page coordinates
+export type Box = { readonly x: number; readonly y: number; readonly width: number; readonly height: number }; // css px, page coordinates
 // A stored artefact. mediaType is open: screenshots are image/png, release notes text/markdown.
 export type ArtifactReference = { readonly name: string; readonly mediaType: string; readonly sha256: string; readonly bytes: number };
 export type GuaranteeLevel = 'isolated' | 'host';                            // host: no egress enforcement, no replay claim
@@ -95,7 +95,7 @@ export type DialogInfo = { readonly kind: 'alert' | 'confirm' | 'prompt' | 'befo
 // One open browser or device session: every driver port together.
 export interface Session extends PageNavigator, ActionRunner, Prober, Camera, Auditor {
   readonly browser: { readonly name: string; readonly version: string };
-  blockedOrigins(): readonly string[];                                 // origins refused, as evidence the run stayed hermetic
+  blockedOrigins(): readonly string[];                                 // origins refused so far, complete once close resolves; a datagram never sent has no refusal
   close(): Promise<void>;                                              // every started process exits
   frame(locator: Locator): Promise<Result<Session, DriverError>>;      // addition: scoped to an iframe
   onDialog(action: 'accept' | 'dismiss'): Promise<Result<DialogInfo, DriverError>>;      // addition
@@ -135,7 +135,7 @@ export type Thresholds = Readonly<Record<ThresholdMetric, number>> & { windows: 
 export type PlanErrorCode = 'not_object' | 'unknown_field' | 'missing_field' | 'wrong_type' | 'unknown_step'
   | 'unknown_value' | 'invalid_url' | 'scheme_not_allowed' | 'origin_not_allowed' | 'target_not_in_matrix'
   | 'unsafe_text' | 'too_large' | 'too_long' | 'duplicate' | 'version_unsupported' | 'empty'
-  | 'vacuous' | 'no_criterion_id' | 'literal_secret' | 'pack_not_enabled';                         // addition
+  | 'vacuous' | 'literal_secret' | 'pack_not_enabled';                         // addition
 export type DriverErrorCode = 'not-found' | 'ambiguous' | 'not-actionable' | 'timeout' | 'navigation-failed'
   | 'target-crashed' | 'unsupported-step' | 'policy-denied';                                       // addition
 // A driver doesn't know the step's index; the run records the code against the step. detail is a short
@@ -151,7 +151,7 @@ export type CliErrorCode = 'usage' | 'config-invalid' | 'untrusted-source' | 'pl
 **Additions.** The seeded code lacks the shapes marked "addition", and later specs need them. Each is added with the spec that first uses it, on top of the seeded shapes, never by changing one:
 
 - `Role` values `listbox`, `menuitem`, `table`, `row`, `cell` and `form`; assertion kinds `absent`, `checked`, `unchecked`, `focused`, `valueContains` and `countEquals`, and page kind `url` (plan v1.1 and the readable grammar: SPEC-01, SPEC-28);
-- plan codes `vacuous` and `no_criterion_id` (SPEC-01), `literal_secret` (SPEC-04) and `pack_not_enabled` (SPEC-23);
+- plan code `vacuous` (SPEC-01; Changed by the founder, 2026-11-02: `no_criterion_id` is removed with the migration), `literal_secret` (SPEC-04) and `pack_not_enabled` (SPEC-23);
 - driver codes `target-crashed`, `unsupported-step` and `policy-denied`, and `ResolvedElement` (SPEC-03, SPEC-06);
 - `Session.frame`, `onDialog` and `upload`, and `DialogInfo` (SPEC-01 v1.1 steps, SPEC-06). `FixtureReference` moves from engine to contracts when `upload` is added, because drivers import only contracts.
 

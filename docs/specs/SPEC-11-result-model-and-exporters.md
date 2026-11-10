@@ -6,7 +6,7 @@ One typed, hashed result per run is the source of truth; every other format is a
 
 ## Scope and non-goals
 
-- **In:** the `<namespace>.result/v1` schema; the evidence-rich finding set (masked annotated screenshot with a problem box, P1–P4 severity with its impact basis, steps, target, request and response excerpts or logs); the published severity scale (research `10`), with core's proposal and a recorded override; exporters to JUnit XML, SARIF 2.1.0 (Static Analysis Results Interchange Format) and a Markdown job summary; fixed CLI exit codes; timings outside the result hash.
+- **In:** the `<namespace>.result/v1` schema; the evidence-rich finding set (masked annotated screenshot with a problem box, P1–P4 severity with its impact basis, steps, target, request and response excerpts or logs); the published severity scale (research `10`), with core's proposal and a recorded override; exporters to JUnit XML, SARIF 2.1.0 (Static Analysis Results Interchange Format) and a Markdown job summary; fixed CLI exit codes; timings outside the result hash and the evidence hash (SPEC-08 says what each covers).
 - **Non-goals:** CTRF (on request); the HTML report and PR comment (SPEC-12).
 
 ## Interfaces and types

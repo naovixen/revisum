@@ -1,0 +1,14 @@
+# Hash-compared or generated: reformatting would change what they prove.
+fixtures/
+golden/
+test/fixtures/
+test/golden/
+/docs/
+*.md
+package-lock.json
+licences.json
+eslint-suppressions.json
+*.schema.json
+dist/
+.browsers/
+temp/

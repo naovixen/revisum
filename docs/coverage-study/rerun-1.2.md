@@ -1,5 +1,7 @@
 # Coverage study: re-run on plan language 1.2
 
+The tool that produced this, `tools/coverage-study.ts`, was removed on 2026-11-02. It is in git history.
+
 ## In short
 
 - Whole-test share, as `node tools/coverage-study.ts` reports it:

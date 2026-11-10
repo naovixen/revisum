@@ -2,13 +2,11 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "revisum.plan/v1",
   "title": "Plan language 1.3",
-  "description": "A closed, versioned test plan. Every assertion names the acceptance criterion it checks. A plan declaring \"1.1\" or \"1.2\" may use only what that version had. The unsafe features of \"1.3\" (CSS and XPath locators, DOM checks, page scripts and database commands) parse only when the trusted project enables each one, and a run using any of them is labelled unsafe. Fitting this schema is necessary, not sufficient: the plan parser also checks the project's allow-list, matrix, declared secrets, fixtures, test-id attributes and email domains, its limits, its text safety rules that every value and download is defined before it is used, that a second tab and a call stand only at the top level, and that each call, stub, observed request, storage entry, argument and field is one the project declares.",
+  "description": "A closed, versioned test plan. Every assertion names the acceptance criterion it checks. A plan must declare \"1.3\"; any other version is refused. The unsafe features (CSS and XPath locators, DOM checks, page scripts and database commands) parse only when the trusted project enables each one, and a run using any of them is labelled unsafe. Fitting this schema is necessary, not sufficient: the plan parser also checks the project's allow-list, matrix, declared secrets, fixtures, test-id attributes and email domains, its limits, its text safety rules that every value and download is defined before it is used, that a second tab and a call stand only at the top level, and that each call, stub, observed request, storage entry, argument and field is one the project declares.",
   "type": "object",
   "properties": {
     "version": {
       "enum": [
-        "1.1",
-        "1.2",
         "1.3"
       ]
     },
@@ -23,13 +21,13 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 200,
-          "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
         },
         "title": {
           "type": "string",
           "minLength": 1,
           "maxLength": 120,
-          "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
         }
       },
       "required": [
@@ -81,7 +79,7 @@
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 100,
-                "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
               }
             },
             "required": [
@@ -380,7 +378,7 @@
             {
               "type": "string",
               "minLength": 0,
-              "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+              "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
             },
             {
               "type": "object",
@@ -425,7 +423,7 @@
             {
               "type": "string",
               "minLength": 1,
-              "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+              "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
             },
             {
               "$ref": "#/$defs/valueReference"
@@ -607,7 +605,7 @@
             {
               "type": "string",
               "minLength": 1,
-              "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+              "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
             },
             {
               "$ref": "#/$defs/valueReference"
@@ -898,7 +896,7 @@
               {
                 "type": "string",
                 "minLength": 0,
-                "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
               },
               {
                 "type": "number"
@@ -963,7 +961,7 @@
               {
                 "type": "string",
                 "minLength": 0,
-                "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
               },
               {
                 "type": "number"
@@ -1038,7 +1036,7 @@
               {
                 "type": "string",
                 "minLength": 0,
-                "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
               },
               {
                 "type": "number"
@@ -1162,7 +1160,7 @@
               {
                 "type": "string",
                 "minLength": 0,
-                "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
               },
               {
                 "type": "number"
@@ -1339,7 +1337,7 @@
                       },
                       "additionalProperties": {
                         "type": "string",
-                        "pattern": "^(/([^~]|~[01])*)*$"
+                        "pattern": "^(/([^~\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]|~[01])*)*$"
                       }
                     }
                   },
@@ -1367,7 +1365,7 @@
               {
                 "type": "string",
                 "minLength": 0,
-                "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
               },
               {
                 "type": "number"
@@ -1449,7 +1447,7 @@
                       },
                       "additionalProperties": {
                         "type": "string",
-                        "pattern": "^(/([^~]|~[01])*)*$"
+                        "pattern": "^(/([^~\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]|~[01])*)*$"
                       }
                     }
                   },
@@ -1477,7 +1475,7 @@
               {
                 "type": "string",
                 "minLength": 0,
-                "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
               },
               {
                 "type": "number"
@@ -1546,7 +1544,7 @@
               {
                 "type": "string",
                 "minLength": 0,
-                "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
               },
               {
                 "type": "number"
@@ -1611,7 +1609,7 @@
               {
                 "type": "string",
                 "minLength": 0,
-                "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
               },
               {
                 "type": "number"
@@ -1702,7 +1700,7 @@
                 {
                   "type": "string",
                   "minLength": 1,
-                  "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                  "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
                 },
                 {
                   "$ref": "#/$defs/valueReference"
@@ -1743,7 +1741,7 @@
                 {
                   "type": "string",
                   "minLength": 1,
-                  "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                  "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
                 },
                 {
                   "$ref": "#/$defs/valueReference"
@@ -1783,7 +1781,7 @@
                 {
                   "type": "string",
                   "minLength": 1,
-                  "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                  "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
                 },
                 {
                   "$ref": "#/$defs/valueReference"
@@ -1824,7 +1822,7 @@
                   "type": "string",
                   "minLength": 1,
                   "maxLength": 64,
-                  "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                  "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
                 },
                 {
                   "$ref": "#/$defs/valueReference"
@@ -1867,14 +1865,14 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 512,
-              "pattern": "^[^{};@\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+              "pattern": "^[^{};@\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
             },
             "hasText": {
               "oneOf": [
                 {
                   "type": "string",
                   "minLength": 1,
-                  "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                  "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
                 },
                 {
                   "$ref": "#/$defs/valueReference"
@@ -1916,14 +1914,14 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 512,
-              "pattern": "^[^{};@\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+              "pattern": "^[^{};@\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
             },
             "hasText": {
               "oneOf": [
                 {
                   "type": "string",
                   "minLength": 1,
-                  "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                  "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
                 },
                 {
                   "$ref": "#/$defs/valueReference"
@@ -2003,7 +2001,7 @@
                 {
                   "type": "string",
                   "minLength": 1,
-                  "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                  "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
                 },
                 {
                   "$ref": "#/$defs/valueReference"
@@ -2092,7 +2090,7 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 500,
-              "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+              "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
             }
           },
           "required": [
@@ -2117,7 +2115,7 @@
                 {
                   "type": "string",
                   "minLength": 0,
-                  "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                  "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
                 },
                 {
                   "$ref": "#/$defs/valueReference"
@@ -2165,7 +2163,7 @@
             "value": {
               "type": "string",
               "minLength": 0,
-              "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+              "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
             }
           },
           "required": [
@@ -2199,7 +2197,7 @@
             "value": {
               "type": "string",
               "maxLength": 2048,
-              "pattern": "^/[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+              "pattern": "^/[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
             }
           },
           "required": [
@@ -2218,14 +2216,14 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 128,
-              "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+              "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
             },
             "value": {
               "oneOf": [
                 {
                   "type": "string",
                   "minLength": 1,
-                  "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                  "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
                 },
                 {
                   "$ref": "#/$defs/valueReference"
@@ -2275,7 +2273,7 @@
                 {
                   "type": "string",
                   "minLength": 1,
-                  "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                  "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
                 },
                 {
                   "$ref": "#/$defs/valueReference"
@@ -2298,7 +2296,7 @@
             "value": {
               "type": "string",
               "minLength": 1,
-              "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+              "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
             }
           },
           "required": [
@@ -2376,7 +2374,7 @@
                 {
                   "type": "string",
                   "minLength": 1,
-                  "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                  "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
                 },
                 {
                   "$ref": "#/$defs/valueReference"
@@ -2512,7 +2510,7 @@
                 {
                   "type": "string",
                   "minLength": 1,
-                  "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                  "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
                 },
                 {
                   "$ref": "#/$defs/valueReference"
@@ -2557,7 +2555,7 @@
                 {
                   "type": "string",
                   "minLength": 1,
-                  "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                  "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
                 },
                 {
                   "$ref": "#/$defs/valueReference"
@@ -2586,7 +2584,7 @@
                 {
                   "type": "string",
                   "minLength": 1,
-                  "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                  "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
                 },
                 {
                   "$ref": "#/$defs/valueReference"
@@ -2617,7 +2615,7 @@
                 {
                   "type": "string",
                   "minLength": 1,
-                  "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                  "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
                 },
                 {
                   "$ref": "#/$defs/valueReference"
@@ -2655,7 +2653,7 @@
               {
                 "type": "string",
                 "minLength": 1,
-                "pattern": "^[^/?#\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                "pattern": "^[^/?#\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
               },
               {
                 "$ref": "#/$defs/valueReference"
@@ -2668,14 +2666,14 @@
         "query": {
           "type": "object",
           "propertyNames": {
-            "pattern": "^[A-Za-z0-9_.-]{1,64}$"
+            "pattern": "^(?!__proto__$)[A-Za-z0-9_.-]{1,64}$"
           },
           "additionalProperties": {
             "oneOf": [
               {
                 "type": "string",
                 "minLength": 0,
-                "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
               },
               {
                 "$ref": "#/$defs/valueReference"
@@ -2712,7 +2710,7 @@
               {
                 "type": "string",
                 "minLength": 0,
-                "pattern": "^[^\\u0000-\\u001f\\u007f\\u202a-\\u202e\\u2066-\\u2069]*$"
+                "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u180e\\u200b\\u200e\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff\\ufff9-\\ufffb]*$"
               },
               {
                 "$ref": "#/$defs/valueReference"

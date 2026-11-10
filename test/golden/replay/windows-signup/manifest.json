@@ -1,0 +1,54 @@
+{
+  "schema": "revisum.run-manifest/v1",
+  "engineVersion": "0.1.0",
+  "planHash": "9145b01ecc23b23d0aae4fcdef7dc26dc88c6a33d5dd062315a193e79332d0ab",
+  "target": {
+    "id": "cdp-chromium",
+    "adapter": "cdp",
+    "engine": "chromium",
+    "device": "desktop-1280",
+    "locale": "de-DE",
+    "timezone": "Asia/Tokyo",
+    "colorScheme": "dark",
+    "reducedMotion": "reduce"
+  },
+  "adapter": {
+    "id": "cdp",
+    "version": "0.1.0",
+    "protocol": "Chrome DevTools Protocol (raw WebSocket)"
+  },
+  "browser": {
+    "name": "chromium",
+    "version": "156.0.8078.47"
+  },
+  "seeds": {
+    "random": 42
+  },
+  "clock": {
+    "fixedTimeMilliseconds": 1768473000000
+  },
+  "fixtures": [
+    {
+      "path": "/app.js",
+      "sha256": "7fcf8ba71f79719e9251a35529465f03a7cfbe6eef55ded021fecfec46f8fc72"
+    },
+    {
+      "path": "/index.html",
+      "sha256": "08ac094923543bbb0009998a92520546e0f1b7412dc37c85daa94a1ec6a3e6a5"
+    },
+    {
+      "path": "/logo.svg",
+      "sha256": "ad1065d74f8c0fa4881f4f97d62264cef423fec77efb06fd2701f57867db8000"
+    },
+    {
+      "path": "/styles.css",
+      "sha256": "bac35c24b84d8ac38bf8f4f5f7d4328f5668a363696816ffa61010123a8fea9b"
+    }
+  ],
+  "host": {
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "nonHermeticInputs": [],
+  "executableSha256": "5af44a250a2139d4e0864c07227bf0687a6d12655bab9682a5be784b41bc82e1"
+}

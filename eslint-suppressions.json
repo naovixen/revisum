@@ -1,0 +1,3033 @@
+{
+  "packages/auditor-act/src/page/BuildSnapshot.ts": {
+    "max-lines-per-function": {
+      "count": 2
+    },
+    "no-useless-assignment": {
+      "count": 1
+    }
+  },
+  "packages/auditor-act/src/page/DecodePng.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "no-nested-ternary": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "packages/auditor-act/src/page/InAccessibilityTree.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 2
+    },
+    "no-restricted-syntax": {
+      "count": 8
+    },
+    "prefer-template": {
+      "count": 1
+    }
+  },
+  "packages/auditor-act/src/page/LaunchBrowser.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 2
+    },
+    "no-restricted-syntax": {
+      "count": 9
+    },
+    "prefer-template": {
+      "count": 2
+    }
+  },
+  "packages/auditor-act/src/rules/ActRuleMeta.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 2
+    },
+    "@typescript-eslint/strict-boolean-expressions": {
+      "count": 9
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 57
+    }
+  },
+  "packages/auditor-act/src/rules/InteractiveRules.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 14
+    },
+    "@typescript-eslint/require-await": {
+      "count": 4
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 15
+    },
+    "prefer-template": {
+      "count": 6
+    }
+  },
+  "packages/auditor-act/src/rules/Rule.ts": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "packages/auditor-act/src/rules/StaticRules.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 15
+    },
+    "@typescript-eslint/strict-boolean-expressions": {
+      "count": 51
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "no-nested-ternary": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 71
+    },
+    "prefer-template": {
+      "count": 4
+    }
+  },
+  "packages/auditor-act/src/scan/Scan.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "@typescript-eslint/strict-boolean-expressions": {
+      "count": 4
+    }
+  },
+  "packages/auditor-axe/src/audit/RunAxe.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/cli/src/commands/BenchmarkRuns.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 13
+    }
+  },
+  "packages/cli/src/commands/DraftCommand.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 3
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 2
+    },
+    "no-restricted-syntax": {
+      "count": 10
+    }
+  },
+  "packages/cli/src/commands/RunPins.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/cli/src/commands/RunSuite.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 2
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "packages/cli/src/explore/ExploreInContainer.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/cli/src/wiring/BuildAdapters.ts": {
+    "no-restricted-syntax": {
+      "count": 6
+    }
+  },
+  "packages/contracts/src/foundation/ParseOrigin.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/contracts/src/plan/Plan.ts": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "packages/contracts/src/ports/DeterminismScript.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "packages/driver-cdp/src/capabilities/DownloadFolder.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "packages/driver-cdp/src/capabilities/EgressRecorder.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "packages/driver-cdp/src/capabilities/PageStorage.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/driver-cdp/src/connection/CdpConnection.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "packages/driver-cdp/src/in-page/document/PageAudit.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 5
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "packages/driver-cdp/src/in-page/elements/Actionability.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "packages/driver-cdp/src/launch/LaunchChromium.ts": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "packages/driver-cdp/src/page/CdpPage.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/driver-cdp/src/page/MainWorld.ts": {
+    "no-restricted-syntax": {
+      "count": 6
+    }
+  },
+  "packages/driver-cdp/src/page/checks/ClickCheckWorld.ts": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "packages/driver-cdp/src/page/checks/HitChecks.ts": {
+    "no-restricted-syntax": {
+      "count": 10
+    }
+  },
+  "packages/driver-cdp/src/page/checks/RoleAndNameOf.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "packages/driver-cdp/src/page/input/CdpPageInput.ts": {
+    "no-restricted-syntax": {
+      "count": 9
+    }
+  },
+  "packages/driver-cdp/src/page/input/HeldModifierKeys.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/driver-cdp/src/page/input/KeyDefinitions.ts": {
+    "no-restricted-syntax": {
+      "count": 29
+    }
+  },
+  "packages/driver-cdp/src/session/PreparePage.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/driver-cdp/src/session/actions/WaitUntilActionable.ts": {
+    "no-restricted-syntax": {
+      "count": 6
+    }
+  },
+  "packages/driver-cdp/src/session/document/FindElements.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "packages/driver-cdp/src/session/document/ProbeDocument.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/driver-cdp/src/session/document/RunPageScript.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "packages/engine/src/approval/ApprovalVerifier.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/engine/src/approval/ParseCodeOwners.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 2
+    },
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/engine/src/decoding/ReadRecord.ts": {
+    "no-control-regex": {
+      "count": 2
+    }
+  },
+  "packages/engine/src/decoding/ReadableCopy.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/engine/src/drafting/CheckDraftLocators.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/engine/src/drafting/CrawlSite.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/engine/src/drafting/ExtractCriteria.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/engine/src/drafting/PageMapEntry.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "packages/engine/src/drafting/PlannerRequestBody.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "packages/engine/src/evidence/EvidenceResult.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 2
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "no-control-regex": {
+      "count": 1
+    }
+  },
+  "packages/engine/src/evidence/ParseSuiteTrace.ts": {
+    "@typescript-eslint/strict-boolean-expressions": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/engine/src/evidence/ReadZip.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/engine/src/evidence/SuitePasses.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    }
+  },
+  "packages/engine/src/evidence/SuiteReport.ts": {
+    "max-lines": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/engine/src/foundation/RepositoryPath.ts": {
+    "no-control-regex": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "packages/engine/src/foundation/Sha256.ts": {
+    "no-nested-ternary": {
+      "count": 1
+    }
+  },
+  "packages/engine/src/plan/parse/AdmitDraft.ts": {
+    "@typescript-eslint/no-unsafe-assignment": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/engine/src/plan/parse/declarations/ReadPlanClock.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "packages/engine/src/plan/parse/text/ReadNavigation.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/engine/src/plan/parse/text/ReadUrl.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/engine/src/plan/readable/ReadPlanText.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 6
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 3
+    },
+    "no-irregular-whitespace": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 16
+    }
+  },
+  "packages/engine/src/plan/readable/StepStatements.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "packages/engine/src/plan/readable/Syntax.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 2
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "no-nested-ternary": {
+      "count": 2
+    },
+    "no-restricted-syntax": {
+      "count": 15
+    }
+  },
+  "packages/engine/src/plan/schema/PlanJsonSchema.ts": {
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 53
+    }
+  },
+  "packages/engine/src/policy/IsDestructivePath.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/engine/src/policy/PolicyGate.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 3
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "packages/engine/src/project/ParseBaseUrl.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/engine/src/project/ParseProject.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 3
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 5
+    }
+  },
+  "packages/engine/src/project/ReadCallDeclarations.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 2
+    },
+    "no-restricted-syntax": {
+      "count": 6
+    }
+  },
+  "packages/engine/src/project/ReadEvidenceMode.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 6
+    },
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "packages/engine/src/project/ReadStubDeclarations.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "packages/engine/src/project/ReadUnsafeFeatures.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 5
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "packages/engine/src/project/TrustedProject.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/engine/src/replay/DecodeManifest.ts": {
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "packages/engine/src/replay/Replay.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 2
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "packages/engine/src/replay/RunRecording.ts": {
+    "@typescript-eslint/require-await": {
+      "count": 2
+    },
+    "@typescript-eslint/unbound-method": {
+      "count": 2
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/engine/src/run/CodeForThrow.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/engine/src/run/Observe.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/engine/src/run/after-the-verdict/ReadKeepingTheResult.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/engine/src/run/executors/clock-and-clipboard/CheckClipboard.ts": {
+    "no-restricted-syntax": {
+      "count": 11
+    }
+  },
+  "packages/engine/src/run/executors/database-commands/RunDatabaseStep.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "packages/engine/src/run/executors/network-and-storage/CheckRequests.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 3
+    },
+    "@typescript-eslint/require-await": {
+      "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "packages/engine/src/run/executors/page-scripts/DecodeScriptResult.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 7
+    }
+  },
+  "packages/engine/src/run/executors/service-calls/ArgumentValue.ts": {
+    "no-nested-ternary": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/engine/src/run/executors/service-calls/BuildServiceRequest.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unsafe-argument": {
+      "count": 2
+    },
+    "no-restricted-syntax": {
+      "count": 7
+    }
+  },
+  "packages/engine/src/run/executors/service-calls/CheckBackendField.ts": {
+    "no-nested-ternary": {
+      "count": 1
+    }
+  },
+  "packages/engine/src/run/executors/service-calls/RunCallStep.ts": {
+    "max-lines": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 7
+    }
+  },
+  "packages/engine/src/run/logging/JsonLinesEventSink.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/engine/src/run/logging/LoggingManifest.ts": {
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 20
+    }
+  },
+  "packages/engine/src/run/outcome/Transition.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 2
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 2
+    },
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "packages/engine/src/run/outcome/Verdict.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 3
+    }
+  },
+  "packages/engine/src/run/seal/BuildManifest.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 3
+    },
+    "@typescript-eslint/prefer-nullish-coalescing": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/engine/src/run/seal/DriverBrokeResultOfRun.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/engine/src/run/seal/GuaranteeStatement.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 3
+    }
+  },
+  "packages/engine/src/run/seal/UnavailableResult.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/engine/src/run/steps/RunPlanStep.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "packages/engine/src/run/values/RunValues.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/engine/src/secrets/EncodedEchoes.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "packages/engine/src/secrets/LeakScanner.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/engine/src/secrets/SecretRedaction.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 4
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 6
+    }
+  },
+  "packages/engine/src/target/GuardedDriver.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "packages/engine/src/target/ReadLockfile.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/report/src/model/CleanText.ts": {
+    "no-control-regex": {
+      "count": 1
+    }
+  },
+  "packages/report/src/model/LevelAt.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 2
+    }
+  },
+  "packages/report/src/model/ParseReportInput.ts": {
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 3
+    },
+    "no-restricted-syntax": {
+      "count": 12
+    }
+  },
+  "packages/report/src/model/ReportView.ts": {
+    "@typescript-eslint/strict-boolean-expressions": {
+      "count": 4
+    },
+    "no-nested-ternary": {
+      "count": 2
+    }
+  },
+  "packages/report/src/render/FigureSvg.ts": {
+    "@typescript-eslint/strict-boolean-expressions": {
+      "count": 1
+    }
+  },
+  "packages/report/src/render/Generate.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "packages/report/src/render/RenderHtml.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 1
+    },
+    "@typescript-eslint/prefer-nullish-coalescing": {
+      "count": 2
+    },
+    "@typescript-eslint/strict-boolean-expressions": {
+      "count": 7
+    },
+    "no-restricted-syntax": {
+      "count": 2
+    },
+    "prefer-template": {
+      "count": 6
+    }
+  },
+  "packages/report/src/render/SharesChart.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 2
+    },
+    "@typescript-eslint/strict-boolean-expressions": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "no-nested-ternary": {
+      "count": 1
+    }
+  },
+  "packages/runner/src/containers/ContainerEngine.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/runner/src/containers/DockerRunner.ts": {
+    "no-restricted-syntax": {
+      "count": 8
+    }
+  },
+  "packages/runner/src/containers/RunImageContainer.ts": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "packages/runner/src/egress-proxy/addresses/AddressVetter.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/runner/src/egress-proxy/requests/ParseRequestTarget.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/runner/src/egress/BuildEgressPolicy.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "packages/runner/src/egress/StartRecordKeeping.ts": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "packages/runner/src/image/RunImage.ts": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "packages/runner/src/service-calls/ServiceCaller.ts": {
+    "@typescript-eslint/dot-notation": {
+      "count": 1
+    },
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "packages/runner/src/workload/CheckWorkloadRequest.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/runner/src/workload/ReadWorkloadEgress.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/runner/src/workload/RunCommandUnderTimeout.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/runner/src/workload/ShowEgressControlled.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/runner/src/workload/WorkloadEnvironment.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    }
+  },
+  "packages/runner/src/workload/WorkloadRunner.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/runner/src/workload/output/ReadyOutputFolder.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/runner/src/workload/output/RemoveFromOutput.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/runner/src/workload/team-container/CheckoutMounts.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "packages/runner/src/workload/team-container/IsSafeInMountArgument.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "test/browser/accessibility/ActRuleAgreement.test.ts": {
+    "revisum/test-title-format": {
+      "count": 1
+    }
+  },
+  "test/browser/accessibility/BrowserScan.test.ts": {
+    "revisum/test-title-format": {
+      "count": 5
+    }
+  },
+  "test/browser/clock-and-clipboard/CdpClipboardChecks.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 3
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 35
+    }
+  },
+  "test/browser/clock-and-clipboard/CdpClockAcrossDocuments.test.ts": {
+    "revisum/test-title-format": {
+      "count": 15
+    }
+  },
+  "test/browser/clock-and-clipboard/CdpClockAdvance.test.ts": {
+    "revisum/test-title-format": {
+      "count": 16
+    }
+  },
+  "test/browser/clock-and-clipboard/CdpPlanClock.test.ts": {
+    "revisum/test-title-format": {
+      "count": 6
+    }
+  },
+  "test/browser/clock-and-clipboard/ClockAndClipboardDriverSupport.test.ts": {
+    "revisum/test-title-format": {
+      "count": 12
+    }
+  },
+  "test/browser/clock-and-clipboard/support/ClockPlan.ts": {
+    "@typescript-eslint/no-unsafe-return": {
+      "count": 1
+    }
+  },
+  "test/browser/clock-and-clipboard/support/HostClipboard.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 3
+    },
+    "@typescript-eslint/no-base-to-string": {
+      "count": 2
+    },
+    "@typescript-eslint/require-await": {
+      "count": 7
+    },
+    "no-nested-ternary": {
+      "count": 1
+    }
+  },
+  "test/browser/downloads/CdpDownloads.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 2
+    },
+    "@typescript-eslint/require-await": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 33
+    }
+  },
+  "test/browser/downloads/CdpPagesAndDownloads.test.ts": {
+    "revisum/test-title-format": {
+      "count": 6
+    }
+  },
+  "test/browser/egress/EgressChannels.test.ts": {
+    "revisum/test-title-format": {
+      "count": 6
+    }
+  },
+  "test/browser/egress/EgressResponseRewrites.test.ts": {
+    "revisum/test-title-format": {
+      "count": 4
+    }
+  },
+  "test/browser/egress/PageScriptEgress.test.ts": {
+    "revisum/test-title-format": {
+      "count": 2
+    }
+  },
+  "test/browser/egress/StubEgress.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 4
+    }
+  },
+  "test/browser/element-state/CdpAccessibleStates.test.ts": {
+    "revisum/test-title-format": {
+      "count": 18
+    }
+  },
+  "test/browser/element-state/CdpAutoWait.test.ts": {
+    "revisum/test-title-format": {
+      "count": 7
+    }
+  },
+  "test/browser/element-state/CdpPositionsAndTestIds.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 4
+    },
+    "revisum/test-title-format": {
+      "count": 24
+    }
+  },
+  "test/browser/element-state/DomChecks.test.ts": {
+    "revisum/test-title-format": {
+      "count": 6
+    }
+  },
+  "test/browser/element-state/StructuralLocatorGuard.test.ts": {
+    "revisum/test-title-format": {
+      "count": 19
+    }
+  },
+  "test/browser/explore/ExploreCommand.test.ts": {
+    "max-lines": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 48
+    }
+  },
+  "test/browser/explore/examples/ExploreCommandPorts.ts": {
+    "@typescript-eslint/require-await": {
+      "count": 1
+    },
+    "@typescript-eslint/unbound-method": {
+      "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "test/browser/frames-and-tabs/CdpDownloadAndTabReplays.test.ts": {
+    "revisum/test-title-format": {
+      "count": 2
+    }
+  },
+  "test/browser/frames-and-tabs/CdpNewTabs.test.ts": {
+    "revisum/test-title-format": {
+      "count": 15
+    }
+  },
+  "test/browser/frames-and-tabs/OpeningsOutsideAnAction.test.ts": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "test/browser/frames-and-tabs/PopupHeldBack.test.ts": {
+    "revisum/test-title-format": {
+      "count": 2
+    }
+  },
+  "test/browser/input/CdpKeyChordsAndLines.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 4
+    },
+    "revisum/test-title-format": {
+      "count": 24
+    }
+  },
+  "test/browser/input/DriverActionGuard.test.ts": {
+    "revisum/test-title-format": {
+      "count": 21
+    }
+  },
+  "test/browser/lifecycle/CdpBrowserProcesses.test.ts": {
+    "@typescript-eslint/strict-boolean-expressions": {
+      "count": 1
+    },
+    "no-useless-assignment": {
+      "count": 3
+    },
+    "revisum/test-title-format": {
+      "count": 21
+    }
+  },
+  "test/browser/lifecycle/CdpCapabilities.test.ts": {
+    "revisum/test-title-format": {
+      "count": 19
+    }
+  },
+  "test/browser/lifecycle/ChromiumDisabledFeatures.test.ts": {
+    "revisum/test-title-format": {
+      "count": 7
+    }
+  },
+  "test/browser/lifecycle/DriverContract.test.ts": {
+    "revisum/test-title-format": {
+      "count": 17
+    }
+  },
+  "test/browser/network/CdpNetworkStubs.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 24
+    }
+  },
+  "test/browser/network/CdpRequestChecks.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 31
+    }
+  },
+  "test/browser/network/CdpServiceWorkerBypass.test.ts": {
+    "revisum/test-title-format": {
+      "count": 4
+    }
+  },
+  "test/browser/network/CdpWebStorage.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 14
+    }
+  },
+  "test/browser/network/NetworkStubsDriverSupport.test.ts": {
+    "revisum/test-title-format": {
+      "count": 5
+    }
+  },
+  "test/browser/network/support/NetworkRun.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    }
+  },
+  "test/browser/page-reads/AssertionValues.test.ts": {
+    "revisum/test-title-format": {
+      "count": 4
+    }
+  },
+  "test/browser/page-reads/CdpLinkTargetsAndPageMetadata.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 3
+    },
+    "revisum/test-title-format": {
+      "count": 27
+    }
+  },
+  "test/browser/page-reads/NegativeChecksOnUnreadablePages.test.ts": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "test/browser/page-reads/PageStatesDriverSupport.test.ts": {
+    "revisum/test-title-format": {
+      "count": 9
+    }
+  },
+  "test/browser/page-reads/support/PageStatesHarness.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    }
+  },
+  "test/browser/page-scripts/PageScriptArguments.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 14
+    }
+  },
+  "test/browser/page-scripts/PageScriptResults.test.ts": {
+    "revisum/test-title-format": {
+      "count": 6
+    }
+  },
+  "test/browser/page-scripts/UnsafePageDriverSupport.test.ts": {
+    "revisum/test-title-format": {
+      "count": 4
+    }
+  },
+  "test/browser/values/CdpRememberedValues.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 2
+    },
+    "revisum/test-title-format": {
+      "count": 15
+    }
+  },
+  "test/browser/values/PlanValuesDriverSupport.test.ts": {
+    "revisum/test-title-format": {
+      "count": 5
+    }
+  },
+  "test/containers/egress/BrowserChannelsAndDirectConnections.test.ts": {
+    "max-lines": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 14
+    }
+  },
+  "test/containers/egress/EgressEnforcement.test.ts": {
+    "revisum/test-title-format": {
+      "count": 4
+    }
+  },
+  "test/containers/egress/ProxyEvidence.test.ts": {
+    "revisum/test-title-format": {
+      "count": 2
+    }
+  },
+  "test/containers/isolation/ContainerHardening.test.ts": {
+    "revisum/test-title-format": {
+      "count": 5
+    }
+  },
+  "test/containers/isolation/ExploreIsolated.test.ts": {
+    "@typescript-eslint/require-await": {
+      "count": 2
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 14
+    }
+  },
+  "test/containers/isolation/ImagePinning.test.ts": {
+    "revisum/test-title-format": {
+      "count": 2
+    }
+  },
+  "test/containers/isolation/RunEnvironment.test.ts": {
+    "revisum/test-title-format": {
+      "count": 6
+    }
+  },
+  "test/containers/isolation/StoppedDockerDaemon.test.ts": {
+    "revisum/test-title-format": {
+      "count": 4
+    }
+  },
+  "test/containers/support/PlanRunInside.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "test/containers/support/RealCommandRun.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "test/containers/workloads/DatabaseCommands.test.ts": {
+    "revisum/test-title-format": {
+      "count": 12
+    }
+  },
+  "test/containers/workloads/WorkloadIsolation.test.ts": {
+    "revisum/test-title-format": {
+      "count": 11
+    }
+  },
+  "test/containers/workloads/WorkloadOutputs.test.ts": {
+    "revisum/test-title-format": {
+      "count": 7
+    }
+  },
+  "test/proofs/browser-isolation/ClipboardHostIsolation.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "@typescript-eslint/require-await": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 11
+    }
+  },
+  "test/proofs/egress/ServiceCallIsolation.test.ts": {
+    "revisum/test-title-format": {
+      "count": 10
+    }
+  },
+  "test/proofs/plan-schema/PlanSchemaCheck.test.ts": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unsafe-assignment": {
+      "count": 4
+    },
+    "@typescript-eslint/strict-boolean-expressions": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 9
+    }
+  },
+  "test/proofs/plan-schema/PlanSchemaClockAndClipboard.test.ts": {
+    "@typescript-eslint/no-unsafe-assignment": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unsafe-return": {
+      "count": 3
+    },
+    "revisum/test-title-format": {
+      "count": 7
+    }
+  },
+  "test/proofs/plan-schema/PlanSchemaNewerVersion.test.ts": {
+    "@typescript-eslint/no-unsafe-assignment": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unsafe-return": {
+      "count": 1
+    },
+    "@typescript-eslint/strict-boolean-expressions": {
+      "count": 2
+    },
+    "revisum/test-title-format": {
+      "count": 6
+    }
+  },
+  "test/proofs/plan-schema/PlanSchemaPageChecks.test.ts": {
+    "@typescript-eslint/no-unsafe-return": {
+      "count": 3
+    },
+    "revisum/test-title-format": {
+      "count": 5
+    }
+  },
+  "test/proofs/plan-schema/PlanSchemaStubsAndStorage.test.ts": {
+    "@typescript-eslint/no-unsafe-return": {
+      "count": 3
+    },
+    "revisum/test-title-format": {
+      "count": 6
+    }
+  },
+  "test/proofs/plan-schema/PlanSchemaUnsafeFeatures.test.ts": {
+    "revisum/test-title-format": {
+      "count": 2
+    }
+  },
+  "test/proofs/repo-rules/approval-strength/ApprovalStrengthLint.test.ts": {
+    "revisum/test-title-format": {
+      "count": 7
+    }
+  },
+  "test/proofs/repo-rules/approval-strength/ApprovalStrengthLintForms.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 7
+    }
+  },
+  "test/proofs/repo-rules/approval-strength/ApprovalTypeGuarantees.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 6
+    }
+  },
+  "test/proofs/repo-rules/approval-strength/ForgedApproval.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 2
+    }
+  },
+  "test/proofs/repo-rules/brands/PlanBrandCheck.test.ts": {
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 6
+    }
+  },
+  "test/proofs/repo-rules/brands/PlanCastLint.test.ts": {
+    "revisum/test-title-format": {
+      "count": 7
+    }
+  },
+  "test/proofs/repo-rules/brands/SharedTypeLints.test.ts": {
+    "revisum/test-title-format": {
+      "count": 14
+    }
+  },
+  "test/proofs/repo-rules/brands/SharedTypes.test.ts": {
+    "revisum/test-title-format": {
+      "count": 4
+    }
+  },
+  "test/proofs/repo-rules/composition-root/ClearedRunRuns.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "test/proofs/repo-rules/composition-root/DescribePlanError.ts": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "test/proofs/repo-rules/composition-root/DraftCommandRouteLint.test.ts": {
+    "revisum/test-title-format": {
+      "count": 5
+    }
+  },
+  "test/proofs/repo-rules/composition-root/RuntimeImportLint.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unsafe-assignment": {
+      "count": 1
+    },
+    "@typescript-eslint/strict-boolean-expressions": {
+      "count": 2
+    },
+    "revisum/test-title-format": {
+      "count": 7
+    }
+  },
+  "test/proofs/repo-rules/licences-and-reviews/ClockAndClipboardDependencies.test.ts": {
+    "@typescript-eslint/no-unsafe-assignment": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 3
+    }
+  },
+  "test/proofs/repo-rules/licences-and-reviews/DatabaseCommandDependencies.test.ts": {
+    "revisum/test-title-format": {
+      "count": 5
+    }
+  },
+  "test/proofs/repo-rules/licences-and-reviews/DependencyReviewLint.test.ts": {
+    "prefer-template": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 7
+    }
+  },
+  "test/proofs/repo-rules/licences-and-reviews/EvidenceModeDependencies.test.ts": {
+    "@typescript-eslint/no-unsafe-return": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 4
+    }
+  },
+  "test/proofs/repo-rules/licences-and-reviews/LicenceRoles.test.ts": {
+    "@typescript-eslint/no-unsafe-assignment": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 9
+    }
+  },
+  "test/proofs/repo-rules/licences-and-reviews/PageScriptDriverDependencies.test.ts": {
+    "revisum/test-title-format": {
+      "count": 6
+    }
+  },
+  "test/proofs/repo-rules/licences-and-reviews/RuntimeDependencies.test.ts": {
+    "@typescript-eslint/no-unsafe-assignment": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 3
+    }
+  },
+  "test/proofs/repo-rules/metrics/Benchmark.test.ts": {
+    "revisum/test-title-format": {
+      "count": 12
+    }
+  },
+  "test/proofs/repo-rules/metrics/BrowserUpkeep.test.ts": {
+    "@typescript-eslint/strict-boolean-expressions": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 14
+    }
+  },
+  "test/proofs/repo-rules/metrics/GuaranteeMap.test.ts": {
+    "@typescript-eslint/no-unsafe-assignment": {
+      "count": 1
+    },
+    "no-useless-assignment": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 9
+    }
+  },
+  "test/proofs/repo-rules/running/CommitTrailers.test.ts": {
+    "revisum/test-title-format": {
+      "count": 13
+    }
+  },
+  "test/proofs/repo-rules/running/DenyRulesLint.test.ts": {
+    "revisum/test-title-format": {
+      "count": 3
+    }
+  },
+  "test/proofs/repo-rules/running/ErrorAnchors.test.ts": {
+    "revisum/test-title-format": {
+      "count": 4
+    }
+  },
+  "test/proofs/repo-rules/running/GlossaryLint.test.ts": {
+    "revisum/test-title-format": {
+      "count": 9
+    }
+  },
+  "test/proofs/repo-rules/running/ProjectMetrics.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unsafe-return": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 9
+    }
+  },
+  "test/proofs/repo-rules/running/TestsApartCommits.test.ts": {
+    "revisum/test-title-format": {
+      "count": 9
+    }
+  },
+  "test/proofs/repo-rules/running/TypeCheck.test.ts": {
+    "revisum/test-title-format": {
+      "count": 1
+    }
+  },
+  "test/proofs/repo-rules/support/WithEdits.ts": {
+    "@typescript-eslint/no-unsafe-assignment": {
+      "count": 1
+    }
+  },
+  "test/proofs/runs/ActionGuardPassing.test.ts": {
+    "revisum/test-title-format": {
+      "count": 2
+    }
+  },
+  "test/proofs/runs/DownloadFileNames.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "@typescript-eslint/require-await": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 3
+    }
+  },
+  "test/proofs/runs/ExploreHostilePage.test.ts": {
+    "revisum/test-title-format": {
+      "count": 5
+    }
+  },
+  "test/proofs/runs/HostilePlanRejection.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "@typescript-eslint/require-await": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 4
+    }
+  },
+  "test/proofs/runs/PolicyBrandAndAuditGuarantees.test.ts": {
+    "revisum/test-title-format": {
+      "count": 6
+    }
+  },
+  "test/proofs/runs/PolicyTypeGuarantees.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 4
+    }
+  },
+  "test/proofs/runs/RunGuarantees.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    },
+    "@typescript-eslint/require-await": {
+      "count": 4
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 29
+    }
+  },
+  "test/proofs/secrets/SecretEncodedEchoScan.test.ts": {
+    "revisum/test-title-format": {
+      "count": 3
+    }
+  },
+  "test/proofs/secrets/SecretLeakScan.test.ts": {
+    "revisum/test-title-format": {
+      "count": 3
+    }
+  },
+  "test/proofs/secrets/SecretRevealLint.test.ts": {
+    "revisum/test-title-format": {
+      "count": 5
+    }
+  },
+  "test/proofs/secrets/SecretRevealLintDestructuring.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 5
+    }
+  },
+  "test/proofs/secrets/leak-scans/ClipboardLeakScan.test.ts": {
+    "revisum/test-title-format": {
+      "count": 3
+    }
+  },
+  "test/proofs/secrets/leak-scans/DownloadLeakScan.test.ts": {
+    "revisum/test-title-format": {
+      "count": 7
+    }
+  },
+  "test/proofs/secrets/leak-scans/NetworkAndStorageLeakScan.test.ts": {
+    "revisum/test-title-format": {
+      "count": 3
+    }
+  },
+  "test/proofs/secrets/leak-scans/RememberedValueLeakScan.test.ts": {
+    "revisum/test-title-format": {
+      "count": 2
+    }
+  },
+  "test/proofs/secrets/leak-scans/UnsafePageLeakScan.test.ts": {
+    "revisum/test-title-format": {
+      "count": 14
+    }
+  },
+  "test/replay/GoldenReport.test.ts": {
+    "revisum/test-title-format": {
+      "count": 1
+    }
+  },
+  "test/replay/SignupReplay.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 4
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 3
+    },
+    "@typescript-eslint/require-await": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 5
+    }
+  },
+  "test/support/browser/Browsers.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    }
+  },
+  "test/support/browser/harnesses/ProcessTree.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    }
+  },
+  "test/support/builders/DecodePng.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "no-nested-ternary": {
+      "count": 1
+    }
+  },
+  "test/support/builders/HostilePlans.ts": {
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "test/support/builders/MemoryEventSink.ts": {
+    "@typescript-eslint/require-await": {
+      "count": 1
+    }
+  },
+  "test/support/builders/ReportInputs.ts": {
+    "@typescript-eslint/strict-boolean-expressions": {
+      "count": 1
+    }
+  },
+  "test/support/repository/ChangelogEntries.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    }
+  },
+  "test/unit/auditor-act/rules/RuleSet.test.ts": {
+    "revisum/test-title-format": {
+      "count": 7
+    }
+  },
+  "test/unit/cli/commands/DraftCommand.test.ts": {
+    "revisum/test-title-format": {
+      "count": 19
+    }
+  },
+  "test/unit/cli/commands/examples/DraftCommand.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "test/unit/cli/commands/run-suite/SuiteRuns.test.ts": {
+    "@typescript-eslint/await-thenable": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 27
+    }
+  },
+  "test/unit/cli/commands/run-suite/examples/SuiteRun.ts": {
+    "@typescript-eslint/require-await": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "test/unit/cli/planners/PlannerAdapters.test.ts": {
+    "revisum/test-title-format": {
+      "count": 21
+    }
+  },
+  "test/unit/contracts/events/PersonActorTypes.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 4
+    }
+  },
+  "test/unit/driver-cdp/page/ModifierKeys.test.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 4
+    }
+  },
+  "test/unit/engine/approval/AgentLockdownApproval.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 13
+    }
+  },
+  "test/unit/engine/approval/ApprovalRedTeam.test.ts": {
+    "@typescript-eslint/require-await": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 4
+    }
+  },
+  "test/unit/engine/approval/ApprovalSubjectHash.test.ts": {
+    "revisum/test-title-format": {
+      "count": 7
+    }
+  },
+  "test/unit/engine/approval/PlanApproval.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 2
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 2
+    },
+    "revisum/test-title-format": {
+      "count": 14
+    }
+  },
+  "test/unit/engine/approval/SignedApproval.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 3
+    }
+  },
+  "test/unit/engine/approval/SubjectKindGates.test.ts": {
+    "@typescript-eslint/no-unsafe-return": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 2
+    }
+  },
+  "test/unit/engine/approval/UnverifiedDecisions.test.ts": {
+    "revisum/test-title-format": {
+      "count": 6
+    }
+  },
+  "test/unit/engine/approval/code-owners/CodeOwnerApproval.test.ts": {
+    "revisum/test-title-format": {
+      "count": 15
+    }
+  },
+  "test/unit/engine/approval/code-owners/CodeOwnerReviewedBytes.test.ts": {
+    "revisum/test-title-format": {
+      "count": 7
+    }
+  },
+  "test/unit/engine/approval/examples/MemoryApprovalStore.ts": {
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 1
+    },
+    "@typescript-eslint/require-await": {
+      "count": 7
+    },
+    "max-lines-per-function": {
+      "count": 2
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "test/unit/engine/drafting/AiText.test.ts": {
+    "@typescript-eslint/require-await": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 7
+    }
+  },
+  "test/unit/engine/drafting/DraftLocatorCheck.test.ts": {
+    "revisum/test-title-format": {
+      "count": 15
+    }
+  },
+  "test/unit/engine/drafting/ExploreDraftAdmission.test.ts": {
+    "revisum/test-title-format": {
+      "count": 4
+    }
+  },
+  "test/unit/engine/drafting/ExplorePlannerRequest.test.ts": {
+    "revisum/test-title-format": {
+      "count": 4
+    }
+  },
+  "test/unit/engine/drafting/PageMapEntry.test.ts": {
+    "revisum/test-title-format": {
+      "count": 15
+    }
+  },
+  "test/unit/engine/drafting/SiteCrawl.test.ts": {
+    "revisum/test-title-format": {
+      "count": 18
+    }
+  },
+  "test/unit/engine/drafting/examples/CrawlOutcome.ts": {
+    "@typescript-eslint/require-await": {
+      "count": 4
+    },
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "test/unit/engine/evidence/EvidencePlanRunsUnchanged.test.ts": {
+    "revisum/test-title-format": {
+      "count": 5
+    }
+  },
+  "test/unit/engine/evidence/EvidenceResults.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 25
+    }
+  },
+  "test/unit/engine/evidence/EvidenceSuiteTrust.test.ts": {
+    "revisum/test-title-format": {
+      "count": 14
+    }
+  },
+  "test/unit/engine/evidence/SuiteArguments.test.ts": {
+    "revisum/test-title-format": {
+      "count": 7
+    }
+  },
+  "test/unit/engine/evidence/SuiteOutcomeRules.test.ts": {
+    "revisum/test-title-format": {
+      "count": 8
+    }
+  },
+  "test/unit/engine/evidence/SuiteReportDecoding.test.ts": {
+    "@typescript-eslint/no-unsafe-return": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 13
+    }
+  },
+  "test/unit/engine/evidence/SuiteTraceDecoding.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 13
+    }
+  },
+  "test/unit/engine/evidence/examples/EvidenceRun.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "test/unit/engine/plan/ClockAndClipboardPlans.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    },
+    "@typescript-eslint/require-await": {
+      "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 24
+    }
+  },
+  "test/unit/engine/plan/PlanClock.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    },
+    "@typescript-eslint/strict-boolean-expressions": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 6
+    }
+  },
+  "test/unit/engine/plan/PlanDrafts.test.ts": {
+    "max-lines": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 14
+    }
+  },
+  "test/unit/engine/plan/PlanVacuity.test.ts": {
+    "revisum/test-title-format": {
+      "count": 14
+    }
+  },
+  "test/unit/engine/plan/PositionsKeysAndText.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 3
+    },
+    "revisum/test-title-format": {
+      "count": 26
+    }
+  },
+  "test/unit/engine/plan/ServiceCallPlans.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 21
+    }
+  },
+  "test/unit/engine/plan/StubAndStoragePlans.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 19
+    }
+  },
+  "test/unit/engine/plan/ValueReferences.test.ts": {
+    "revisum/test-title-format": {
+      "count": 12
+    }
+  },
+  "test/unit/engine/plan/examples/GoldenPlan.ts": {
+    "@typescript-eslint/no-unsafe-return": {
+      "count": 1
+    }
+  },
+  "test/unit/engine/plan/parse/PathTemplates.test.ts": {
+    "revisum/test-title-format": {
+      "count": 8
+    }
+  },
+  "test/unit/engine/plan/parse/PlanClosedLanguage.test.ts": {
+    "revisum/test-title-format": {
+      "count": 4
+    }
+  },
+  "test/unit/engine/plan/parse/PlanLimits.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 9
+    }
+  },
+  "test/unit/engine/plan/parse/PlanReferences.test.ts": {
+    "revisum/test-title-format": {
+      "count": 14
+    }
+  },
+  "test/unit/engine/plan/readable/ReadablePlanConversion.test.ts": {
+    "@typescript-eslint/no-unsafe-assignment": {
+      "count": 1
+    },
+    "no-irregular-whitespace": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 13
+    }
+  },
+  "test/unit/engine/plan/readable/ReadablePlanErrors.test.ts": {
+    "max-lines": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 31
+    }
+  },
+  "test/unit/engine/plan/readable/ReadablePlanExample.test.ts": {
+    "revisum/test-title-format": {
+      "count": 5
+    }
+  },
+  "test/unit/engine/plan/readable/ReadablePlanHash.test.ts": {
+    "revisum/test-title-format": {
+      "count": 5
+    }
+  },
+  "test/unit/engine/plan/readable/UnsafeFeatureReadableText.test.ts": {
+    "revisum/test-title-format": {
+      "count": 4
+    }
+  },
+  "test/unit/engine/plan/readable/UnsafeReadableConversion.test.ts": {
+    "no-irregular-whitespace": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 17
+    }
+  },
+  "test/unit/engine/plan/readable/UnsafeReadableErrors.test.ts": {
+    "max-lines": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 25
+    }
+  },
+  "test/unit/engine/plan/readable/UnsafeReadableHash.test.ts": {
+    "revisum/test-title-format": {
+      "count": 4
+    }
+  },
+  "test/unit/engine/plan/readable/UnsafeReadableTextForms.test.ts": {
+    "max-lines": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 30
+    }
+  },
+  "test/unit/engine/plan/readable/examples/ParsePlan.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 6
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 5
+    },
+    "no-nested-ternary": {
+      "count": 3
+    }
+  },
+  "test/unit/engine/plan/readable/examples/UnsafeMark.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unsafe-return": {
+      "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 3
+    },
+    "no-nested-ternary": {
+      "count": 2
+    },
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "test/unit/engine/plan/schema/PlanVersions.test.ts": {
+    "revisum/test-title-format": {
+      "count": 7
+    }
+  },
+  "test/unit/engine/plan/unsafe-features/UnsafeFeatureClosedPlansUnchanged.test.ts": {
+    "@typescript-eslint/no-unsafe-return": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 7
+    }
+  },
+  "test/unit/engine/plan/unsafe-features/UnsafeFeatureLabels.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unsafe-assignment": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 24
+    }
+  },
+  "test/unit/engine/plan/unsafe-features/UnsafeFeatureParsing.test.ts": {
+    "revisum/test-title-format": {
+      "count": 23
+    }
+  },
+  "test/unit/engine/plan/unsafe-features/UnsafeGoldenPlans.test.ts": {
+    "@typescript-eslint/no-unsafe-return": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 3
+    }
+  },
+  "test/unit/engine/plan/unsafe-features/examples/LostByFeature.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    }
+  },
+  "test/unit/engine/plan/unsafe-features/examples/UnsafePlan.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "test/unit/engine/policy/DenyRuleFamilies.test.ts": {
+    "revisum/test-title-format": {
+      "count": 6
+    }
+  },
+  "test/unit/engine/policy/PolicyDenialEvents.test.ts": {
+    "revisum/test-title-format": {
+      "count": 7
+    }
+  },
+  "test/unit/engine/policy/PolicyDeterminism.test.ts": {
+    "revisum/test-title-format": {
+      "count": 5
+    }
+  },
+  "test/unit/engine/policy/PolicyReviewFixes.test.ts": {
+    "revisum/test-title-format": {
+      "count": 13
+    }
+  },
+  "test/unit/engine/policy/PolicyRuntimeGuard.test.ts": {
+    "revisum/test-title-format": {
+      "count": 23
+    }
+  },
+  "test/unit/engine/policy/PolicyStaticCheck.test.ts": {
+    "revisum/test-title-format": {
+      "count": 28
+    }
+  },
+  "test/unit/engine/policy/red-team/PolicyRedTeam.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 7
+    }
+  },
+  "test/unit/engine/policy/red-team/PolicyRedTeamRuns.test.ts": {
+    "revisum/test-title-format": {
+      "count": 3
+    }
+  },
+  "test/unit/engine/policy/step-families/PolicyClockAndClipboard.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 4
+    }
+  },
+  "test/unit/engine/policy/step-families/PolicyDownloadsAndTabs.test.ts": {
+    "revisum/test-title-format": {
+      "count": 9
+    }
+  },
+  "test/unit/engine/policy/step-families/PolicyKeyChords.test.ts": {
+    "revisum/test-title-format": {
+      "count": 4
+    }
+  },
+  "test/unit/engine/policy/step-families/PolicyServiceCalls.test.ts": {
+    "revisum/test-title-format": {
+      "count": 15
+    }
+  },
+  "test/unit/engine/policy/step-families/PolicyStubsAndStorage.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 10
+    }
+  },
+  "test/unit/engine/policy/step-families/PolicyUnsafeFeatures.test.ts": {
+    "revisum/test-title-format": {
+      "count": 24
+    }
+  },
+  "test/unit/engine/project/DownloadProjectSettings.test.ts": {
+    "revisum/test-title-format": {
+      "count": 7
+    }
+  },
+  "test/unit/engine/project/EvidenceSuiteDeclarations.test.ts": {
+    "revisum/test-title-format": {
+      "count": 10
+    }
+  },
+  "test/unit/engine/project/PlannerEndpointDeclarations.test.ts": {
+    "revisum/test-title-format": {
+      "count": 3
+    }
+  },
+  "test/unit/engine/project/ServiceCallDeclarations.test.ts": {
+    "max-lines": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 32
+    }
+  },
+  "test/unit/engine/project/StubAndStorageDeclarations.test.ts": {
+    "max-lines": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 35
+    }
+  },
+  "test/unit/engine/project/TrustedProject.test.ts": {
+    "revisum/test-title-format": {
+      "count": 13
+    }
+  },
+  "test/unit/engine/project/UnsafeFeatureTrust.test.ts": {
+    "@typescript-eslint/no-unsafe-return": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 7
+    }
+  },
+  "test/unit/engine/project/WorkingCopyIsolation.test.ts": {
+    "revisum/test-title-format": {
+      "count": 7
+    }
+  },
+  "test/unit/engine/replay/ManifestPerturbation.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 3
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    },
+    "@typescript-eslint/require-await": {
+      "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 9
+    }
+  },
+  "test/unit/engine/replay/Replay.test.ts": {
+    "@typescript-eslint/no-unsafe-assignment": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 18
+    }
+  },
+  "test/unit/engine/replay/ReplayClaimMatchesReplay.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 3
+    },
+    "revisum/test-title-format": {
+      "count": 11
+    }
+  },
+  "test/unit/engine/replay/ReplayIsolatedLevel.test.ts": {
+    "revisum/test-title-format": {
+      "count": 7
+    }
+  },
+  "test/unit/engine/replay/ReplayedReplies.test.ts": {
+    "revisum/test-title-format": {
+      "count": 12
+    }
+  },
+  "test/unit/engine/replay/ResponseRewriteManifest.test.ts": {
+    "revisum/test-title-format": {
+      "count": 3
+    }
+  },
+  "test/unit/engine/replay/examples/ManifestUnderTest.ts": {
+    "@typescript-eslint/require-await": {
+      "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "test/unit/engine/run/executors/clock-and-clipboard/ClockAdvanceLimits.test.ts": {
+    "revisum/test-title-format": {
+      "count": 14
+    }
+  },
+  "test/unit/engine/run/executors/clock-and-clipboard/ClockAdvanceRuns.test.ts": {
+    "revisum/test-title-format": {
+      "count": 8
+    }
+  },
+  "test/unit/engine/run/executors/database-commands/DatabaseCommandArguments.test.ts": {
+    "revisum/test-title-format": {
+      "count": 12
+    }
+  },
+  "test/unit/engine/run/executors/database-commands/DatabaseCommandRuns.test.ts": {
+    "revisum/test-title-format": {
+      "count": 18
+    }
+  },
+  "test/unit/engine/run/executors/database-commands/examples/Database.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "@typescript-eslint/require-await": {
+      "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "test/unit/engine/run/executors/network-and-storage/StorageState.test.ts": {
+    "revisum/test-title-format": {
+      "count": 8
+    }
+  },
+  "test/unit/engine/run/executors/network-and-storage/examples/Stubs.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "test/unit/engine/run/executors/page-checks/PageChecksDownloadsAndTabs.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 42
+    }
+  },
+  "test/unit/engine/run/executors/service-calls/ServiceCallRuns.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "@typescript-eslint/strict-boolean-expressions": {
+      "count": 2
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 36
+    }
+  },
+  "test/unit/engine/run/executors/service-calls/ServiceRequestBuilding.test.ts": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 21
+    }
+  },
+  "test/unit/engine/run/executors/service-calls/examples/ShopService.ts": {
+    "max-lines": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "test/unit/engine/run/logging/JsonLinesEventSink.test.ts": {
+    "revisum/test-title-format": {
+      "count": 8
+    }
+  },
+  "test/unit/engine/run/preflight/TargetRefusals.test.ts": {
+    "revisum/test-title-format": {
+      "count": 3
+    }
+  },
+  "test/unit/engine/run/seal/RunGuaranteeLevel.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 5
+    }
+  },
+  "test/unit/engine/run/values/RunValues.test.ts": {
+    "@typescript-eslint/no-unsafe-assignment": {
+      "count": 1
+    },
+    "@typescript-eslint/strict-boolean-expressions": {
+      "count": 2
+    },
+    "revisum/test-title-format": {
+      "count": 21
+    }
+  },
+  "test/unit/engine/run/values/examples/RunPlan.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "test/unit/engine/secrets/EncodedSecretEchoes.test.ts": {
+    "revisum/test-title-format": {
+      "count": 4
+    }
+  },
+  "test/unit/engine/secrets/SecretOpacity.test.ts": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 4
+    },
+    "@typescript-eslint/restrict-template-expressions": {
+      "count": 2
+    },
+    "revisum/test-title-format": {
+      "count": 5
+    }
+  },
+  "test/unit/engine/secrets/SecretResolution.test.ts": {
+    "revisum/test-title-format": {
+      "count": 10
+    }
+  },
+  "test/unit/engine/secrets/ShortSecretObservations.test.ts": {
+    "revisum/test-title-format": {
+      "count": 5
+    }
+  },
+  "test/unit/engine/secrets/examples/SecretRun.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    }
+  },
+  "test/unit/engine/secrets/leak-scanner/LeakScanner.test.ts": {
+    "revisum/test-title-format": {
+      "count": 6
+    }
+  },
+  "test/unit/engine/secrets/literal-secrets/LiteralSecret.test.ts": {
+    "revisum/test-title-format": {
+      "count": 9
+    }
+  },
+  "test/unit/engine/secrets/literal-secrets/LiteralSecretFieldNames.test.ts": {
+    "revisum/test-title-format": {
+      "count": 2
+    }
+  },
+  "test/unit/engine/target/ExecutableHash.test.ts": {
+    "revisum/test-title-format": {
+      "count": 6
+    }
+  },
+  "test/unit/engine/target/TargetLock.test.ts": {
+    "revisum/test-title-format": {
+      "count": 23
+    }
+  },
+  "test/unit/engine/target/TargetResolution.test.ts": {
+    "revisum/test-title-format": {
+      "count": 30
+    }
+  },
+  "test/unit/engine/target/TestedOnWording.test.ts": {
+    "revisum/test-title-format": {
+      "count": 20
+    }
+  },
+  "test/unit/engine/target/UnavailableTargetOutcome.test.ts": {
+    "revisum/test-title-format": {
+      "count": 5
+    }
+  },
+  "test/unit/report/model/ReportModel.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 2
+    },
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unsafe-call": {
+      "count": 1
+    },
+    "@typescript-eslint/no-unsafe-member-access": {
+      "count": 16
+    },
+    "revisum/test-title-format": {
+      "count": 8
+    }
+  },
+  "test/unit/report/render/ReportGenerator.test.ts": {
+    "max-lines": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 29
+    }
+  },
+  "test/unit/runner/RunnerSourceRules.test.ts": {
+    "revisum/test-title-format": {
+      "count": 4
+    }
+  },
+  "test/unit/runner/containers/DockerNetworkDescription.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 2
+    },
+    "@typescript-eslint/unbound-method": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 12
+    }
+  },
+  "test/unit/runner/containers/runner-handle/RunnerGuaranteeLevel.test.ts": {
+    "revisum/test-title-format": {
+      "count": 4
+    }
+  },
+  "test/unit/runner/containers/runner-handle/RunnerHandleEvidence.test.ts": {
+    "revisum/test-title-format": {
+      "count": 12
+    }
+  },
+  "test/unit/runner/egress-proxy/EgressProxyAddresses.test.ts": {
+    "revisum/test-title-format": {
+      "count": 15
+    }
+  },
+  "test/unit/runner/egress-proxy/EgressProxyMalformedRequests.test.ts": {
+    "revisum/test-title-format": {
+      "count": 2
+    }
+  },
+  "test/unit/runner/egress-proxy/EgressProxyTunnels.test.ts": {
+    "revisum/test-title-format": {
+      "count": 6
+    }
+  },
+  "test/unit/runner/egress-proxy/rules/FixtureOriginPolicy.test.ts": {
+    "revisum/test-title-format": {
+      "count": 8
+    }
+  },
+  "test/unit/runner/egress-proxy/rules/FixtureOriginRefusalCodes.test.ts": {
+    "revisum/test-title-format": {
+      "count": 4
+    }
+  },
+  "test/unit/runner/egress-proxy/rules/RefusedIpv6Forms.test.ts": {
+    "revisum/test-title-format": {
+      "count": 5
+    }
+  },
+  "test/unit/runner/egress-proxy/rules/ResponseRewritePolicy.test.ts": {
+    "revisum/test-title-format": {
+      "count": 5
+    }
+  },
+  "test/unit/runner/egress/EgressEvents.test.ts": {
+    "revisum/test-title-format": {
+      "count": 4
+    }
+  },
+  "test/unit/runner/egress/EgressEventsUnreportedRecords.test.ts": {
+    "revisum/test-title-format": {
+      "count": 15
+    }
+  },
+  "test/unit/runner/egress/NetworkGatewayProbe.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 2
+    },
+    "@typescript-eslint/require-await": {
+      "count": 2
+    },
+    "revisum/test-title-format": {
+      "count": 11
+    }
+  },
+  "test/unit/runner/egress/PrivateServiceMetadata.test.ts": {
+    "revisum/test-title-format": {
+      "count": 6
+    }
+  },
+  "test/unit/runner/egress/ResolvedAddressCheck.test.ts": {
+    "revisum/test-title-format": {
+      "count": 4
+    }
+  },
+  "test/unit/runner/examples/DeclaredService.ts": {
+    "@typescript-eslint/require-await": {
+      "count": 1
+    }
+  },
+  "test/unit/runner/image/GitMountCheck.test.ts": {
+    "revisum/test-title-format": {
+      "count": 5
+    }
+  },
+  "test/unit/runner/image/RunnerImagePinning.test.ts": {
+    "revisum/test-title-format": {
+      "count": 3
+    }
+  },
+  "test/unit/runner/service-calls/ServiceCaller.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "@typescript-eslint/require-await": {
+      "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 23
+    }
+  },
+  "test/unit/runner/service-calls/ServiceCallerRuns.test.ts": {
+    "@typescript-eslint/require-await": {
+      "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 12
+    }
+  },
+  "test/unit/runner/support/FakeContainerEngine.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "test/unit/runner/support/LocalService.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 2
+    },
+    "@typescript-eslint/no-unnecessary-type-assertion": {
+      "count": 1
+    },
+    "@typescript-eslint/unbound-method": {
+      "count": 1
+    }
+  },
+  "test/unit/runner/workload/WorkloadRunner.test.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "revisum/test-title-format": {
+      "count": 13
+    }
+  },
+  "tools/eslint/FileNameMatchesExport.ts": {
+    "no-restricted-syntax": {
+      "count": 6
+    }
+  },
+  "tools/eslint/InPageFunctionsAreSelfContained.ts": {
+    "no-restricted-syntax": {
+      "count": 5
+    }
+  },
+  "tools/eslint/TestTitleFormat.ts": {
+    "no-restricted-syntax": {
+      "count": 10
+    }
+  },
+  "tools/metrics/GuaranteeMap.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "tools/metrics/ProjectMetrics.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    }
+  },
+  "tools/repo-rules/MatchesAny.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "tools/repo-rules/ReadWorkspacePackages.ts": {
+    "@typescript-eslint/no-unsafe-assignment": {
+      "count": 1
+    }
+  },
+  "tools/repo-rules/RunRepositoryRules.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "tools/repo-rules/ValidateAgainstSchema.ts": {
+    "max-lines-per-function": {
+      "count": 2
+    },
+    "no-nested-ternary": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 25
+    }
+  },
+  "tools/repo-rules/code/CheckApprovalStrength.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 4
+    },
+    "no-restricted-syntax": {
+      "count": 6
+    }
+  },
+  "tools/repo-rules/code/CheckBrandedCasts.ts": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "tools/repo-rules/code/CheckCompositionRoot.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "tools/repo-rules/code/CheckPersonGates.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 2
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "tools/repo-rules/code/CheckSecretReveal.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "tools/repo-rules/commits/CheckDenyRules.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    }
+  },
+  "tools/repo-rules/commits/CommitTrailers.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "tools/repo-rules/docs/CheckDependencyReviews.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "tools/repo-rules/docs/CheckErrorAnchors.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "tools/repo-rules/docs/CheckGlossary.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 2
+    },
+    "no-restricted-syntax": {
+      "count": 20
+    }
+  },
+  "tools/repo-rules/docs/CheckLicences.ts": {
+    "@typescript-eslint/no-base-to-string": {
+      "count": 1
+    }
+  },
+  "tools/repo-rules/naming/LintRepository.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 8
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 2
+    },
+    "no-restricted-syntax": {
+      "count": 32
+    }
+  },
+  "tools/scheduled/BenchmarkRuns.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 5
+    }
+  },
+  "tools/scheduled/SummariseUpkeep.ts": {
+    "@typescript-eslint/naming-convention": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "tools/test-runner/LoadEngineFunction.ts": {
+    "@typescript-eslint/no-unsafe-return": {
+      "count": 1
+    }
+  },
+  "tools/test-runner/ReadTestResults.ts": {
+    "@typescript-eslint/strict-boolean-expressions": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "tools/test-runner/RecordGoldens.ts": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "tools/test-runner/RunTestFolder.ts": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "tools/test-runner/TestResultLine.ts": {
+    "no-restricted-syntax": {
+      "count": 7
+    }
+  }
+}

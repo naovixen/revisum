@@ -1,0 +1,360 @@
+// Resolves the secrets a plan names, once, before a run opens any browser: every fill's
+// { secretName }, the plan's saved storage state, the secrets its declared calls use, in their
+// headers or as arguments, the secrets its stub starts and storage writes pass as arguments, and the
+// secrets in the environments of the database commands it runs. The first name the store cannot
+// resolve stops the run as secret-missing. The resolved secrets give the run its redaction and its
+// manifest records, and each fill of a secret its secret; their values stay inside the opaque Secret
+// objects.
+import {
+    StepType,
+    failure,
+    NavigateScripts,
+    success,
+    type CallDeclaration,
+    type CallName,
+    type CommandName,
+    type DatabaseCommandDeclaration,
+    type Plan,
+    type Redactor,
+    type Result,
+    type Secret,
+    type SecretName,
+    type SecretStore,
+    type Step,
+    type SecretRecord,
+    type StorageStateRecord,
+} from "@revisum/contracts";
+import { sha256 } from "../foundation/Sha256.ts";
+import { stepsWithin } from "../plan/VisitSteps.ts";
+import type { RunStep } from "../run/steps/RunStep.ts";
+import {
+    redactionModeOf,
+    secretRedaction,
+    secretSha256,
+    shortSecretMatch,
+    storageStateSecrets,
+} from "./SecretRedaction.ts";
+
+export type ResolvedSecrets = {
+    // The secrets fill steps name, by name.
+    readonly fills: ReadonlyMap<SecretName, Secret>;
+    readonly storageState: Secret | null;
+    // The secrets declared calls use, by name.
+    readonly services: ReadonlyMap<SecretName, Secret>;
+    // The secrets stub starts and storage writes pass as arguments, by name.
+    readonly stubsAndStorage: ReadonlyMap<SecretName, Secret>;
+    // The secrets declared database commands put in their environments, by name.
+    readonly commands: ReadonlyMap<SecretName, Secret>;
+};
+
+export const NO_SECRETS: ResolvedSecrets = {
+    fills: new Map(),
+    storageState: null,
+    services: new Map(),
+    stubsAndStorage: new Map(),
+    commands: new Map(),
+};
+
+// A plan's secrets, resolved: every one it names, and its steps as the run runs them, each fill of
+// a secret carrying its own.
+export type PlanSecrets = { readonly secrets: ResolvedSecrets; readonly steps: readonly RunStep[] };
+
+type ResolveName = (name: SecretName) => Result<Secret, SecretName>;
+
+// The secret names the plan's calls use, its cleanup included, in plan order: each declaration's
+// header secrets, then the secrets passed as arguments.
+function callSecretNames(
+    plan: Plan,
+    calls: Readonly<Record<CallName, CallDeclaration>>,
+): SecretName[] {
+    const steps = [...plan.steps, ...(plan.cleanup ?? [])];
+    return steps.flatMap((step) => {
+        if (step.type !== StepType.Call && step.type !== StepType.ExpectBackend) {
+            return [];
+        }
+        const declaration = Object.entries(calls).find(([name]) => name === step.call)?.[1];
+        const headers = Object.values(declaration?.headers ?? {}).flatMap((header) =>
+            "secretName" in header ? [header.secretName] : [],
+        );
+        const passed = Object.values(step.arguments).flatMap((argument) =>
+            typeof argument === "object" && "secretName" in argument ? [argument.secretName] : [],
+        );
+        return [...headers, ...passed];
+    });
+}
+
+// The steps as the run runs them, inside frames and second tabs too, in plan order: each fill of a
+// secret carries the secret and each navigate how its page loads, or the first name the store
+// cannot resolve stops them.
+function runStepsOf(
+    steps: readonly Step[],
+    resolveName: ResolveName,
+): Result<RunStep[], SecretName> {
+    const runSteps: RunStep[] = [];
+    for (const step of steps) {
+        const runStep = runStepOf(step, resolveName);
+        if (!runStep.ok) {
+            return runStep;
+        }
+        runSteps.push(runStep.value);
+    }
+    return success(runSteps);
+}
+
+function runStepOf(step: Step, resolveName: ResolveName): Result<RunStep, SecretName> {
+    switch (step.type) {
+        case StepType.Frame:
+        case StepType.NewTab: {
+            const inner = runStepsOf(step.steps, resolveName);
+            return inner.ok ? success({ ...step, steps: inner.value }) : inner;
+        }
+        case StepType.Navigate:
+            return success({
+                ...step,
+                navigation: { scripts: step.scripts ?? NavigateScripts.Enabled },
+            });
+        case StepType.Fill: {
+            const value = step.value;
+            if (typeof value === "string" || !("secretName" in value)) {
+                return success({ ...step, value });
+            }
+            const secret = resolveName(value.secretName);
+            return secret.ok ? success({ ...step, value, secret: secret.value }) : secret;
+        }
+        case StepType.Click:
+        case StepType.Hover:
+        case StepType.Select:
+        case StepType.Upload:
+        case StepType.Press:
+        case StepType.Dialog:
+        case StepType.Expect:
+        case StepType.ExpectPage:
+        case StepType.A11yAudit:
+        case StepType.Capture:
+        case StepType.Remember:
+        case StepType.Download:
+        case StepType.ExpectDownload:
+        case StepType.Call:
+        case StepType.ExpectBackend:
+        case StepType.Stub:
+        case StepType.ResetRequests:
+        case StepType.ExpectRequests:
+        case StepType.ExpectResponse:
+        case StepType.SetStorage:
+        case StepType.RemoveStorage:
+        case StepType.ExpectStorage:
+        case StepType.AdvanceClock:
+        case StepType.ExpectClipboard:
+        case StepType.Evaluate:
+        case StepType.ExpectScript:
+        case StepType.Database:
+        case StepType.ExpectDatabase:
+            return success(step);
+    }
+}
+
+// The secret names stub starts and storage writes pass as arguments, inside frames and second tabs
+// too, in plan order.
+function stubAndStorageSecretNames(steps: readonly Step[]): SecretName[] {
+    return stepsWithin(steps).flatMap((step) => {
+        if (step.type !== StepType.Stub && step.type !== StepType.SetStorage) {
+            return [];
+        }
+        return Object.values(step.arguments ?? {}).flatMap((argument) =>
+            typeof argument === "object" && "secretName" in argument ? [argument.secretName] : [],
+        );
+    });
+}
+
+// The secret names in the environments of the database commands the plan runs, its cleanup
+// included, in plan order.
+function commandSecretNames(
+    plan: Plan,
+    commands: Readonly<Record<CommandName, DatabaseCommandDeclaration>>,
+): SecretName[] {
+    const steps = [...plan.steps, ...(plan.cleanup ?? [])];
+    return steps.flatMap((step) => {
+        if (step.type !== StepType.Database && step.type !== StepType.ExpectDatabase) {
+            return [];
+        }
+        const declaration = Object.entries(commands).find(([name]) => name === step.command)?.[1];
+        return Object.values(declaration?.environment ?? {}).flatMap((value) =>
+            "secretName" in value ? [value.secretName] : [],
+        );
+    });
+}
+
+// Without a store, every name is missing: a run never falls back to typing nothing. `commands` is
+// given only to a run that can run database commands; another never needs their secrets.
+export function resolvePlanSecrets(
+    plan: Plan,
+    store: SecretStore | undefined,
+    calls: Readonly<Record<CallName, CallDeclaration>>,
+    commands: Readonly<Record<CommandName, DatabaseCommandDeclaration>> = {},
+): Result<PlanSecrets, SecretName> {
+    const resolveAll = (
+        names: readonly SecretName[],
+    ): Result<Map<SecretName, Secret>, SecretName> => {
+        const resolved = new Map<SecretName, Secret>();
+        for (const name of names) {
+            if (resolved.has(name)) {
+                continue;
+            }
+            const secret = store?.resolve(name) ?? null;
+            if (secret === null) {
+                return failure(name);
+            }
+            resolved.set(name, secret);
+        }
+        return success(resolved);
+    };
+    const fills = new Map<SecretName, Secret>();
+    const resolveFill: ResolveName = (name) => {
+        const secret = fills.get(name) ?? store?.resolve(name) ?? null;
+        if (secret === null) {
+            return failure(name);
+        }
+        fills.set(name, secret);
+        return success(secret);
+    };
+    const steps = runStepsOf(plan.steps, resolveFill);
+    if (!steps.ok) {
+        return steps;
+    }
+    const storageState =
+        plan.storageState === undefined
+            ? null
+            : (store?.resolve(plan.storageState.secretName) ?? null);
+    if (plan.storageState !== undefined && storageState === null) {
+        return failure(plan.storageState.secretName);
+    }
+    const services = resolveAll(callSecretNames(plan, calls));
+    if (!services.ok) {
+        return services;
+    }
+    const stubsAndStorage = resolveAll(stubAndStorageSecretNames(plan.steps));
+    if (!stubsAndStorage.ok) {
+        return stubsAndStorage;
+    }
+    const commandSecrets = resolveAll(commandSecretNames(plan, commands));
+    if (!commandSecrets.ok) {
+        return commandSecrets;
+    }
+    return success({
+        secrets: {
+            fills,
+            storageState,
+            services: services.value,
+            stubsAndStorage: stubsAndStorage.value,
+            commands: commandSecrets.value,
+        },
+        steps: steps.value,
+    });
+}
+
+// The store a declared call's request is built from: only the secrets the run resolved before it
+// started, so a call never reaches past them.
+export const resolvedSecretStore = (secrets: ResolvedSecrets): SecretStore => ({
+    resolve: (name) => secrets.services.get(name) ?? null,
+});
+// The store stub bodies and storage values are filled from, in the same way.
+export const stubAndStorageSecretStore = (secrets: ResolvedSecrets): SecretStore => ({
+    resolve: (name) => secrets.stubsAndStorage.get(name) ?? null,
+});
+// The store database commands' environments are filled from, in the same way.
+export const commandSecretStore = (secrets: ResolvedSecrets): SecretStore => ({
+    resolve: (name) => secrets.commands.get(name) ?? null,
+});
+
+// Every secret whose echoes the run looks for. Saved storage state counts as a whole and by each
+// cookie and stored value inside it.
+function watchedSecrets(secrets: ResolvedSecrets): Secret[] {
+    const storage =
+        secrets.storageState === null
+            ? []
+            : [secrets.storageState, ...storageStateSecrets(secrets.storageState)];
+    return [
+        ...secrets.fills.values(),
+        ...secrets.services.values(),
+        ...secrets.stubsAndStorage.values(),
+        ...secrets.commands.values(),
+        ...storage,
+    ];
+}
+
+// Removes every echo of the resolved secrets from a text, and nothing else.
+export const secretEchoRemoval = (secrets: ResolvedSecrets): ((text: string) => string) =>
+    secretRedaction(watchedSecrets(secrets));
+
+// The run's redactor: the caller's personal-data redaction, with every echo of the resolved secrets
+// removed first, so a pattern match cannot split a secret and leave part of it behind. Saved
+// storage state is redacted as a whole and by each cookie and stored value inside it.
+export function withSecretRedaction(redactor: Redactor, secrets: ResolvedSecrets): Redactor {
+    const watched = watchedSecrets(secrets);
+    if (watched.length === 0) {
+        return redactor;
+    }
+    const redactSecrets = secretRedaction(watched);
+    return { selectors: redactor.selectors, text: (value) => redactor.text(redactSecrets(value)) };
+}
+
+// The redactor for text read from pages outside a run, such as a crawl's page map: every declared
+// secret the store holds is removed first, wherever it appears, then the caller's personal-data
+// redaction runs. A declared secret the store lacks cannot be on the page from this store, so it is
+// skipped rather than refused.
+export function withDeclaredSecretRedaction(
+    redactor: Redactor,
+    secretNames: readonly SecretName[],
+    store: SecretStore,
+): Redactor {
+    const declared = new Map<SecretName, Secret>();
+    for (const name of secretNames) {
+        const secret = store.resolve(name);
+        if (secret !== null) {
+            declared.set(name, secret);
+        }
+    }
+    return withSecretRedaction(redactor, { ...NO_SECRETS, fills: declared });
+}
+
+// Whether a whole observed text is one of the run's short secrets, which redaction by value never
+// looks for: a failed check that observed exactly such a value keeps a placeholder instead.
+export const shortSecretObservation = (secrets: ResolvedSecrets): ((observed: string) => boolean) =>
+    shortSecretMatch(watchedSecrets(secrets));
+
+// A hash of text holding a secret lets anyone who can guess the rest try secrets against it offline,
+// so what a run keeps of such text has none.
+export function sha256UnlessHoldingASecret(
+    content: string | Uint8Array,
+    holdsSecret: (text: string) => boolean,
+): string | null {
+    const text = typeof content === "string" ? content : new TextDecoder().decode(content);
+    return holdsSecret(text) ? null : sha256(content);
+}
+
+// What the manifest records: each fill's, call's, stub's, storage write's and command's secret by name and
+// redaction mode, once, and the storage state's name and content hash.
+export function secretRecords(secrets: ResolvedSecrets): {
+    readonly secrets: readonly SecretRecord[];
+    readonly storageState?: StorageStateRecord;
+} {
+    const named = new Map([
+        ...secrets.fills,
+        ...secrets.services,
+        ...secrets.stubsAndStorage,
+        ...secrets.commands,
+    ]);
+    const records = [...named].map(([name, secret]): SecretRecord => ({
+        name,
+        mode: redactionModeOf(secret),
+    }));
+    return secrets.storageState === null
+        ? { secrets: records }
+        : {
+              secrets: records,
+              storageState: {
+                  name: secrets.storageState.name,
+                  sha256: secretSha256(secrets.storageState),
+              },
+          };
+}

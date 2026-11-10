@@ -1,0 +1,179 @@
+// Two guarantees around the policy gate, each proved by compiling a small file on its own:
+//   - Only the policy gate makes a ClearedRun. Giving a parsed plan every field of a cleared run by
+//     hand must not type-check, while the cleared run the gate returns still does.
+//   - Every denial is recorded. A run either cannot be given ports without an audit sink (the
+//     port is required, so leaving it out does not type-check), or, if it can, it refuses to start
+//     without one rather than deny a plan with no record.
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { createRunService, type RunPorts } from "@revisum/engine";
+import { memoryEventSink } from "../../unit/engine/approval/examples/MemoryApprovalStore.ts";
+import {
+    finalState,
+    guardedDriver,
+    parserFor,
+    portsWithoutAudit,
+    runBase,
+} from "../../unit/engine/run/examples/GuardedDriver.ts";
+import {
+    CLOSING_CHECK,
+    OPEN_ACCOUNT_PAGE,
+    click,
+    planOf,
+    role,
+} from "../../unit/engine/policy/examples/Policy.ts";
+import { compileFiles } from "../repo-rules/support/CompileFiles.ts";
+
+const TIMEOUT = 300_000;
+
+const compile = (name: string, lines: readonly string[]) =>
+    compileFiles([{ name, source: [...lines, ""].join("\n") }]);
+
+// ---- Forging a cleared run ------------------------------------------------------------------------
+
+const FORGERY_SETUP = [
+    "import type { ClearedRun, Plan } from '@revisum/engine';",
+    "declare const parsed: Plan;",
+    "declare const cleared: ClearedRun;",
+];
+
+const CLEARED_RUN_FIELDS =
+    "kind: 'cleared' as const, plan: cleared.plan, project: cleared.project, target: cleared.target, targetId: cleared.targetId, standing: cleared.standing";
+
+test(
+    "control: the cleared run the policy gate returns compiles as a ClearedRun",
+    { timeout: TIMEOUT },
+    () => {
+        const compiled = compile("gate-output.ts", [
+            "import type { ClearedRun, Plan, PolicyGate, TargetId } from '@revisum/engine';",
+            "declare const gate: PolicyGate;",
+            "declare const parsed: Plan;",
+            "declare const targetId: TargetId;",
+            "const decision = gate.clear(parsed, targetId);",
+            "export const cleared: ClearedRun | null = decision.kind === 'allow' ? decision.run : null;",
+        ]);
+        assert.equal(compiled.passed, true, compiled.output);
+    },
+);
+
+test(
+    "a parsed plan spread into an object with every field of a cleared run added by hand does not compile as a ClearedRun",
+    { timeout: TIMEOUT },
+    () => {
+        const compiled = compile("forged-by-spread.ts", [
+            ...FORGERY_SETUP,
+            `export const forged: ClearedRun = { ...parsed, ${CLEARED_RUN_FIELDS} };`,
+        ]);
+        assert.equal(compiled.passed, false, "a hand-made ClearedRun compiled");
+        assert.equal(compiled.errors.length, 1, compiled.output);
+    },
+);
+
+test(
+    "a parsed plan given every field of a cleared run by Object.assign does not compile as a ClearedRun",
+    { timeout: TIMEOUT },
+    () => {
+        const compiled = compile("forged-by-assign.ts", [
+            ...FORGERY_SETUP,
+            `export const forged: ClearedRun = Object.assign({}, parsed, { ${CLEARED_RUN_FIELDS} });`,
+        ]);
+        assert.equal(compiled.passed, false, "a hand-made ClearedRun compiled");
+        assert.equal(compiled.errors.length, 1, compiled.output);
+    },
+);
+
+// ---- A run without an audit sink -----------------------------------------------------------------
+
+const PORTS_SETUP = [
+    "import { unwiredPorts, type ArtifactStore, type BrowserDriver, type Clock, type EventSink, type Redactor, type RunEventSink, type RunIsolation, type RunPorts } from '@revisum/engine';",
+    "declare const drivers: ReadonlyMap<string, BrowserDriver>;",
+    "declare const clock: Clock;",
+    "declare const artifacts: ArtifactStore;",
+    "declare const redactor: Redactor;",
+    "declare const events: RunEventSink;",
+    "declare const audit: EventSink;",
+    "declare const isolation: RunIsolation;",
+];
+
+test("control: run ports with an audit sink compile", { timeout: TIMEOUT }, () => {
+    const compiled = compile("ports-with-audit.ts", [
+        ...PORTS_SETUP,
+        "export const ports: RunPorts = { drivers, clock, artifacts, redactor, events, audit, isolation, ...unwiredPorts };",
+    ]);
+    assert.equal(compiled.passed, true, compiled.output);
+});
+
+const DELETE_STEPS = [OPEN_ACCOUNT_PAGE, click(role("button", "Delete account"))];
+const SAVE_STEPS = [OPEN_ACCOUNT_PAGE, click(role("button", "Save changes"))];
+
+test(
+    "a run cannot deny a plan without recording it: the audit port is required, or a run without one refuses to start",
+    { timeout: TIMEOUT },
+    async () => {
+        const compiled = compile("ports-without-audit.ts", [
+            ...PORTS_SETUP,
+            "export const ports: RunPorts = { drivers, clock, artifacts, redactor, events, isolation, ...unwiredPorts };",
+        ]);
+        if (!compiled.passed) {
+            // The port is required: leaving it out is the one error, and it names the audit sink.
+            assert.equal(compiled.errors.length, 1, compiled.output);
+            assert.match(compiled.output, /audit/, compiled.output);
+            return;
+        }
+        // The port is optional, so a run without one must refuse to start: neither deny unrecorded nor run.
+        for (const steps of [DELETE_STEPS, SAVE_STEPS]) {
+            const driven = guardedDriver([...steps, CLOSING_CHECK]);
+            // Built as a caller that leaves the port out would; the cast keeps this file compiling once the port is required.
+            const ports = portsWithoutAudit(driven.driver) as RunPorts;
+            let state: string;
+            try {
+                state = finalState(
+                    await createRunService(ports).runUntrusted(
+                        planOf(steps),
+                        parserFor(),
+                        runBase(),
+                    ),
+                );
+            } catch {
+                state = "refused";
+            }
+            assert.notEqual(
+                state,
+                "Denied",
+                "a plan was denied with no audit sink to record the denial",
+            );
+            assert.notEqual(state, "Passed", "a plan ran with no audit sink to record a denial");
+            assert.equal(driven.opens(), 0, "a run with no audit sink opened a browser");
+        }
+    },
+);
+
+test("with an audit sink, a denial is recorded and an allowed plan runs", async () => {
+    const audit = memoryEventSink();
+    const denied = guardedDriver([...DELETE_STEPS, CLOSING_CHECK]);
+    assert.equal(
+        finalState(
+            await createRunService({ ...portsWithoutAudit(denied.driver), audit }).runUntrusted(
+                planOf(DELETE_STEPS),
+                parserFor(),
+                runBase(),
+            ),
+        ),
+        "Denied",
+    );
+    assert.deepEqual(
+        audit.recorded.map(({ event }) => [event.kind, event.code]),
+        [["plan.denied", "irreversible-action"]],
+    );
+    const allowed = guardedDriver([...SAVE_STEPS, CLOSING_CHECK]);
+    assert.equal(
+        finalState(
+            await createRunService({ ...portsWithoutAudit(allowed.driver), audit }).runUntrusted(
+                planOf(SAVE_STEPS),
+                parserFor(),
+                runBase(),
+            ),
+        ),
+        "Passed",
+    );
+});

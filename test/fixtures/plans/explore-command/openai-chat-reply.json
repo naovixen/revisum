@@ -1,0 +1,21 @@
+{
+  "id": "chat-completion-explore-recorded-1",
+  "object": "chat.completion",
+  "created": 1793520000,
+  "model": "llama-test",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Plan: Browse the Lantern Books pages\nFeature: EXPLORE-1\nSpec: pages/lantern-books\nVersion: 1.3\nTargets: explore-chromium\nGo to /\nCriterion: AC-1\nExpect heading \"Lantern Books\" is visible\nExpect link \"About us\" is visible\nGo to /about.html\nCriterion: AC-2\nExpect heading \"About Lantern Books\" is visible\nGo to /pricing.html\nCriterion: AC-3\nExpect heading \"Pricing\" is visible\n"
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 2410,
+    "completion_tokens": 131,
+    "total_tokens": 2541
+  }
+}

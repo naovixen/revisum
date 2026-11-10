@@ -6,6 +6,72 @@ The founder's checklist and the build queue.
 
 ## Progress
 
+**Spec work is paused for the architecture refactor (approved 2026-11-02).** On "Continue the build", take the next unchecked phase here. Spec work resumes after phase 5. Bugs found on the way go in `docs/decisions/refactor-defects.md`.
+
+**The refactor is on the branch `refactor/architecture`, not `main` (founder, 2026-11-02),** so it can be dropped if needed. Commit there. The founder pushes the branch to run CI, and merging it to `main` is the approval. The last commit before the refactor is `5a18cbf`.
+
+Architecture refactor:
+
+- [x] Phase 0: measure the baseline and set the written conventions (`docs/decisions/refactor-baseline.md`)
+- [x] Phase 1: cut, reset the goldens once, then freeze them
+- [x] Phase 2: fast tests
+- [ ] Phase 3: cold bug review, fixes, then ground the core; the founder pushes and CI takes 10 minutes or less (moved from phase 2, founder, 2026-11-02)
+  - [x] Cold reviews and the trust-path break test (21 of 24 breaks caught)
+  - [x] First round of fixes: false passes, action guard, approval, secrets, parser, evidence mode
+  - [x] Run `npm run check:linux` on a new container with `xclip`: green in 36 minutes, with the browser tests serial (24 minutes; CI splits them into 3). The clipboard proof and the symlinked report test ran and passed (findings 25, 99)
+  - [x] Confirm host-user deletion of container-owned `test-results`: it fails for a host user with another uid (finding 140)
+  - [x] Clear the remaining open findings: nothing open but the deferred rows 159, 161, 163, 165 and 167
+  - [x] Before grounding the core: a fresh Opus helper assesses the decisions independently, with `docs/prompts/session-decision-assessment.md`, and the founder rules on what it raises (founder, 2026-11-03). Rulings: `docs/decisions/decision-assessment.md`
+  - [x] Ground the core. The plan is `C:\Users\naomi\.claude\plans\before-starting-on-the-jiggly-squirrel.md`. **Tick a part only when its review with `docs/prompts/session-core-review.md` is clear (founder, 2026-11-03).** Code a part touches leaves with no suppressed nested ternaries, loose conditions or unsafe types; these don't wait for phase 6.
+    - **Reviews don't pause the work (founder, 2026-11-04):** after a part's second review, fix what it found, record it and tick as an exception, with no third review and no ruling asked. Only what is truly the founder's to decide stops the work.
+    - **Way of working, unless the founder objects:** the core spine runs in order, with at most two side tracks beside it in their own worktrees, applied as patches because the main session can't merge. Not yet run for all this: the full browser suite, `check:push`, `check:linux`, and the container tests beyond `container-hardening`.
+    - [x] Switch on `@typescript-eslint/no-unnecessary-condition`, fixing the hits in their own commits, with no baseline. The rule is on at `8efce5f` with no hits (240, not the 22 first counted). Ticked as an exception the founder recorded (2026-11-04, `docs/decisions/decision-assessment.md`), with no `clear` verdict: 180, 181, 187, 189, 190 and 191 are fixed. These are requirements of the driver port, which can't clear without them: 176, 177, 178, 182, 183, 185, 186 (a reproduced false pass), 188 and 192. 184 goes with split `run`.
+    - [x] Constant objects in `contracts`. Ticked as an exception the founder recorded (2026-11-04, `docs/decisions/decision-assessment.md`), with no `clear` verdict: 194 and 195 are fixed. 193 and 196 go to the phase 4 sweep, and 197 to the phase 5 docs.
+    - [x] Foundation helpers. Two reviews, the second `not clear`; its findings are fixed under the founder's rule that reviews don't pause the work (`ada0438`), with no third review. 198 goes to the `RunResult` part, 199 to step tables and 200 to split `plan-parser`.
+    - [x] One complete fake per port, and `fakePorts(overrides)` for the whole set. Two reviews, the second `not clear`; its findings are fixed under the founder's rule that reviews don't pause the work, with no third review. The same 54 tests now run over the fake session and the real driver. `npm run proofs` holds 718 tests in two summary blocks, 494 and 224.
+    - [x] Driver port, with findings 14 and 59. Two reviews, the second `not clear`. Its findings are fixed under the founder's rule that reviews don't pause the work (`7cf4d7f`, `dbb2648`, `f75ca15`), with no third review. One finding, row 236, was rejected as not a bug. Carried forward: 213 goes to the cleared run, 220, 221, 240 and 241 to split `cdp-driver`, and 204 waits for the founder. Browser suite at `f75ca15`: 1384 pass, 0 fail, 46 skip.
+    - [x] Cleared run, with the pipeline and preflight: the gate returns one value holding plan, project, target and standing; `baseUrl` is parsed; `act` and `probe` take resolved types, with the secret carried on the fill; the guarantee level is read at seal through a port. Two reviews, the second `not clear`; its findings are fixed under the founder's rule that reviews don't pause the work (`be75695`, `a3b6cdf`), with no third review. Rows 213, 242, 243 and 246 to 261 are fixed. Carried forward: 244 (a base URL outside the project's origins) to preflight with the step tables, 245 (`Authorised` redundant) to the phase 4 sweep, and 262 (an unreachable crawl refusal) to the composition root.
+    - [x] Step tables. Two reviews, the second `not clear`; its findings are fixed under the founder's rule that reviews don't pause the work, with no third review. Rows 153, 244, 263 to 274 and 277 to 279 are fixed, and 199 in part. Carried forward: 275 (step records as a union to the `RunResult` part, with 198; the run context's side channels and wide bag to split `run`), 276 (the navigate and download defaults) and 280 (the parser's frame depth) to split `plan-parser`. A new step type needs about 9 edits in 8 files plus its executor, 7 of them compiler-forced. From here, a behaviour fix gets its own commit, apart from refactoring (second review).
+    - [x] Split `run`: one file per concept under `run/`, with `createRunService(ports)` the only way in, required ports with unwired defaults, and the records after the steps read as outcomes. Two reviews, the second `not clear`; its findings are fixed under the founder's rule that reviews don't pause the work, with no third review. The second review found a false pass: refused request decisions that could not be read fell back to none (row 298). Rows 184, 275 and 285 to 300 are fixed. Carried forward: 281 (narrow executor contexts) and 292 to the runners' shared lifecycle, 293 and 302 to split `cdp-driver`, 294 to the phase 4 sweep, 301 to the composition root, 303 to split `plan-parser`, and 304 to the `RunResult` part.
+    - [x] `RunResult` to contracts, as a union with the same bytes, with findings 8 and 22. The result lives in `contracts/src/run-result/`: seven shapes told apart by state and mode, steps as passed, failed with a code or skipped, a plan and an evidence manifest, and every result code a constant with a heading in `docs/errors.md`. Two reviews, the second `not clear`; its findings are fixed under the founder's rule that reviews don't pause the work, with no third review. Rows 8, 22, 198 and 305 to 315 are fixed, and 304 is not a bug. Behaviour fixes: a denied run keeps and logs its denial whichever record went unread (305, 315), the replay decoder refuses a plan manifest missing its target, adapter or browser (310, stricter), and a suite whose setup fails reports its egress instead of claiming it enforced (314, stricter). Carried forward to phase 6: tests that probe a result with `?.` instead of asserting its state first.
+    - [x] Split `plan-parser`, adopting `readFields` as it goes. One reader per concept under `plan/parse/`, a step reader table the compiler completes, each reader naming every field of its step, and one frame-depth rule shared with the gate; the old and new parsers agreed on 400,000 mutated golden plans. Two reviews, the second `not clear`; its findings are fixed under the founder's rule that reviews don't pause the work, with no third review. Rows 200, 280, 303 and 316 to 325 are fixed. Behaviour fixes: parsers answer instead of throwing on objects that throw when read (200, 322), and any object script is the inline form, so an empty one is refused when inline scripts are off (323, stricter). Carried forward: 276 (the navigate scripts default, set in secret resolution) to the composition root, with 321; 320 and 326 to phase 4.
+    - [x] Cycle rule and in-page free-variable rule. The `import-cycles` repository rule fails on any import cycle, value or type-only, and the cycles it found are cut at the root; the `in-page-functions-are-self-contained` ESLint rule holds functions sent to the page to their own parameters, locals and the browser's globals, followed through aliases and wrappers. Two reviews, the second `not clear`; its findings are fixed under the founder's rule that reviews don't pause the work, with no third review. Rows 327 to 331 and 334 to 345 are fixed. Behaviour fixes: the page audit is decoded and its refusals carry a fixed code and an index path, never page text (336, 342, a guarantee); a local planner off loopback is refused by the project parser (343); a malformed lock file fails the dependency check (344, stricter). Carried forward: 332 (folder-level coupling) to phase 4, 333 and 339 (page code sent as strings) to split `cdp-driver` and the runners' shared lifecycle.
+    - [x] Split `cdp-driver`. One concept per file under `connection/`, `launch/`, `page/`, `session/`, `in-page/` and `capabilities/`, with `CdpDriver.ts` as the entry. Two reviews, the second `not clear`; its findings are fixed under the founder's rule that reviews don't pause the work (`c73a723`, `fe701ae`), with no third review. Rows 220, 221, 240, 241, 293, 302, 339, 346 to 355 and 357 to 368 are fixed. Behaviour fixes: captures mask same-process framed documents and fail when a frame is out of reach; a garbled report of an element is refused rather than read as no link; every read of a step shares its one deadline; a driver that breaks its `Result` contract ends the run `Errored` through `GuardedDriver`. Carried forward: 356 (split `PageWatch.ts`) to phase 4. Assumptions for the founder are in `docs/decisions/refactor-assumptions.md`.
+    - [x] Split `egress-proxy`. One concept per file under `runner/src/egress-proxy/`, with rules parsed once into a branded type and starting the proxy an outcome that frees every port. Two reviews, the second `not clear`; its findings are fixed under the founder's rule that reviews don't pause the work, with no third review. Rows 369 to 391 are fixed. Behaviour fixes: chunked framing is kept for any request with a body, so a chunk can't reach a service as a second request; a mark inside a tunnel is not read, so an HTTPS service can't forge a refusal; refusals carry a code and a path, never the rule's value; one origin reader, in `contracts`. The real-container tests have not run on this part; they run at the phase-end Linux check. Assumptions for the founder are in `docs/decisions/refactor-assumptions.md`.
+    - [x] The runners' shared lifecycle. Both container runners use one scope and `withRun`, which gives the run's value and the facts read after its end, and the workload runner is one concept per file. Two reviews, the second `not clear`; its findings are fixed under the founder's rule that reviews don't pause the work, with no third review. Rows 172, 281, 292, 339 and 392 to 411 are fixed. Behaviour fixes: a failed removal is reported and every other still attempted; `USER 00` counts as root; a command's exit stays its own, told apart by the Docker client's real failure text; only a refused internal network may move to an ordinary one. Real-container tests pass, 168 of 170 with 2 skipped. Carried forward: 412 (the proxy image isn't pinned) to phase 5. Assumptions for the founder are in `docs/decisions/refactor-assumptions.md`.
+    - [x] One composition root: finish `cli/src/BuildAdapters.ts`, so no caller can open a browser without the egress proxy. Commands take finished ports, production launchers take no arguments, and the `composition-root` rule refuses the routes round it, as a guard against mistakes rather than deliberate evasion. Two reviews, the second `not clear`; its findings are fixed under the founder's rule that reviews don't pause the work, with no third review. Rows 262, 276, 301 and 413 to 427 are fixed, and 321 is decided. Behaviour fixes: a run's proxy must be one `http(s)://host:port`, so `direct://` no longer sends the browser to the network; proxy variables can't be project secret names; a navigate whose page holds its own thread passes again. Assumptions for the founder are in `docs/decisions/refactor-assumptions.md`.
+    - [x] Throwaway-step experiment: about 7 edits, each forced by the compiler. Result: 16 edits, 14 forced by `tsc` or lint and 2 by unit tests; the target of about 7 is not met (assumption 29). Its findings are fixed: plan text can't skip the secret scan, a step field with no schema fails loudly, and every step states whether it changes the page, whether it is unsafe and how its secrets resolve (rows 428 to 432). This part is an experiment, so it had no review of its own.
+    - [x] Re-run the trust-path break test; a break that goes uncaught becomes a finding to fix. At `3c01fcd`, of 115 planted defects, 106 were caught, including the 3 missed earlier. The other 9 were gaps in the tests, not bugs: rows 433 to 441, each now with a fast unit test proven to fail with its defect planted (`3793f06`).
+    - [x] Close phase 3: at `2d0f5a6`, `npm run check:linux` is green (77 minutes, serial: 6,996 unit and contract tests, 1,390 browser tests with 60 skipped, proofs, replay, gates) and `npm run check:containers` is green (168 of 170, 2 skipped). `npm run check:push` was green on Windows one fix earlier, at `bb7a7bf`. The Linux check found a real race: a tab the driver closed could leave a command unanswered until its deadline (row 442, fixed).
+  - [ ] The founder pushes, and CI takes 10 minutes or less. Waits for the end of the refactor (founder, 2026-11-08), so it doesn't hold up phase 4. Not yet measured.
+- [x] Phase 4: move files, constants for magic strings, formatting. The move map and its risks are in `C:\Users\naomi\.claude\projects\E--revisum\phase-4\` (`move-map.tsv`, `move-map-summary.md`): 1,882 files.
+  - [x] Golden check tolerates a move: tests, then code, keeping the old and new globs and updating ignore files
+  - [x] Move packages, tools, config and docs (`79725ed`)
+  - [x] Move test data, tests and helpers, with their imports and paths (`e88db4c`). Goldens and fixtures all exact renames. Stale paths left for phase 5: `CLAUDE.md` names the old `tools/check-tests-apart.ts` (now `tools/repo-rules/commits/CheckTestsApart.ts`), and `docs/prompts/session-00-seed.md`, `session-core-review.md` and `session-decision-assessment.md` have one old path each and need the founder's agreement
+  - [x] Verify the move at `4a95f3e`: `npm run check:linux` green (78 minutes) and `npm run check:containers` green (168 of 170, 2 skipped); goldens rename-only; test counts reconciled
+  - [x] Sweeps, each its own commit pair: domain strings to constants, `curly`, Prettier; new ESLint rules on. Baselined for phase 6: 730 magic strings and 101 size entries (assumptions 34 and 35)
+  - [x] Carried findings: 193, 196, 245, 294, 320, 326, 332, 356, with each fix tested. `engine/src/project/` may no longer import `engine/src/plan/`, by rule
+  - [x] Phase-end checks, at `a3a8447`: `npm run check:linux` green (81 minutes: 7,064 unit and contract tests, 1,390 browser tests with 60 skipped, proofs in two runs, 615 and 204 of 208 with 4 skipped for the full tier, 7 replay tests; goldens unchanged since the move) and `npm run check:containers` green (168 of 170, 2 skipped)
+  - [ ] After the founder pushes: drop the legacy `fixtures/` and `golden/` globs
+- [ ] Phase 5: docs and final trust-path review; the founder pushes. **Resume here.**
+  - [x] Docs: architecture guide, system design, repo guidance, seven specs amended, decision record
+  - [x] Cold reviews of SPEC-02, 03, 04 and 07, and a review of their fixes: rows 446 to 503 in `docs/decisions/refactor-defects.md`, every fix-now item fixed test-first. `npm run check` was green just before the last fixes (7,165 passed, 1 skipped)
+  - [x] Phase-end checks, at `53d051a` (2026-11-10): `npm run check:linux` green (7,228 unit and contract tests, 1,402 browser tests with 60 skipped, proofs in two runs, 627 and 204 of 208 with 4 skipped for the full tier, replay, gates) and `npm run check:containers` green (174 of 176, 2 skipped). The first Linux run, at `31f560b`, found three hostile-plan proofs still expecting `invalid_url` for a url holding a user name and password, which the fix for row 484 refuses as `literal_secret`; the tests were updated (`53d051a`) and proofs, replay and gates rerun in the same container, with no code changed
+  - [ ] Founder to validate `docs/decisions/refactor-assumptions.md`, especially 31 and 38 to 43; assumption 39 needs research behind the question
+  - [x] Make the two licences unmistakable: the README says each package has exactly one licence and it is not a dual licence, gives `tools/`, `test/` and `docs/` FSL-1.1-ALv2 except the Apache-2.0 schemas, and lists only packages that exist; every package README already stated its licence. Each package shipping its own licence file is carried to SPEC-17 (assumption 44)
+- [ ] Phase 6: test titles and remaining suppressions (may run alongside M3)
+
+Where phase 3 stands, from `docs/decisions/refactor-defects.md`:
+
+- **Fix next:** nothing open. Findings 147 and the rest of 148 go with the parts that touch them.
+- **Checked at the end (2026-11-03):** `npm run check:linux` green at `ad2946a`, the whole chain. Windows `test:browser` and `check:containers` ran before the last changes: 907 of 953 passed with 46 skipped, and 165 of 170 with one file fixed and passing alone. **Next:** the founder reads the deferred rows, then grounding the core starts.
+- **With SPEC-16:** 100-103, 107-112, the rest of 114, 115, 136, and re-reading the guarantee level after a plan run. Founder decided 103: mount tracked files only.
+- **Founder decided, still to build:** one real Playwright Test run in the weekly tier, after a dependency review (116).
+- **Founder decided:** closed shadow roots stay a documented limit, to revisit with SPEC-10 (129).
+- **Founder decided, being built:** host runs always go through a per-session egress proxy set on the browser context, with WebRTC UDP off, stay labelled `host` and claim nothing new (39, 47, 49, 141, 142). The design and commit order are in `docs/decisions/host-egress-proxy.md`. All steps are done.
+- **Calls made in the main session, which the founder can reverse:** refused connections in request counts (87, amended in SPEC-33) and allowing U+200C and U+200D in plan text (122).
+- **Machine leftovers:** a locked worktree in `.claude/worktrees/` from the break test. Leave it unless the founder says otherwise. `npm run check:linux` uses its own container, labelled `revisum.check=linux`.
+
 Setup and seed (done):
 
 - [x] Research committed in `E:\core`; research commit recorded
@@ -49,23 +115,30 @@ M2, driver and isolation (alpha):
 - [x] SPEC-08 manifest and replay, with SPEC-32's call replay and SPEC-36's database-command replay (AC-SPEC-32-13, AC-SPEC-36-15; 2026-11-01)
 - [x] M2 exit (2026-11-01): `docs/decisions/milestone-exits.md`
 
-M3, evidence:
+Demo path, first once phase 5 is done (founder, 2026-11-10: `docs/decisions/demo-first-order.md`). Only the order changes: each item stays in its milestone, with its criteria as approved. Phase 6 may run alongside and doesn't hold this up.
 
-- [ ] SPEC-09 privacy masking
-- [ ] SPEC-10 accessibility audit
-- [ ] SPEC-29 WCAG test base
-- [ ] SPEC-11 result model and exporters
-- [ ] SPEC-12 visual report and PR comment
-- [ ] SPEC-13 review queue and recorder
-- [ ] SPEC-35 snapshot audit, masked captures, report, PR comment and review queue; SPEC-36 labels in exporters
-- [ ] SPEC-14 audit log and traceability
+- [ ] SPEC-09 privacy masking (M3)
+- [ ] SPEC-10 accessibility audit, without criteria 11 to 13, which go with SPEC-29 (M3)
+- [ ] SPEC-11 result model and exporters (M3)
+- [ ] SPEC-12 visual report and PR comment (M3)
+- [ ] SPEC-14 audit log and traceability (M3; before SPEC-13, which writes its events through it)
+- [ ] SPEC-13 review queue and recorder (M3)
+- [ ] SPEC-35 snapshot audit, masked captures, report, PR comment and review queue; SPEC-36 labels in exporters (M3)
+- [ ] SPEC-16's demo part (M4): `run` with plans and SPEC-35's `--suite`, `review`, their JSON output and exit codes, the Action with its `suites` input, AC-SPEC-16-11 and 12, and the findings listed above "with SPEC-16" where they touch these
+- [ ] One real Playwright Test run, after the dependency review finding 116 requires
+- [ ] Reviews of SPEC-09 and SPEC-14 with `docs/prompts/session-review.md`, then `npm run check:linux`
+- [ ] Demo on a real app, then the founder judges. The app is the founder's choice, asked at SPEC-16's demo part
+
+M3, evidence (the rest):
+
+- [ ] SPEC-29 WCAG test base, with SPEC-10's criteria 11 to 13
 - [ ] SPEC-15 metrics panel
 - [ ] M3 exit
 
-M4, launch (beta):
+M4, launch (beta; the rest):
 
-- [ ] SPEC-16 CLI and GitHub Action, with SPEC-35's `run --suite` and Action input, and writing SPEC-08's opt-in recording file from `run`
-- [ ] SPEC-17 release artefacts and claims (marketing render target and claim lint), with SPEC-36's `doctor` checks and claim wording
+- [ ] SPEC-16's remaining commands and criteria, writing SPEC-08's opt-in recording file from `run`, and AC-SPEC-16-13. Tick SPEC-16 only when every criterion passes
+- [ ] SPEC-17 release artefacts and claims (marketing render target and claim lint), with SPEC-36's `doctor` checks and claim wording, and a licence file in each package before the first npm publish, since the root licence files are not in a package's tarball
 - [ ] M4 exit
 
 The queue ends at beta. Phase 2 specs (SPEC-18 onwards) wait for pilots.
@@ -84,6 +157,7 @@ From `E:\core\docs\09-mvp-plan.md` §6, counted from the plan's day 0, 2026-11-0
 | Velocity | M3 not done | 2027-06-07 |
 
 - **Language fit: resolved, does not stop the build.** The share stays under 70% (36% fresh on 1.2). On 2026-10-29 the founder recorded evidence mode with opt-in unsafe features (`docs/decisions/language-fit-pivot.md`) as this signal's response, the one the MVP plan lists. The build goes on until it is demoable, so the founder can judge from use whether the product is worthwhile.
+- **Problem fit: set aside, does not stop the build.** On 2026-11-01 the founder said not to worry about discovery calls for now: the aim is a demo, to see it working and judge whether it is feasible.
 
 ## Setup reference
 

@@ -1,9 +1,9 @@
 # Weekly browser upkeep for the own CDP driver. It reads the latest Stable Chrome for Testing
 # version from Google's public version list. When that major is newer than the pinned build, it
 # installs the new build and its headless shell and re-runs the contract and capability suites on
-# them. Then tools/browser-upkeep.ts reports the average fix hours per major, flags the Playwright
-# fallback rule when they are over the limit, and fails when the new major has no upkeep record.
-# Runs in the same pinned image as the "ci" workflow. See docs/specs/SPEC-06-cdp-driver.md.
+# them. Then tools/scheduled/SummariseUpkeep.ts reports the average fix hours per major, flags the kill
+# criterion when they are over the limit, and fails when the new major has no upkeep record.
+# Runs in the same pinned image as the "ci" workflow.
 name: browser-upkeep
 
 on:
@@ -30,14 +30,14 @@ jobs:
             bash -euo pipefail -c '
               npm ci
               # The system libraries the browsers need on Linux, installed as root.
-              node node_modules/playwright-core/cli.js install-deps chromium firefox webkit
+              bash tools/browsers/install-system-libraries.sh
               chown -R node:node /workspace
               su node -c "bash -euo pipefail" <<"UPKEEP"
                 npm run browsers
                 curl --fail --silent --show-error --location \
                   https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json --output .browsers/latest-versions.json
                 stable=$(node -e "console.log(JSON.parse(require(\"fs\").readFileSync(\".browsers/latest-versions.json\", \"utf8\")).channels.Stable.version)")
-                pinned=$(node --input-type=module -e "import(\"./tools/install-browsers.ts\").then((tool) => console.log(tool.CHROME_FOR_TESTING_BUILD))")
+                pinned=$(node --input-type=module -e "import(\"./tools/browsers/ChromeForTestingBuild.ts\").then((tool) => console.log(tool.CHROME_FOR_TESTING_BUILD))")
                 suites=0
                 if [ "${stable%%.*}" -gt "${pinned%%.*}" ]; then
                   echo "Chrome for Testing Stable ${stable} is a newer major than the pinned ${pinned}: re-running the contract and capability suites"
@@ -45,10 +45,10 @@ jobs:
                   npx @puppeteer/browsers install "chrome-headless-shell@${stable}" --path "$PWD/.browsers/latest"
                   export CHROME_PATH="$PWD/.browsers/latest/chrome/linux-${stable}/chrome-linux64/chrome"
                   export CHROME_HEADLESS_SHELL_PATH="$PWD/.browsers/latest/chrome-headless-shell/linux-${stable}/chrome-headless-shell-linux64/chrome-headless-shell"
-                  node tools/run-test-folder.ts test/contract || suites=1
+                  node tools/test-runner/RunTestFolder.ts test/browser || suites=1
                 fi
                 upkeep=0
-                node tools/browser-upkeep.ts --versions .browsers/latest-versions.json || upkeep=1
+                node tools/scheduled/SummariseUpkeep.ts --versions .browsers/latest-versions.json || upkeep=1
                 exit $(( suites | upkeep ))
           UPKEEP
             '

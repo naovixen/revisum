@@ -1,8 +1,11 @@
 node_modules/
 dist/
+temp/
 *.tsbuildinfo
 *.log
-.idea/
+.idea/*
+!.idea/prettier.xml
+!.idea/jsLinters/
 .vscode/
 .browsers/
 .test-results/
