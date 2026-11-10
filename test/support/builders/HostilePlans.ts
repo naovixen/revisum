@@ -81,6 +81,11 @@ export function hostilePlans(allowedOrigin: string): readonly HostilePlan[] {
         {
             name: "credentials in URL",
             input: withSteps({ type: "navigate", url: `http://user:pass@127.0.0.1:${port}/` }),
+            code: "literal_secret",
+        },
+        {
+            name: "user name in URL",
+            input: withSteps({ type: "navigate", url: `http://user@127.0.0.1:${port}/` }),
             code: "invalid_url",
         },
         {

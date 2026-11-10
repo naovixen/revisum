@@ -78,8 +78,13 @@ function apiSuiteBrowserCases(allowedOrigin: string): readonly HostilePlan[] {
             code: "origin_not_allowed",
         },
         {
-            name: "userinfo in URL",
+            name: "user name and password in URL",
             input: withSteps(navigate(`http://user:pw@127.0.0.1:${port}/tenants/acme/notes`)),
+            code: "literal_secret",
+        },
+        {
+            name: "user name in URL",
+            input: withSteps(navigate(`http://user@127.0.0.1:${port}/tenants/acme/notes`)),
             code: "invalid_url",
         },
         {
