@@ -54,6 +54,12 @@ Architecture refactor:
   - [x] Phase-end checks, at `a3a8447`: `npm run check:linux` green (81 minutes: 7,064 unit and contract tests, 1,390 browser tests with 60 skipped, proofs in two runs, 615 and 204 of 208 with 4 skipped for the full tier, 7 replay tests; goldens unchanged since the move) and `npm run check:containers` green (168 of 170, 2 skipped)
   - [ ] After the founder pushes: drop the legacy `fixtures/` and `golden/` globs
 - [ ] Phase 5: docs and final trust-path review; the founder pushes. **Resume here.**
+  - [ ] Make the two licences unmistakable (GitHub's two tabs read like a choice between them):
+    - Say in the README, or a `LICENSING.md` it links to, that each package has exactly one licence and this is not a dual licence
+    - State the licence for everything outside `packages/` (`tools/`, `test/`, `docs/`), which has none today. Default to FSL-1.1-ALv2; the founder confirms before pushing
+    - Fix the README's Apache list: it names "the drivers" and `action`, but only `driver-cdp` exists (`action` returns with SPEC-16)
+    - Check that each package README states its licence
+    - Add to `npm run lint`, or carry to SPEC-17: each package ships its own licence file before the first npm publish, because the root files aren't included in a package's tarball
 - [ ] Phase 6: test titles and remaining suppressions (may run alongside M3)
 
 Where phase 3 stands, from `docs/decisions/refactor-defects.md`:
