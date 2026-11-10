@@ -523,7 +523,7 @@ Status is one of: `suspected`, `fixed`, `deferred`, `not a bug`.
 | 500 | An anchored partial final star, such as `src/foo*`, did not cover folders | `engine/src/approval/ParseCodeOwners.ts` | fixed | Review of the phase 5 fixes |
 | 501 | A rewrites file that couldn't be read whole kept a stale list, and the run stayed isolated | `runner/src/containers/DockerRunner.ts` | fixed | Review of the phase 5 fixes |
 | 502 | More run-together token names were missed: `oauthtoken`, `bearertoken`, `usertoken`, `clienttoken` | `engine/src/decoding/LooksLikeCredential.ts` | fixed | Review of the phase 5 fixes |
-| 503 | Dropping a path segment's parameters with `/;.*$/` looks quadratic on many `;` before a decoded newline, and leaves such a segment unstripped | `engine/src/policy/IsDestructivePath.ts` | fix now | Found while fixing 496 |
+| 503 | Dropping a path segment's parameters with `/;.*$/` looks quadratic on many `;` before a decoded newline, and leaves such a segment unstripped | `engine/src/policy/IsDestructivePath.ts` | fixed | Found while fixing 496 |
 
 ## Risks
 

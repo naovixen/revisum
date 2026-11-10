@@ -52,7 +52,7 @@ const comparableForm = (decoded: string): string =>
 function withoutDotSegments(path: string, isMergingSlashes: boolean): string {
     const kept: string[] = [];
     for (const segment of path.split("/").slice(1)) {
-        const name = segment.replace(/;.*$/u, "");
+        const name = segment.includes(";") ? segment.slice(0, segment.indexOf(";")) : segment;
         if (name === "..") {
             kept.pop();
         } else if (name !== "." && (segment !== "" || !isMergingSlashes)) {
