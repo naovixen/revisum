@@ -509,11 +509,13 @@ Status is one of: `suspected`, `fixed`, `deferred`, `not a bug`.
 | 486 | A tool comment cites a spec, and the test runner's comments still name `test/contract` | `tools/repo-rules/commits/CommitTrailers.ts`, `tools/test-runner/RunTestFolder.ts` | fixed | Naming rule |
 | 487 | `hasTypedFieldGone` catches document-gone errors as "still there". No page can reach it, as far as reading the code shows, so the catch is dead | `driver-cdp/src/session/document/HasTypedFieldGone.ts` | deferred | Phase 6: remove the catch |
 | 488 | `HTMLFormElement.elements` leaves out image inputs, so Enter in a form whose only submit is an irreversible image input is not refused | `driver-cdp/src/in-page/elements/GuardDetails.ts` | fixed | `625febe`. Found while fixing 465 |
-| 489 | `defaultRedactor()` takes 36 s on 200,000 repeated letters, and grows faster than linear, so a page can stall a run | `engine/src/secrets/` | fix now | Found while fixing 480 |
-| 490 | `writtenPattern` is quadratic when a secret starts with white space and a page has a long run of spaces | `engine/src/secrets/` | fix now | Found while fixing 480 |
+| 489 | `defaultRedactor()` takes 36 s on 200,000 repeated letters, and grows faster than linear, so a page can stall a run | `engine/src/secrets/` | fixed | Found while fixing 480 |
+| 490 | `writtenPattern` is quadratic when a secret starts with white space and a page has a long run of spaces | `engine/src/secrets/` | fixed | Found while fixing 480 |
 | 491 | `cutSecretEchoes` now also cuts the new echo forms, marked approximate, with no direct test | `engine/src/secrets/SecretRedaction.ts` | deferred | Phase 6 |
 | 492 | Nothing in `packages/` wires `RunnerHandle.rewritesApplied` into a plan run: the CLI's run services use `noRewrites` | `cli/src/wiring/BuildAdapters.ts` | deferred | With SPEC-16. Assumption 41 |
 | 493 | The workload route over 16 MiB has no real-Docker test; it shares its line reader with the plan route, which has one | `runner/src/workload/` | deferred | Phase 6 |
+| 494 | The JWT shape is quadratic on `eyJ-eyJ-...` | `engine/src/decoding/LooksLikeCredential.ts` | deferred | Phase 6. It reads plan text, not page text |
+| 495 | `writtenPattern` stays quadratic on white space inside a value when the word before it is only white-space writings, such as a secret `+ x...` over `++++` | `engine/src/secrets/EncodedEchoes.ts` | deferred | Phase 6. Needs a secret of that form, and no fix yet keeps the unlimited run |
 
 ## Risks
 

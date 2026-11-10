@@ -51,15 +51,21 @@ export function writtenPattern(
             ? writings(character)
             : [escapeForPattern(character), ...writings(character)]
         ).join("|");
-    const anyWhiteSpace = `(?:\\s|${WHITE_SPACE_CHARACTERS.flatMap((character) => writings(character)).join("|")})+`;
+    const oneWhiteSpace = `(?:\\s|${WHITE_SPACE_CHARACTERS.flatMap((character) => writings(character)).join("|")})`;
     const pieces = value
         .split(/(\s+)/)
         .filter((piece) => piece !== "")
-        .map((piece) =>
-            piece.trim() === ""
-                ? anyWhiteSpace
-                : [...piece].map((character) => `(?:${eachWay(character)})`).join(""),
-        );
+        .map((piece, index, all) => {
+            if (piece.trim() !== "") {
+                return [...piece].map((character) => `(?:${eachWay(character)})`).join("");
+            }
+            // White space that leads a pattern is tried from every place in a page's long run of it, so
+            // it takes no more than the value's own. Any longer run before the value is only layout, and
+            // the words after it are still found.
+            return index === 0 && all.length > 1
+                ? `${oneWhiteSpace}{1,${piece.length}}`
+                : `${oneWhiteSpace}+`;
+        });
     return new RegExp(pieces.join(""), "gi");
 }
 
