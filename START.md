@@ -56,7 +56,7 @@ Architecture refactor:
 - [ ] Phase 5: docs and final trust-path review; the founder pushes. **Resume here.**
   - [x] Docs: architecture guide, system design, repo guidance, seven specs amended, decision record
   - [x] Cold reviews of SPEC-02, 03, 04 and 07, and a review of their fixes: rows 446 to 503 in `docs/decisions/refactor-defects.md`, every fix-now item fixed test-first. `npm run check` was green just before the last fixes (7,165 passed, 1 skipped)
-  - [ ] Phase-end checks at `31f560b`, not yet run to the end (paused 2026-11-10): `npm run check:linux`, `npm run check:containers`. Don't edit the working copy while they run, because the Linux check mounts it
+  - [x] Phase-end checks, at `53d051a` (2026-11-10): `npm run check:linux` green (7,228 unit and contract tests, 1,402 browser tests with 60 skipped, proofs in two runs, 627 and 204 of 208 with 4 skipped for the full tier, replay, gates) and `npm run check:containers` green (174 of 176, 2 skipped). The first Linux run, at `31f560b`, found three hostile-plan proofs still expecting `invalid_url` for a url holding a user name and password, which the fix for row 484 refuses as `literal_secret`; the tests were updated (`53d051a`) and proofs, replay and gates rerun in the same container, with no code changed
   - [ ] Founder to validate `docs/decisions/refactor-assumptions.md`, especially 31 and 38 to 43; assumption 39 needs research behind the question
   - [ ] Make the two licences unmistakable (GitHub's two tabs read like a choice between them):
     - Say in the README, or a `LICENSING.md` it links to, that each package has exactly one licence and this is not a dual licence
