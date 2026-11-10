@@ -56,7 +56,7 @@ Architecture refactor:
 - [ ] Phase 5: docs and final trust-path review; the founder pushes. **Resume here.**
   - [ ] Make the two licences unmistakable (GitHub's two tabs read like a choice between them):
     - Say in the README, or a `LICENSING.md` it links to, that each package has exactly one licence and this is not a dual licence
-    - State the licence for everything outside `packages/` (`tools/`, `test/`, `docs/`), which has none today. Default to FSL-1.1-ALv2; the founder confirms before pushing
+    - State the licence for everything outside `packages/` (`tools/`, `test/`, `docs/`), which has none today: FSL-1.1-ALv2 (founder, 2026-11-10), except the schemas `licences.json` lists as Apache-2.0
     - Fix the README's Apache list: it names "the drivers" and `action`, but only `driver-cdp` exists (`action` returns with SPEC-16)
     - Check that each package README states its licence
     - Add to `npm run lint`, or carry to SPEC-17: each package ships its own licence file before the first npm publish, because the root files aren't included in a package's tarball
