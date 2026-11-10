@@ -120,22 +120,29 @@ M2, driver and isolation (alpha):
 - [x] SPEC-08 manifest and replay, with SPEC-32's call replay and SPEC-36's database-command replay (AC-SPEC-32-13, AC-SPEC-36-15; 2026-11-01)
 - [x] M2 exit (2026-11-01): `docs/decisions/milestone-exits.md`
 
-M3, evidence:
+Demo path, first once phase 5 is done (founder, 2026-11-10: `docs/decisions/demo-first-order.md`). Only the order changes: each item stays in its milestone, with its criteria as approved. Phase 6 may run alongside and doesn't hold this up.
 
-- [ ] SPEC-09 privacy masking
-- [ ] SPEC-10 accessibility audit
-- [ ] SPEC-29 WCAG test base
-- [ ] SPEC-11 result model and exporters
-- [ ] SPEC-12 visual report and PR comment
-- [ ] SPEC-13 review queue and recorder
-- [ ] SPEC-35 snapshot audit, masked captures, report, PR comment and review queue; SPEC-36 labels in exporters
-- [ ] SPEC-14 audit log and traceability
+- [ ] SPEC-09 privacy masking (M3)
+- [ ] SPEC-10 accessibility audit, without criteria 11 to 13, which go with SPEC-29 (M3)
+- [ ] SPEC-11 result model and exporters (M3)
+- [ ] SPEC-12 visual report and PR comment (M3)
+- [ ] SPEC-14 audit log and traceability (M3; before SPEC-13, which writes its events through it)
+- [ ] SPEC-13 review queue and recorder (M3)
+- [ ] SPEC-35 snapshot audit, masked captures, report, PR comment and review queue; SPEC-36 labels in exporters (M3)
+- [ ] SPEC-16's demo part (M4): `run` with plans and SPEC-35's `--suite`, `review`, their JSON output and exit codes, the Action with its `suites` input, AC-SPEC-16-11 and 12, and the findings listed above "with SPEC-16" where they touch these
+- [ ] One real Playwright Test run, after the dependency review finding 116 requires
+- [ ] Reviews of SPEC-09 and SPEC-14 with `docs/prompts/session-review.md`, then `npm run check:linux`
+- [ ] Demo on a real app, then the founder judges. The app is the founder's choice, asked at SPEC-16's demo part
+
+M3, evidence (the rest):
+
+- [ ] SPEC-29 WCAG test base, with SPEC-10's criteria 11 to 13
 - [ ] SPEC-15 metrics panel
 - [ ] M3 exit
 
-M4, launch (beta):
+M4, launch (beta; the rest):
 
-- [ ] SPEC-16 CLI and GitHub Action, with SPEC-35's `run --suite` and Action input, writing SPEC-08's opt-in recording file from `run`, and the items carried from the M2 exit (AC-SPEC-16-11 to 13)
+- [ ] SPEC-16's remaining commands and criteria, writing SPEC-08's opt-in recording file from `run`, and AC-SPEC-16-13. Tick SPEC-16 only when every criterion passes
 - [ ] SPEC-17 release artefacts and claims (marketing render target and claim lint), with SPEC-36's `doctor` checks and claim wording
 - [ ] M4 exit
 

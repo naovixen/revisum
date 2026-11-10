@@ -273,6 +273,8 @@ A customer's own `criterionId` in a plan is product data, not a name, and stays.
 | M3 evidence | `auditor-axe`, `auditor-act`, `report`, `engine` (review, audit log, metrics); WCAG test base in `test/wcag/` and `fixtures/wcag/` | Report, PR comment, review queue and recorder work end to end; CI publishes "verifies N of M criteria" per level. SPEC-35's snapshot audit, masked captures, report, PR comment and review queue; SPEC-36's labels in exporters |
 | M4 launch | `cli` (the remaining commands), `action`, docs | `npx revisum run` and the Action work on a demo app. SPEC-35's `run --suite` and Action input; SPEC-36's `doctor` checks and claim-lint wording. **Beta** |
 
+The slices above are unchanged. The order in which they are built puts a demo first (founder, 2026-11-10): M3 up to SPEC-35's part, then a demo part of SPEC-16 ahead of SPEC-29 and SPEC-15 (`docs/decisions/demo-first-order.md`).
+
 **Action:** review this table against `09` at every milestone exit.
 
 ## Risks and open questions
