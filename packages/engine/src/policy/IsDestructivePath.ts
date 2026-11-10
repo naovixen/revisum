@@ -26,13 +26,26 @@ const withBackslashesAsSlashes = (path: string): string => path.replace(/\\/gu, 
 
 const decodedOnce = (path: string): string => withBackslashesAsSlashes(withEscapesDecoded(path));
 
+const WHITE_SPACE_OR_SLASH = /[\s/]/u;
+
+// Scans from the end because a page chooses this text: a pattern anchored at the end would retry from
+// every place a long run of these characters starts, and take time in the square of its length.
+function withoutTrailingWhiteSpaceOrSlashes(path: string): string {
+    let end = path.length;
+    while (end > 0 && WHITE_SPACE_OR_SLASH.test(path.charAt(end - 1))) {
+        end--;
+    }
+    return path.slice(0, end);
+}
+
 // Some servers also drop white space at the end of a path, so it counts no more than a last slash.
 const comparableForm = (decoded: string): string =>
-    decoded
-        .toLowerCase()
-        .replace(/;[^/]*/gu, "")
-        .replace(/\/+/gu, "/")
-        .replace(/[\s/]+$/u, "");
+    withoutTrailingWhiteSpaceOrSlashes(
+        decoded
+            .toLowerCase()
+            .replace(/;[^/]*/gu, "")
+            .replace(/\/+/gu, "/"),
+    );
 
 // The path with its "." and ".." segments resolved, a path parameter on one included, as Tomcat reads
 // "..;x=1". Servers differ on whether "//" holds an empty segment that ".." climbs out of.

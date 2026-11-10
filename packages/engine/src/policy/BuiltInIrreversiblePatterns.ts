@@ -175,11 +175,14 @@ function wholeWord(pattern: string): RegExp {
     return new RegExp(`(?<![\\p{L}\\p{N}\\p{M}])${escaped}(?![\\p{L}\\p{N}\\p{M}])`, "iu");
 }
 
-// The Combining Diacritical Marks block alone: the vowel signs of other scripts are their letters.
-const COMBINING_DIACRITIC = /[\u0300-\u036F]/gu;
+// The Unicode blocks of combining marks that belong to no one script, and only those: the vowel signs
+// of other scripts are their letters.
+const COMBINING_DIACRITIC =
+    /[\u0300-\u036F]|[\u1AB0-\u1AFF]|[\u1DC0-\u1DFF]|[\u20D0-\u20FF]|[\uFE20-\uFE2F]/gu;
 
 // Only ever a reading to match against, so a recorded name keeps its accents. "Zählen" reads as
-// "zahlen"; that errs on the safe side.
+// "zahlen"; that errs on the safe side. Every reading is taken after this, so a removed mark is not
+// there for a word boundary to take as joining the word.
 const withoutDiacritics = (text: string): string =>
     text.normalize("NFKD").replace(COMBINING_DIACRITIC, "").normalize("NFC");
 

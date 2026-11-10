@@ -187,8 +187,8 @@ function openRun(setup: RunSetup, ids: RunContainerIds, startingLevel: Guarantee
         ]);
         decisions = readNow ?? decisions;
         rewrites = appliedNow ?? rewrites;
-        if (readNow === null || hasLostRecords) {
-            fallToHost("what the proxy decided could not be read back whole");
+        if (readNow === null || appliedNow === null || hasLostRecords) {
+            fallToHost("what the proxy decided or rewrote could not be read back whole");
         }
     };
     const handle: RunnerHandle = {

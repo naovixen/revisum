@@ -516,6 +516,14 @@ Status is one of: `suspected`, `fixed`, `deferred`, `not a bug`.
 | 493 | The workload route over 16 MiB has no real-Docker test; it shares its line reader with the plan route, which has one | `runner/src/workload/` | deferred | Phase 6 |
 | 494 | The JWT shape is quadratic on `eyJ-eyJ-...` | `engine/src/decoding/LooksLikeCredential.ts` | deferred | Phase 6. It reads plan text, not page text |
 | 495 | `writtenPattern` stays quadratic on white space inside a value when the word before it is only white-space writings, such as a secret `+ x...` over `++++` | `engine/src/secrets/EncodedEchoes.ts` | deferred | Phase 6. Needs a secret of that form, and no fix yet keeps the unlimited run |
+| 496 | Trimming a link path was quadratic on a long run of encoded spaces, introduced by the fix for 468. 160,000 took 55 s, synchronously, from a page's link | `engine/src/policy/IsDestructivePath.ts` | fixed | Review of the phase 5 fixes |
+| 497 | A url with an empty user name did not look like a credential: `redis://:password@host` | `engine/src/decoding/LooksLikeCredential.ts` | fixed | Review of the phase 5 fixes |
+| 498 | A Basic value with a non-ASCII password, or with no padding, did not look like a credential | `engine/src/decoding/LooksLikeCredential.ts` | fixed | Review of the phase 5 fixes |
+| 499 | Combining marks from blocks other than U+0300 to U+036F escaped the accent folding | `engine/src/policy/BuiltInIrreversiblePatterns.ts` | fixed | Review of the phase 5 fixes |
+| 500 | An anchored partial final star, such as `src/foo*`, did not cover folders | `engine/src/approval/ParseCodeOwners.ts` | fixed | Review of the phase 5 fixes |
+| 501 | A rewrites file that couldn't be read whole kept a stale list, and the run stayed isolated | `runner/src/containers/DockerRunner.ts` | fixed | Review of the phase 5 fixes |
+| 502 | More run-together token names were missed: `oauthtoken`, `bearertoken`, `usertoken`, `clienttoken` | `engine/src/decoding/LooksLikeCredential.ts` | fixed | Review of the phase 5 fixes |
+| 503 | Dropping a path segment's parameters with `/;.*$/` looks quadratic on many `;` before a decoded newline, and leaves such a segment unstripped | `engine/src/policy/IsDestructivePath.ts` | fix now | Found while fixing 496 |
 
 ## Risks
 

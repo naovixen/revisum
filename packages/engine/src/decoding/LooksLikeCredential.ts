@@ -18,7 +18,7 @@ const SENSITIVE_FIELD_WORDS: readonly RegExp[] = [
     // so a word boundary alone would miss them; "#tokenizer" and "#author" must still not match.
     /pass\s?(?:word|code|phrase|wd)/i,
     /\bpwd\d*\b/i,
-    /\b(?:auth|access|refresh|session|api|id|csrf|xsrf)?tokens?\d*\b/i,
+    /\b(?:auth|oauth|bearer|access|refresh|session|user|client|api|id|csrf|xsrf)?tokens?\d*\b/i,
     /\b(?:client|app|api|shared)?secrets?\d*\b/i,
     /\bapi[\s_-]?keys?\d*\b/i,
     /\bprivate[\s_-]?keys?\b/i,
@@ -54,20 +54,35 @@ const CREDENTIAL_SHAPES: readonly RegExp[] = [
     /\bglpat-[A-Za-z0-9_-]{20,}/,
     /\bAIza[A-Za-z0-9_-]{35}/,
     /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
-    // A url holding a user name and a password. A port is followed by "/", not "@", so it passes.
-    /:\/\/[^\s/?#:@]+:[^\s/?#@]+@/,
+    // A url holding a password, with or without a user name. A port is followed by "/", not "@", so
+    // it passes.
+    /:\/\/[^\s/?#:@]*:[^\s/?#@]+@/,
 ];
 
-const BASIC_HEADER_VALUE = /\bbasic\s+([A-Za-z0-9+/]{8,}={0,2})(?![A-Za-z0-9+/=])/gi;
-const PRINTABLE_ASCII_WITH_A_COLON = /^[\x20-\x7e]*:[\x20-\x7e]*$/;
+const BASIC_HEADER_VALUE = /\bbasic\s+([A-Za-z0-9+/]{8,})={0,2}(?![A-Za-z0-9+/=])/gi;
+const STRICT_UTF8 = new TextDecoder("utf-8", { fatal: true });
+const CONTROL_CHARACTER = /\p{Cc}/u;
+
+// Base64 leaves zero, two or three characters over a whole group of four, never one.
+const canBeBase64Length = (encoded: string): boolean => encoded.length % 4 !== 1;
+
+function utf8TextOf(encoded: string): string | null {
+    try {
+        return STRICT_UTF8.decode(Buffer.from(encoded, "base64"));
+    } catch {
+        return null;
+    }
+}
+
+const isUserAndPassword = (decoded: string | null): boolean =>
+    decoded !== null && decoded.includes(":") && !CONTROL_CHARACTER.test(decoded);
 
 // "Basic" is an ordinary word and may be followed by a long one, so the value has to decode to the
-// "user:password" text such a header holds. Prose read as base64 does not decode to printable text.
+// "user:password" text such a header holds, in any language and with or without its padding. Prose
+// read as base64 does not decode to text, and neither do random bytes that happen to hold a colon.
 const holdsBasicCredentials = (text: string): boolean =>
     [...text.matchAll(BASIC_HEADER_VALUE)].some(
-        ([, encoded = ""]) =>
-            encoded.length % 4 === 0 &&
-            PRINTABLE_ASCII_WITH_A_COLON.test(Buffer.from(encoded, "base64").toString("latin1")),
+        ([, encoded = ""]) => canBeBase64Length(encoded) && isUserAndPassword(utf8TextOf(encoded)),
     );
 
 export const looksLikeCredential = (text: string): boolean =>

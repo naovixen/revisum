@@ -6,15 +6,18 @@
 
 export type CodeOwnerRule = { readonly pattern: RegExp; readonly owners: readonly string[] };
 
+const LAST_SEGMENT_ONLY_A_STAR = /(?:^|\/)\*$/;
+
 // A folder pattern matches what is inside the folder, and a file pattern also matches a folder's
-// contents. An anchored final single star stops there: GitHub reads "docs/*" as direct children
-// only, though gitignore would also reach inside any folder the star matched. With no slash, as in
-// "foo*", the pattern can name a folder at any depth, so it covers what is inside that folder.
+// contents. An anchored last segment that is nothing but a star stops there: GitHub reads "docs/*" as
+// direct children only, though gitignore would also reach inside any folder the star matched. A last
+// segment only partly a star, as in "src/foo*" or "foo*", can name a folder, so it covers what is
+// inside that folder.
 function patternEnd(body: string, isFolder: boolean, isAnchored: boolean): string {
     if (isFolder) {
         return "/.*$";
     }
-    return isAnchored && /(?:^|[^*])\*$/.test(body) ? "$" : "(?:/.*)?$";
+    return isAnchored && LAST_SEGMENT_ONLY_A_STAR.test(body) ? "$" : "(?:/.*)?$";
 }
 
 // Converts one gitignore-style pattern into a regular expression over a repository path.
