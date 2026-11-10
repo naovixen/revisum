@@ -37,6 +37,8 @@ const DESTRUCTIVE_SPELLINGS: readonly string[] = [
     "/account/delete%20%09/",
     "/account/delete/%20/",
     "/account/delete%C2%A0",
+    // A line feed inside a path parameter does not stop the segment before it being "..".
+    "/account/settings/%2e%2e;x%0Ay/delete",
     // Five layers of encoding is more than the gate reads, and what it can't read might be anything.
     "/account/%2525252564elete",
     "/account/s%2525252565ttings",
@@ -52,6 +54,7 @@ const ORDINARY_PATHS: readonly string[] = [
     "/account/settings%20/",
     // White space counts only where it trails: here it is inside another route's name.
     "/account/delete%20me",
+    "/account/settings/%2e%2e;x%0Ay/profile",
     // Four layers is the most the gate can still read to the end.
     "/account/s%25252565ttings",
 ];

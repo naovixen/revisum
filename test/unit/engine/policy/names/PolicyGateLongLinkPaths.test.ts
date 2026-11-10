@@ -75,6 +75,14 @@ function assertGuardTimeGrowsInStepWithLength(pathOfLength: (length: number) => 
 }
 
 describe("Using the policy gate", () => {
+    describe("given a link whose path is a long run of semicolons that a URL-encoded line feed ends", () => {
+        describe("when the runtime guard reads a path four times as long", () => {
+            test("then it should take about four times as long", () => {
+                assertGuardTimeGrowsInStepWithLength((length) => `/${";".repeat(length)}%0A`);
+            });
+        });
+    });
+
     for (const { name, unit } of RUNS) {
         describe(`given a link whose path is a long run of ${name} that a letter ends`, () => {
             describe("when the runtime guard reads a path four times as long", () => {
