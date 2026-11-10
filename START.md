@@ -58,12 +58,7 @@ Architecture refactor:
   - [x] Cold reviews of SPEC-02, 03, 04 and 07, and a review of their fixes: rows 446 to 503 in `docs/decisions/refactor-defects.md`, every fix-now item fixed test-first. `npm run check` was green just before the last fixes (7,165 passed, 1 skipped)
   - [x] Phase-end checks, at `53d051a` (2026-11-10): `npm run check:linux` green (7,228 unit and contract tests, 1,402 browser tests with 60 skipped, proofs in two runs, 627 and 204 of 208 with 4 skipped for the full tier, replay, gates) and `npm run check:containers` green (174 of 176, 2 skipped). The first Linux run, at `31f560b`, found three hostile-plan proofs still expecting `invalid_url` for a url holding a user name and password, which the fix for row 484 refuses as `literal_secret`; the tests were updated (`53d051a`) and proofs, replay and gates rerun in the same container, with no code changed
   - [ ] Founder to validate `docs/decisions/refactor-assumptions.md`, especially 31 and 38 to 43; assumption 39 needs research behind the question
-  - [ ] Make the two licences unmistakable (GitHub's two tabs read like a choice between them):
-    - Say in the README, or a `LICENSING.md` it links to, that each package has exactly one licence and this is not a dual licence
-    - State the licence for everything outside `packages/` (`tools/`, `test/`, `docs/`), which has none today: FSL-1.1-ALv2 (founder, 2026-11-10), except the schemas `licences.json` lists as Apache-2.0
-    - Fix the README's Apache list: it names "the drivers" and `action`, but only `driver-cdp` exists (`action` returns with SPEC-16)
-    - Check that each package README states its licence
-    - Add to `npm run lint`, or carry to SPEC-17: each package ships its own licence file before the first npm publish, because the root files aren't included in a package's tarball
+  - [x] Make the two licences unmistakable: the README says each package has exactly one licence and it is not a dual licence, gives `tools/`, `test/` and `docs/` FSL-1.1-ALv2 except the Apache-2.0 schemas, and lists only packages that exist; every package README already stated its licence. Each package shipping its own licence file is carried to SPEC-17 (assumption 44)
 - [ ] Phase 6: test titles and remaining suppressions (may run alongside M3)
 
 Where phase 3 stands, from `docs/decisions/refactor-defects.md`:
@@ -143,7 +138,7 @@ M3, evidence (the rest):
 M4, launch (beta; the rest):
 
 - [ ] SPEC-16's remaining commands and criteria, writing SPEC-08's opt-in recording file from `run`, and AC-SPEC-16-13. Tick SPEC-16 only when every criterion passes
-- [ ] SPEC-17 release artefacts and claims (marketing render target and claim lint), with SPEC-36's `doctor` checks and claim wording
+- [ ] SPEC-17 release artefacts and claims (marketing render target and claim lint), with SPEC-36's `doctor` checks and claim wording, and a licence file in each package before the first npm publish, since the root licence files are not in a package's tarball
 - [ ] M4 exit
 
 The queue ends at beta. Phase 2 specs (SPEC-18 onwards) wait for pilots.
