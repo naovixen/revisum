@@ -185,9 +185,46 @@ const CREDENTIALS_WITHOUT_A_TOKEN_SHAPE: readonly {
         name: "a url holding a user name and password",
         literal: "https://admin:hunter22hunter@example.com/",
     },
+    {
+        name: "a url holding a password after an empty user name",
+        literal: "redis://:hunter2secret@cache:6379",
+    },
+    {
+        name: "a Basic header whose password is not ASCII",
+        literal: "Basic dXNlcjpww6Rzc3dvcmQ=",
+    },
+    {
+        name: "a Basic header written without its padding",
+        literal: "Basic dXNlcjpwYXNzd29yZDE",
+    },
+];
+
+const TEXT_THAT_ONLY_LOOKS_LIKE_A_CREDENTIAL: readonly {
+    readonly name: string;
+    readonly literal: string;
+}[] = [
+    { name: "a url with a port and no password", literal: "redis://cache:6379/0" },
+    { name: "Basic before random base64 with no colon", literal: "Basic n5KWwyioqKioqKio" },
+    { name: "Basic before random base64 with a stray colon", literal: "Basic n5I6lsMoqKg=" },
+    {
+        name: "Basic before unpadded base64 of control characters",
+        literal: "Basic AAECAwQFBgcICQoLDA0ODw",
+    },
+    { name: "Basic before a word that reads as base64", literal: "Basic subscription" },
+    { name: "Basic before a word of unpadded length", literal: "Basic understanding of forms" },
 ];
 
 describe("Using the plan parser", () => {
+    for (const { name, literal } of TEXT_THAT_ONLY_LOOKS_LIKE_A_CREDENTIAL) {
+        describe(`given a plan filling ${name} into an ordinary field`, () => {
+            describe("when the plan is parsed", () => {
+                test("then it should accept the plan", () => {
+                    assertAccepted(planWith(fill("Full name", literal)));
+                });
+            });
+        });
+    }
+
     for (const { name, literal } of CREDENTIALS_WITHOUT_A_TOKEN_SHAPE) {
         describe(`given a plan filling ${name} into an ordinary field`, () => {
             describe("when the plan is parsed", () => {

@@ -124,6 +124,10 @@ const CONDENSED_SENSITIVE_SELECTORS: readonly string[] = [
     "#accesstoken",
     "input[name=token2]",
     "#motdepasse",
+    "#oauthtoken",
+    "#bearertoken",
+    "#usertoken",
+    "#clienttoken",
 ];
 
 const ORDINARY_SELECTORS_STARTING_LIKE_SENSITIVE_WORDS: readonly string[] = [

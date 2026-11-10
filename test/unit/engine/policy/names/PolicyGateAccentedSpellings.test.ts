@@ -20,6 +20,7 @@ import {
     stepAt,
     testGate,
     testId,
+    withPatterns,
     type TestGate,
 } from "../examples/Policy.ts";
 
@@ -38,7 +39,20 @@ const IRREVERSIBLE_NAMES: readonly LocalisedName[] = [
     { language: "French", targetId: FRENCH, name: `SUPPR${CAPITAL_I_WITH_DOT}MER` },
     { language: "English", targetId: ENGLISH, name: "Délete account" },
     { language: "English", targetId: ENGLISH, name: `De${COMBINING_ACUTE_ACCENT}lete account` },
+    // Combining marks live in several Unicode blocks, and a browser draws each the same way.
+    { language: "English", targetId: ENGLISH, name: "de᷄lete account" },
+    { language: "English", targetId: ENGLISH, name: "d⃐elete" },
+    { language: "English", targetId: ENGLISH, name: "de︠lete" },
 ];
+
+// In these scripts a vowel sign is a letter of the word, so dropping one reads a different word.
+const WORD_WITH_NO_VOWEL_SIGN = "कल";
+const SAME_WORD_WITH_A_VOWEL_SIGN = "कुल";
+const OTHER_WORD_WITH_A_VOWEL_SIGN = "ลิบ";
+const OTHER_WORD_WITH_NO_VOWEL_SIGN = "ลบ";
+const VOWEL_SIGN_PROJECT = withPatterns({
+    "en-GB": [WORD_WITH_NO_VOWEL_SIGN, OTHER_WORD_WITH_A_VOWEL_SIGN],
+});
 
 const ORDINARY_NAMES: readonly LocalisedName[] = [
     { language: "French", targetId: FRENCH, name: "Supprimés" },
@@ -47,9 +61,22 @@ const ORDINARY_NAMES: readonly LocalisedName[] = [
 ];
 
 let tested: TestGate;
+let testedOnVowelSigns: TestGate;
 before(async () => {
     tested = await testGate();
+    testedOnVowelSigns = await testGate(VOWEL_SIGN_PROJECT);
 });
+
+const decisionOnClickingUnderVowelSignPatterns = (name: string) =>
+    comparable(
+        decideOn(
+            testedOnVowelSigns,
+            parsedPlan(
+                planOf([OPEN_ACCOUNT_PAGE, click(role("button", name))]),
+                VOWEL_SIGN_PROJECT,
+            ),
+        ),
+    );
 
 const decisionOnPlanClicking = ({ targetId, name }: LocalisedName) =>
     comparable(
@@ -91,6 +118,36 @@ describe("Using the policy gate", () => {
                         kind: "deny",
                         rule: "irreversible-action",
                         stepIndex: 1,
+                    });
+                });
+            });
+        });
+    }
+
+    for (const name of [WORD_WITH_NO_VOWEL_SIGN, OTHER_WORD_WITH_A_VOWEL_SIGN]) {
+        describe(`given a project whose patterns name ${name}`, () => {
+            describe("and a plan that clicks that word", () => {
+                describe("when the plan is decided", () => {
+                    test("then it should deny it as irreversible", () => {
+                        assert.deepEqual(
+                            decisionOnClickingUnderVowelSignPatterns(name),
+                            denied("irreversible-action", 1),
+                        );
+                    });
+                });
+            });
+        });
+    }
+
+    for (const { name, pattern } of [
+        { name: SAME_WORD_WITH_A_VOWEL_SIGN, pattern: WORD_WITH_NO_VOWEL_SIGN },
+        { name: OTHER_WORD_WITH_NO_VOWEL_SIGN, pattern: OTHER_WORD_WITH_A_VOWEL_SIGN },
+    ]) {
+        describe(`given a project whose patterns name ${pattern}`, () => {
+            describe(`and a plan that clicks ${name}, which differs by one vowel sign`, () => {
+                describe("when the plan is decided", () => {
+                    test("then it should allow it", () => {
+                        assert.deepEqual(decisionOnClickingUnderVowelSignPatterns(name), ALLOWED);
                     });
                 });
             });

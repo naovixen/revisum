@@ -34,6 +34,9 @@ const DESTRUCTIVE_SPELLINGS: readonly string[] = [
     // Some servers read a backslash as a slash, and some drop trailing white space.
     "/account%5Cdelete",
     "/account/delete%20",
+    "/account/delete%20%09/",
+    "/account/delete/%20/",
+    "/account/delete%C2%A0",
     // Five layers of encoding is more than the gate reads, and what it can't read might be anything.
     "/account/%2525252564elete",
     "/account/s%2525252565ttings",
@@ -46,6 +49,9 @@ const ORDINARY_PATHS: readonly string[] = [
     "/account/delete-history",
     "/account%5Cdeleted",
     "/account/settings%20",
+    "/account/settings%20/",
+    // White space counts only where it trails: here it is inside another route's name.
+    "/account/delete%20me",
     // Four layers is the most the gate can still read to the end.
     "/account/s%25252565ttings",
 ];

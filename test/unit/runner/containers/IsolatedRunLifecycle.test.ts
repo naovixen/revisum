@@ -182,36 +182,85 @@ describe("Using an isolated run", () => {
     describe("given a run whose proxy files are read back at its end", () => {
         const decision = { origin: "http://outside.test", decision: "blocked" };
         const rewrite = { origin: "http://app.test", name: "heading-changed" };
-        const proxyFiles: FakeEngineSettings = {
-            ...ENFORCING,
-            exec: (containerId, command) => {
-                const path = command[1] ?? "";
-                if (command[0] !== "cat") {
-                    return Promise.resolve(success({ exitCode: 0, stdout: "", stderr: "" }));
-                }
-                if (path.includes("rewrite")) {
-                    return Promise.resolve(
-                        success({
-                            exitCode: 0,
-                            stdout: `${JSON.stringify(rewrite)}\n`,
-                            stderr: "",
-                        }),
-                    );
-                }
-                if (path.includes("decision")) {
-                    return Promise.resolve(
-                        success({
-                            exitCode: 0,
-                            stdout: `${JSON.stringify(decision)}\n`,
-                            stderr: "",
-                        }),
-                    );
-                }
+        const answerProxyFileReads: NonNullable<FakeEngineSettings["exec"]> = (
+            containerId,
+            command,
+        ) => {
+            const path = command[1] ?? "";
+            if (command[0] !== "cat") {
+                return Promise.resolve(success({ exitCode: 0, stdout: "", stderr: "" }));
+            }
+            if (path.includes("rewrite")) {
                 return Promise.resolve(
-                    success({ exitCode: 1, stdout: "", stderr: "cat: no such file\n" }),
+                    success({
+                        exitCode: 0,
+                        stdout: `${JSON.stringify(rewrite)}\n`,
+                        stderr: "",
+                    }),
                 );
-            },
+            }
+            if (path.includes("decision")) {
+                return Promise.resolve(
+                    success({
+                        exitCode: 0,
+                        stdout: `${JSON.stringify(decision)}\n`,
+                        stderr: "",
+                    }),
+                );
+            }
+            return Promise.resolve(
+                success({ exitCode: 1, stdout: "", stderr: "cat: no such file\n" }),
+            );
         };
+        const proxyFiles: FakeEngineSettings = { ...ENFORCING, exec: answerProxyFileReads };
+
+        for (const { file, pathPart } of [
+            { file: "rewrites", pathPart: "rewrite" },
+            { file: "decisions", pathPart: "decision" },
+        ]) {
+            describe(`and reading the ${file} file gives only its first part`, () => {
+                const cutShort: FakeEngineSettings = {
+                    ...ENFORCING,
+                    exec: (containerId, command, environmentNames) =>
+                        command[0] === "cat" && (command[1] ?? "").includes(pathPart)
+                            ? Promise.resolve(
+                                  success({
+                                      exitCode: 0,
+                                      stdout: "",
+                                      stderr: "",
+                                      isOutputCutShort: true as const,
+                                  }),
+                              )
+                            : answerProxyFileReads(containerId, command, environmentNames),
+                };
+
+                describe("when a command runs in the run", () => {
+                    test("then it should take the run to the host level as soon as it is read", async () => {
+                        const { runner } = runnerOn(cutShort);
+                        const outcome = await runner.withRun(IMAGE, POLICY, async (run) => {
+                            await run.exec(["true"]);
+                            return run.guaranteeLevel();
+                        });
+                        assertValue(outcome, "host");
+                    });
+                });
+
+                describe("when the run ends", () => {
+                    test("then it should give back the host level and log egress-unenforceable", async () => {
+                        const { runner, logged } = runnerOn(cutShort);
+                        const outcome = await runner.withRun(IMAGE, POLICY, () =>
+                            Promise.resolve(RESULT),
+                        );
+                        assert.ok(outcome.ok, JSON.stringify(outcome));
+                        assert.equal(outcome.value.final.guaranteeLevel, "host");
+                        assert.ok(
+                            logged.some((entry) => entry.code === "egress-unenforceable"),
+                            JSON.stringify(logged),
+                        );
+                    });
+                });
+            });
+        }
 
         describe("when the run ends", () => {
             test("then it should give back the level, decisions and rewrites read after the end", async () => {
